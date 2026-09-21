@@ -422,6 +422,11 @@ export const ENTITLEMENTS = {
 
 CI (GitHub Actions): typecheck, lint, unit/integration tests, size-limit.
 
+**Database test targets:** the dev machine has no working Docker, so DB tests run locally on in-process
+PGlite with a bootstrap that emulates Supabase roles, `auth`/`storage` schemas and `auth.uid()`. CI runs
+the same tests against a real local Supabase (`supabase start`) as the fidelity check. Later phases that
+need Auth/Storage/Realtime at runtime use a free Supabase Cloud dev project.
+
 ## 11. Build order
 
 Each phase gets its own implementation plan:
