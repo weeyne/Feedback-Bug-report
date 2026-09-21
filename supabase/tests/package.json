@@ -10,7 +10,7 @@
   "devDependencies": {
     "@dymcode/shared": "workspace:*",
     "@electric-sql/pglite": "^0.5.8",
-    "@types/node": "^26.6.2",
+    "@types/node": "^24",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.0",
     "typescript": "^7.0.2",

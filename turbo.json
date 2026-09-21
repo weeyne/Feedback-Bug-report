@@ -3,6 +3,10 @@
   "tasks": {
     "typecheck": { "dependsOn": ["^typecheck"] },
     "test": { "dependsOn": ["^typecheck"] },
-    "@dymcode/db-tests#test": { "dependsOn": ["^typecheck"], "cache": false }
+    "@dymcode/db-tests#test": {
+      "dependsOn": ["^typecheck"],
+      "cache": false,
+      "passThroughEnv": ["DB_TEST_TARGET", "DATABASE_URL"]
+    }
   }
 }
