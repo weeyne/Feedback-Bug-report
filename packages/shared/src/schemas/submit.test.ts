@@ -24,7 +24,7 @@ const valid = {
   type: 'bug',
   message: 'Button does nothing',
   metadata,
-  openedAt: 1758466800000,
+  elapsedMs: 5000,
   website: '',
 };
 
@@ -85,5 +85,13 @@ describe('SubmitPayloadSchema', () => {
 
   it('rejects a non-http page url', () => {
     expect(parse({ metadata: { ...metadata, url: 'javascript:alert(1)' } }).success).toBe(false);
+  });
+
+  it('rejects a negative elapsedMs', () => {
+    expect(parse({ elapsedMs: -1 }).success).toBe(false);
+  });
+
+  it('rejects a non-integer elapsedMs', () => {
+    expect(parse({ elapsedMs: 1.5 }).success).toBe(false);
   });
 });

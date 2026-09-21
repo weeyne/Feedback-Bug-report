@@ -423,7 +423,7 @@ const valid = {
   type: 'bug',
   message: 'Button does nothing',
   metadata,
-  openedAt: 1758466800000,
+  elapsedMs: 5000,
   website: '',
 };
 
@@ -548,8 +548,11 @@ export const SubmitPayloadSchema = z.object({
     .union([z.email().max(EMAIL_MAX_LENGTH), z.literal('').transform(() => undefined)])
     .optional(),
   metadata: ClientMetadataSchema,
-  /** Epoch ms when the modal was opened; submissions faster than 2s are treated as bots. */
-  openedAt: z.number().int().positive(),
+  /**
+   * Milliseconds between opening the modal and submitting, measured on the client;
+   * under 2000 is treated as a bot.
+   */
+  elapsedMs: z.number().int().nonnegative().max(86_400_000),
   /** Honeypot: real users never fill it. */
   website: z.string().max(200).default(''),
 });

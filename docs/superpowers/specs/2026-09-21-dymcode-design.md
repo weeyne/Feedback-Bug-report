@@ -255,7 +255,7 @@ are not enough.
    - hidden honeypot input `website`;
    - "Powered by Dymcode" badge unless `config.showBadge === false`.
 5. On submit, it sends `multipart/form-data` with fields `payload` (JSON) and `screenshot` (Blob,
-   optional). `payload = { projectKey, type, message, email?, metadata, openedAt, website }`.
+   optional). `payload = { projectKey, type, message, email?, metadata, elapsedMs, website }`.
    On success it shows "Thanks!" and closes after 2s. On network or 5xx errors it keeps the input and
    shows "Retry". On 429 it shows "Too many submissions, try later".
 6. Everything runs inside try/catch. The widget never throws into the host page.
@@ -284,7 +284,7 @@ Cache headers: `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`.
 | 2 | `hit_rate_limit('submit:{projectKey}:{sha256(ip + salt)}', 5, 60)` | 429 |
 | 3 | Load project by `public_key` and `is_pro(owner_id)` | 404 |
 | 4 | If `allowed_origins` is non-empty, `Origin` must match one exactly | 403 |
-| 5 | Honeypot non-empty, or `now - openedAt < 2s` | 200 `{ id: null }` (silent drop) |
+| 5 | Honeypot non-empty, or `elapsedMs < 2000` | 200 `{ id: null }` (silent drop) |
 | 6 | `count = consume_quota(owner)`; `over_quota = !pro && count > 20` | — |
 | 7 | Generate id; upload screenshot to Storage; insert `feedback` | Upload failure → insert without screenshot, log error. Insert failure → 500 |
 | 8 | Respond `201 { id }` | — |
