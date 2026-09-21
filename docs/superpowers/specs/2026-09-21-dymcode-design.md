@@ -1,17 +1,17 @@
-# Dimko — Feedback & Bug-Report Widget: Design
+# Dymcode — Feedback & Bug-Report Widget: Design
 
 **Date:** 2026-09-21
 **Status:** Approved in brainstorming, pending spec review
 
 ## 1. Product summary
 
-Dimko is a micro-SaaS for indie makers and small SaaS teams: an embeddable feedback/bug-report widget
+Dymcode is a micro-SaaS for indie makers and small SaaS teams: an embeddable feedback/bug-report widget
 (core script ≤ 20KB gzip) that captures a message, a client-side screenshot and technical context,
 and delivers it in real time to the owner's Telegram or Discord.
 
 Positioning: a lightweight, cheap alternative to Canny, Marker.io and Usersnap.
 
-**Naming:** product `Dimko`, domain placeholder `dimko.dev`, shared Telegram bot `@DimkoFeedbackBot`.
+**Naming:** product `Dymcode`, domain placeholder `dymcode.dev`, shared Telegram bot `@DymcodeBot`.
 All three live in one config module (`packages/shared/src/brand.ts`) so they can be changed in one place.
 
 ### Tiers
@@ -21,7 +21,7 @@ All three live in one config module (`packages/shared/src/brand.ts`) so they can
 | Submissions | 20/month per account | Unlimited |
 | Projects | 1 | Unlimited |
 | Telegram (shared bot) / Discord alerts | Yes | Yes |
-| "Powered by Dimko" badge | Mandatory | Can be hidden |
+| "Powered by Dymcode" badge | Mandatory | Can be hidden |
 | Custom CSS | No | Yes |
 | Own Telegram bot ("white label") | No | Yes |
 
@@ -35,7 +35,7 @@ and are shown blurred in the dashboard with an upgrade CTA.
 - **Repository:** pnpm workspaces + Turborepo monorepo.
 
 ```
-dimko/
+dymcode/
 ├── apps/web/                          # Next.js (App Router) → Vercel
 │   ├── app/
 │   │   ├── (marketing)/               # landing, pricing
@@ -218,7 +218,7 @@ create table rate_limits (
 
 ## 4. Widget (`packages/widget`)
 
-**Embed:** `<script async src="https://dimko.dev/w/widget.js" data-project-id="pk_…"></script>`
+**Embed:** `<script async src="https://dymcode.dev/w/widget.js" data-project-id="pk_…"></script>`
 
 **Budget:** the core `widget.js` is ≤ 20KB gzip, enforced by `size-limit` in CI. The screenshot chunk
 (`modern-screenshot`) is loaded only when the modal opens.
@@ -243,7 +243,7 @@ create table rate_limits (
    - optional email;
    - screenshot toggle;
    - hidden honeypot input `website`;
-   - "Powered by Dimko" badge unless `config.showBadge === false`.
+   - "Powered by Dymcode" badge unless `config.showBadge === false`.
 5. On submit, it sends `multipart/form-data` with fields `payload` (JSON) and `screenshot` (Blob,
    optional). `payload = { projectKey, type, message, email?, metadata, openedAt, website }`.
    On success it shows "Thanks!" and closes after 2s. On network or 5xx errors it keeps the input and
@@ -263,7 +263,7 @@ All responses from `/api/v1/widget/*` include `Access-Control-Allow-Origin: <req
 ### `GET /api/v1/widget/config?key=pk_…`
 Returns `{ primaryColor, triggerText, position, showBadge, customCss | null, badgeUrl }`. `showBadge`
 is `!(hide_badge && is_pro)` and `customCss` is only returned if the owner is Pro.
-`badgeUrl = https://dimko.dev/?ref={public_key}&utm_source=widget`.
+`badgeUrl = https://dymcode.dev/?ref={public_key}&utm_source=widget`.
 Cache headers: `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. Unknown key → 404.
 
 ### `POST /api/v1/widget/submit`
@@ -334,10 +334,10 @@ entitlements server-side.
 - **Integrations:** three cards (Telegram shared, Telegram custom bot, Discord). Each shows its
   status, `last_error` and a "Send test" button.
   - *Telegram shared:*
-    1. "Connect" creates a link code and offers `t.me/DimkoFeedbackBot?start=<code>` (private chat)
+    1. "Connect" creates a link code and offers `t.me/DymcodeBot?start=<code>` (private chat)
        and `?startgroup=<code>` (group).
     2. `/api/telegram/webhook` verifies `X-Telegram-Bot-Api-Secret-Token`, handles `/start <code>` and
-       `/start@DimkoFeedbackBot <code>`, upserts the `telegram_shared` integration with `target = chat.id`,
+       `/start@DymcodeBot <code>`, upserts the `telegram_shared` integration with `target = chat.id`,
        deletes the code and replies "✅ Connected to <project>".
     3. The dashboard polls until connected.
   - *Telegram custom (Pro):* bot token and chat ID. The server validates them with `getMe` plus a
