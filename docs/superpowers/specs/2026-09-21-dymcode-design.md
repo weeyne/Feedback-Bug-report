@@ -228,6 +228,8 @@ are not enough.
 
 ## 4. Widget (`packages/widget`)
 
+> Refined by `docs/superpowers/specs/2026-09-21-widget-design.md` (layout, i18n, host JS API, build, testing, config `locale`, metadata `user`). That document wins for the widget.
+
 **Embed:** `<script async src="https://dymcode.dev/w/widget.js" data-project-id="pk_…"></script>`
 
 **Budget:** the core `widget.js` is ≤ 20KB gzip, enforced by `size-limit` in CI. The screenshot chunk
