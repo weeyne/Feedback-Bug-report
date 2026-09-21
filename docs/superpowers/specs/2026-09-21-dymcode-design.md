@@ -201,12 +201,22 @@ create table rate_limits (
 
 ### RLS and access
 
-- `profiles`: select/update own row.
-- `projects`: all operations only where `owner_id = auth.uid()`.
-- `feedback`: select/update/delete where the project belongs to `auth.uid()`. Over-quota rows are
-  readable by the owner via RLS, but the dashboard reads feedback through a server-side query that
-  replaces `message`, `email`, `screenshot_path` and `metadata` with nulls when `over_quota and not is_pro(owner)`.
-  The page is a Server Component, so the client never receives hidden content.
+The browser holds the Supabase anon key, so RLS must enforce every paywall rule. UI checks alone
+are not enough.
+
+- `profiles`: select own row only.
+- `projects`: select/delete own rows. Update is limited by a column-level grant to the settings
+  columns (`name`, `allowed_origins`, `primary_color`, `trigger_text`, `position`, `hide_badge`,
+  `custom_css`). There is **no insert policy**: projects are created by a server action with the
+  service-role client after checking `maxProjects`.
+- `feedback`: select where the project belongs to `auth.uid()` **and** (`not over_quota` or
+  `current_user_is_pro()`). Over-quota rows are therefore invisible to Free accounts at the database
+  level, including Realtime. The dashboard gets the number of hidden rows from a service-role count
+  query and renders that many blurred placeholders. Update is limited to the `status` column
+  (column-level grant). Delete own rows. No insert policy (the submit route uses service role).
+- `current_user_is_pro()` (security definer, `is_pro(auth.uid())`) is the only billing function
+  executable by `authenticated`. `is_pro`, `consume_quota`, `claim_quota_notice` and `hit_rate_limit`
+  are revoked from `public`, `anon` and `authenticated` and granted to `service_role` only.
 - `integrations`, `subscriptions`, `usage_counters`, `rate_limits`, `telegram_link_codes`: RLS enabled
   with **no policies**. Only the service-role client (server actions and route handlers) accesses them.
   Server actions return integration DTOs without secrets.
