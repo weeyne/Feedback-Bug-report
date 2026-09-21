@@ -3,6 +3,6 @@
   "tasks": {
     "typecheck": { "dependsOn": ["^typecheck"] },
     "test": { "dependsOn": ["^typecheck"] },
-    "test:db": { "cache": false }
+    "@dymcode/db-tests#test": { "dependsOn": ["^typecheck"], "cache": false }
   }
 }
