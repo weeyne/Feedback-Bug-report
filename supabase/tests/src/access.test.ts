@@ -228,3 +228,27 @@ describe('storage and realtime', () => {
       expect(rows).toEqual([{ tablename: 'feedback' }]);
     }));
 });
+
+describe('default privileges for future objects', () => {
+  it('does not grant anon/authenticated execute on functions created later', () =>
+    withTx(async (db) => {
+      await db.query(
+        `create function public.tmp_guard_fn() returns int language sql as 'select 1'`,
+      );
+      const rows = await db.query<{ anon_ok: boolean; authenticated_ok: boolean }>(
+        `select has_function_privilege('anon', 'public.tmp_guard_fn()', 'execute') as anon_ok,
+                has_function_privilege('authenticated', 'public.tmp_guard_fn()', 'execute') as authenticated_ok`,
+      );
+      expect(rows).toEqual([{ anon_ok: false, authenticated_ok: false }]);
+    }));
+
+  it('does not grant anon/authenticated select on tables created later', () =>
+    withTx(async (db) => {
+      await db.query(`create table public.tmp_guard_table (id int)`);
+      const rows = await db.query<{ anon_ok: boolean; authenticated_ok: boolean }>(
+        `select has_table_privilege('anon', 'public.tmp_guard_table', 'select') as anon_ok,
+                has_table_privilege('authenticated', 'public.tmp_guard_table', 'select') as authenticated_ok`,
+      );
+      expect(rows).toEqual([{ anon_ok: false, authenticated_ok: false }]);
+    }));
+});

@@ -4,7 +4,11 @@
 --    and make tables/functions created by later migrations private by default too.
 revoke all on all tables in schema public from anon, authenticated;
 alter default privileges in schema public revoke all on tables from anon, authenticated;
-alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
+alter default privileges in schema public revoke execute on functions from anon, authenticated;
+-- Schema-scoped default privileges only ever ADD to the global default, which grants EXECUTE
+-- on new functions to PUBLIC; only a global (no "in schema") revoke removes that.
+alter default privileges revoke execute on functions from public;
 
 grant select on public.profiles to authenticated;
 
