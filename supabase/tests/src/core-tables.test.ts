@@ -51,6 +51,17 @@ describe('projects', () => {
       expect(error).toMatch(/projects_custom_css_check/);
     }));
 
+  it('rejects more than 20 allowed_origins', () =>
+    withTx(async (db) => {
+      const owner = await createUser(db);
+      const origins = Array.from({ length: 21 }, (_, i) => `https://example${i}.com`);
+      const error = await db.queryError(
+        `insert into public.projects (owner_id, name, allowed_origins) values ($1, 'x', $2)`,
+        [owner, origins],
+      );
+      expect(error).toMatch(/projects_allowed_origins_check/);
+    }));
+
   it('cascades deletes to feedback and integrations', () =>
     withTx(async (db) => {
       const owner = await createUser(db);

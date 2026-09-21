@@ -145,21 +145,58 @@ describe('feedback access', () => {
       );
       expect(error).toMatch(/permission denied/);
     }));
+
+  it('cannot delete over-quota feedback via an unfiltered delete', () =>
+    withTx(async (db) => {
+      const { a, visible, hidden } = await seed(db);
+      await db.asUser(a);
+      const deleted = await db.query<{ id: string }>('delete from public.feedback returning id');
+      expect(deleted.map((r) => r.id)).toEqual([visible]);
+
+      await db.asPostgres();
+      const stillThere = await db.query('select id from public.feedback where id = $1', [hidden]);
+      expect(stillThere).toEqual([{ id: hidden }]);
+    }));
+
+  it('forbids changing project_id, including to a foreign project', () =>
+    withTx(async (db) => {
+      const { a, visible, projectB } = await seed(db);
+      await db.asUser(a);
+      expect(
+        await db.queryError('update public.feedback set project_id = $1 where id = $2', [
+          projectB.id,
+          visible,
+        ]),
+      ).toMatch(/permission denied/);
+    }));
+
+  it('anon cannot select feedback', () =>
+    withTx(async (db) => {
+      await seed(db);
+      await db.asAnon();
+      expect(await db.queryError('select * from public.feedback')).toMatch(/permission denied/);
+    }));
 });
 
 describe('backend-only tables', () => {
-  it.each([
+  const tables = [
     'subscriptions',
     'integrations',
     'telegram_link_codes',
     'usage_counters',
     'rate_limits',
-  ])('%s is not readable by authenticated users', (table) =>
-    withTx(async (db) => {
-      const { a } = await seed(db);
-      await db.asUser(a);
-      expect(await db.queryError(`select * from public.${table}`)).toMatch(/permission denied/);
-    }),
+  ] as const;
+  const roles = ['anon', 'authenticated'] as const;
+
+  it.each(roles.flatMap((role) => tables.map((table) => [role, table] as const)))(
+    '%s cannot read %s',
+    (role, table) =>
+      withTx(async (db) => {
+        const { a } = await seed(db);
+        if (role === 'anon') await db.asAnon();
+        else await db.asUser(a);
+        expect(await db.queryError(`select * from public.${table}`)).toMatch(/permission denied/);
+      }),
   );
 
   it('service role can read everything', () =>
@@ -171,6 +208,23 @@ describe('backend-only tables', () => {
       );
       expect(row?.n).toBeGreaterThanOrEqual(1);
     }));
+
+  it('service role can insert into projects and feedback', () =>
+    withTx(async (db) => {
+      const { a, projectA } = await seed(db);
+      await db.asServiceRole();
+      const [project] = await db.query<{ id: string }>(
+        `insert into public.projects (owner_id, name) values ($1, 'svc') returning id`,
+        [a],
+      );
+      expect(project?.id).toBeTruthy();
+      const [feedback] = await db.query<{ id: string }>(
+        `insert into public.feedback (project_id, type, message) values ($1, 'bug', 'svc')
+         returning id`,
+        [projectA.id],
+      );
+      expect(feedback?.id).toBeTruthy();
+    }));
 });
 
 describe('profiles access', () => {
@@ -179,6 +233,13 @@ describe('profiles access', () => {
       const { a } = await seed(db);
       await db.asUser(a);
       expect(await db.query('select id from public.profiles')).toEqual([{ id: a }]);
+    }));
+
+  it('anon cannot select profiles', () =>
+    withTx(async (db) => {
+      await seed(db);
+      await db.asAnon();
+      expect(await db.queryError('select * from public.profiles')).toMatch(/permission denied/);
     }));
 });
 
@@ -199,6 +260,30 @@ describe('function privileges', () => {
     withTx(async (db) => {
       await db.asAnon();
       expect(await db.queryError(`select public.hit_rate_limit('k', 1, 60)`)).toMatch(
+        /permission denied/,
+      );
+    }));
+
+  it('hit_rate_limit is not callable by authenticated users', () =>
+    withTx(async (db) => {
+      const { a } = await seed(db);
+      await db.asUser(a);
+      expect(await db.queryError(`select public.hit_rate_limit('k', 1, 60)`)).toMatch(
+        /permission denied/,
+      );
+    }));
+
+  it('random_base62 is not callable by authenticated users', () =>
+    withTx(async (db) => {
+      const { a } = await seed(db);
+      await db.asUser(a);
+      expect(await db.queryError(`select public.random_base62(8)`)).toMatch(/permission denied/);
+    }));
+
+  it('current_user_is_pro is not callable by anon', () =>
+    withTx(async (db) => {
+      await db.asAnon();
+      expect(await db.queryError(`select public.current_user_is_pro()`)).toMatch(
         /permission denied/,
       );
     }));
