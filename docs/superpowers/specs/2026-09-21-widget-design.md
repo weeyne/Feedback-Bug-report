@@ -32,7 +32,9 @@ copying build output into `apps/web` (phase 3), and the dashboard preview UI (ph
 ```
 packages/widget/
 ├── src/
-│   ├── index.ts              # bootstrap
+│   ├── entry.ts              # IIFE entry: boot(window, currentScript)
+│   ├── index.ts              # boot()
+│   ├── screenshot-loader.ts  # memoized lazy import() of screenshot.js
 │   ├── api.ts                # fetchConfig(), submitFeedback()
 │   ├── i18n.ts               # dictionaries + resolveLocale()
 │   ├── public-api.ts         # window.Dymcode + dymcode:ready
@@ -102,8 +104,8 @@ Phase 1 is on `main`, so the DB change is a **new migration**. The shared schema
    - On success: mount (§6.2) and dispatch `dymcode:ready`.
 
 ### Mount (`ui/mount.ts`)
-- `mountWidget(host: HTMLElement, config: WidgetConfig, options: { preview?: boolean; hideTrigger?: boolean; apiOrigin?: string })`
-  returns `{ open(type?), destroy() }`.
+- `mountWidget(container: HTMLElement, config: WidgetConfig, options: { preview?: boolean; hideTrigger?: boolean; deps?: PanelDeps; languages?: readonly string[] })`
+  returns `{ host, open(type?), close(), identify(user), destroy() }`. `deps` injects side effects (submit, screenshot loader, metadata, clock) so the UI is testable; bootstrap wires the real ones.
 - In normal mode the host is a `div` appended to `document.body` with inline style
   `all: initial; position: fixed; z-index: 2147483000`. It gets an open shadow root containing
   base styles, then `config.customCss` (if non-null) in a separate `<style>`, then the UI.
