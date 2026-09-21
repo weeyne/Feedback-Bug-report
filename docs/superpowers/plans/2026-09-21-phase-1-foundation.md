@@ -4,9 +4,13 @@
 
 **Goal:** Stand up the Dymcode monorepo with the shared widget↔API contract package and the complete, tested Supabase database layer: schema, functions, RLS, storage bucket and realtime.
 
-**Architecture:** This is a pnpm + Turborepo monorepo. `packages/shared` is an internal TS-source package that holds zod schemas and constants. `supabase/` holds SQL migrations applied by the Supabase CLI to a local Docker stack. `supabase/tests` is a workspace package with Vitest + `pg` tests. Each test runs inside a transaction that is always rolled back and switches Postgres roles (`authenticated`, `anon`, `service_role`) to exercise RLS exactly as PostgREST would.
+**Architecture:** This is a pnpm + Turborepo monorepo. `packages/shared` is an internal TS-source package that holds zod schemas and constants. `supabase/` holds SQL migrations in the Supabase CLI layout. `supabase/tests` is a workspace package with Vitest DB tests that run against one of two targets behind the same `Db` interface:
+- `pglite` (default, local): an in-process PGlite Postgres with a small bootstrap that emulates what Supabase provides (roles, `auth`/`storage`/`extensions` schemas, `auth.uid()`, the realtime publication), plus all migrations applied fresh per test file.
+- `supabase` (CI, `DB_TEST_TARGET=supabase`): node-postgres against a real local Supabase started by the CLI in GitHub Actions.
 
-**Tech Stack:** Node 24, pnpm 11, Turborepo 2, TypeScript 5 (strict), zod 4, Vitest 3, node-postgres, Supabase CLI + Docker Desktop, GitHub Actions.
+Each test runs inside a transaction that is always rolled back and switches Postgres roles (`authenticated`, `anon`, `service_role`) to exercise RLS as PostgREST would. The developer machine has no working Docker, so the local loop never needs it.
+
+**Tech Stack:** Node 24, pnpm 11, Turborepo 2, TypeScript (strict), zod 4, Vitest, PGlite, node-postgres, Supabase CLI, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-09-21-dymcode-design.md` (sections 2, 3, 9, 10 are implemented here).
 
@@ -26,8 +30,8 @@
 
 ## Prerequisites (human)
 
-- Docker Desktop installed and running (`docker info` succeeds).
 - Node ≥ 24 and pnpm ≥ 11 on PATH.
+- Docker is **not** required locally (it is broken on the dev machine). Real-Supabase verification happens only in CI.
 
 ## File Map
 
@@ -47,7 +51,8 @@
 | `supabase/migrations/20260921000200_core_tables.sql` | All remaining tables + RLS enabled |
 | `supabase/migrations/20260921000300_functions.sql` | `is_pro`, `current_user_is_pro`, `consume_quota`, `claim_quota_notice`, `hit_rate_limit` + grants |
 | `supabase/migrations/20260921000400_access.sql` | Table/column grants, RLS policies, storage bucket, realtime |
-| `supabase/tests/src/db.ts` | Connection, `withTx`, role switching |
+| `supabase/tests/src/db.ts` | Target selection (PGlite / real Supabase), `withTx`, role switching |
+| `supabase/tests/src/pglite-bootstrap.sql` | Emulation of Supabase-provided roles, schemas and functions for PGlite |
 | `supabase/tests/src/fixtures.ts` | `createUser`, `createProject`, `createFeedback`, `grantPro` |
 | `supabase/tests/src/*.test.ts` | DB tests per migration |
 | `.github/workflows/ci.yml` | CI: format, typecheck, unit tests, DB tests |
@@ -418,7 +423,7 @@ const valid = {
   type: 'bug',
   message: 'Button does nothing',
   metadata,
-  openedAt: 1758466800000,
+  elapsedMs: 5000,
   website: '',
 };
 
@@ -543,8 +548,11 @@ export const SubmitPayloadSchema = z.object({
     .union([z.email().max(EMAIL_MAX_LENGTH), z.literal('').transform(() => undefined)])
     .optional(),
   metadata: ClientMetadataSchema,
-  /** Epoch ms when the modal was opened; submissions faster than 2s are treated as bots. */
-  openedAt: z.number().int().positive(),
+  /**
+   * Milliseconds between opening the modal and submitting, measured on the client;
+   * under 2000 is treated as a bot.
+   */
+  elapsedMs: z.number().int().nonnegative().max(86_400_000),
   /** Honeypot: real users never fill it. */
   website: z.string().max(200).default(''),
 });
@@ -689,27 +697,31 @@ git commit -m "feat(shared): add widget config schema"
 
 ---
 
-### Task 5: Supabase CLI, DB test harness, profiles migration
+### Task 5: Supabase CLI, DB test harness (PGlite + real Supabase), profiles migration
 
 **Files:**
 - Create: `supabase/config.toml` (generated), `supabase/migrations/20260921000100_profiles.sql`
-- Create: `supabase/tests/package.json`, `supabase/tests/tsconfig.json`, `supabase/tests/vitest.config.ts`, `supabase/tests/src/setup.ts`, `supabase/tests/src/db.ts`, `supabase/tests/src/fixtures.ts`
-- Modify: `package.json` (root scripts)
+- Create: `supabase/tests/package.json`, `supabase/tests/tsconfig.json`, `supabase/tests/vitest.config.ts`, `supabase/tests/src/setup.ts`, `supabase/tests/src/db.ts`, `supabase/tests/src/pglite-bootstrap.sql`, `supabase/tests/src/fixtures.ts`
+- Modify: `package.json` (root scripts), `turbo.json` (drop `test:db`, disable cache for db tests)
 - Test: `supabase/tests/src/profiles.test.ts`
 
 **Interfaces:**
 - Produces (`supabase/tests/src/db.ts`):
   ```ts
+  type Row = Record<string, unknown>;
   interface Db {
-    query<T extends QueryResultRow = QueryResultRow>(sql: string, params?: unknown[]): Promise<T[]>;
+    query<T extends Row = Row>(sql: string, params?: unknown[]): Promise<T[]>;
     queryError(sql: string, params?: unknown[]): Promise<string>; // error message; throws if the query succeeds
     asUser(uid: string): Promise<void>;
     asAnon(): Promise<void>;
     asServiceRole(): Promise<void>;
     asPostgres(): Promise<void>;
   }
+  function connect(): Promise<void>;    // opens the target selected by DB_TEST_TARGET ('pglite' default | 'supabase')
+  function disconnect(): Promise<void>;
   function withTx<T>(fn: (db: Db) => Promise<T>): Promise<T>; // always rolls back
   ```
+  Both targets return `int8`/`bigint` columns as **strings** (node-postgres behaviour). The PGlite target is configured to match.
 - Produces (`supabase/tests/src/fixtures.ts`), all run as the current role (use as postgres):
   ```ts
   createUser(db: Db, email?: string): Promise<string>                       // returns user id
@@ -719,17 +731,18 @@ git commit -m "feat(shared): add widget config schema"
   // periodEnd is a Postgres interval relative to now(), e.g. '1 day' or '-1 day'
   ```
 - Produces (SQL): enums `feedback_type`, `feedback_status`, `widget_position`, `integration_kind`, `plan_kind`; `public.random_base62(len int) returns text`; table `public.profiles`; trigger `on_auth_user_created`.
-- Root scripts: `db:start`, `db:stop`, `db:reset`, `db:test`.
+- Root scripts: `db:start`, `db:stop`, `db:reset` (CLI, need Docker, used in CI only) and `db:test` (PGlite locally, real Supabase when `DB_TEST_TARGET=supabase`).
+- `pnpm test` (turbo) now also runs the DB tests on PGlite.
 
 - [ ] **Step 1: Install and initialize the Supabase CLI**
 
 Run: `pnpm add -D -w supabase`
-If pnpm reports that the `supabase` build script was ignored, run `pnpm approve-builds` and approve `supabase` (this downloads the CLI binary and records the approval in the workspace config). Then commit that config change together with this task.
+If pnpm reports that the `supabase` build script was ignored, run `pnpm approve-builds` and approve `supabase` (this downloads the CLI binary and records the approval in the workspace config). Commit that config change with this task.
 
 Run: `pnpm supabase --version`
 Expected: prints a version (2.x).
 
-Run: `pnpm supabase init` (answer **N** to the VS Code/Deno prompts)
+Run: `pnpm supabase init` (answer **N** to the VS Code/Deno prompts; `init` does not need Docker)
 Expected: `supabase/config.toml` is created.
 
 Edit `supabase/config.toml`: set `project_id = "dymcode"`.
@@ -739,11 +752,20 @@ Add to root `package.json` `scripts`:
 "db:start": "supabase start",
 "db:stop": "supabase stop",
 "db:reset": "supabase db reset",
-"db:test": "pnpm --filter @dymcode/db-tests test:db"
+"db:test": "pnpm --filter @dymcode/db-tests test"
 ```
 
-Run: `pnpm db:start` (the first run pulls Docker images and takes several minutes)
-Expected: prints `DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres` among the other service URLs.
+Replace `turbo.json` with (the `test:db` task is gone; DB tests must not be cached because their real inputs, `supabase/migrations`, live outside the package):
+```json
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "typecheck": { "dependsOn": ["^typecheck"] },
+    "test": { "dependsOn": ["^typecheck"] },
+    "@dymcode/db-tests#test": { "dependsOn": ["^typecheck"], "cache": false }
+  }
+}
+```
 
 - [ ] **Step 2: Create the test package**
 
@@ -756,12 +778,12 @@ Expected: prints `DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgre
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test:db": "vitest run"
+    "test": "vitest run"
   }
 }
 ```
 
-Run: `pnpm --filter @dymcode/db-tests add -D vitest typescript pg @types/pg @types/node`
+Run: `pnpm --filter @dymcode/db-tests add -D vitest typescript pg @types/pg @types/node @electric-sql/pglite`
 Run: `pnpm --filter @dymcode/db-tests add -D "@dymcode/shared@workspace:*"`
 
 `supabase/tests/tsconfig.json`:
@@ -780,34 +802,140 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     setupFiles: ['./src/setup.ts'],
-    // One shared connection per file; run files sequentially to avoid lock contention.
+    // One database per file; sequential files keep the real-Supabase target free of lock contention.
     fileParallelism: false,
     testTimeout: 15_000,
+    hookTimeout: 60_000, // PGlite boot + migrations
   },
 });
 ```
 
+`supabase/tests/src/pglite-bootstrap.sql`:
+```sql
+-- Emulates what a Supabase project provides before user migrations run.
+-- Used only by the PGlite target; the real stack (CI) provides all of this itself.
+
+create role anon nologin noinherit;
+create role authenticated nologin noinherit;
+create role service_role nologin noinherit bypassrls;
+
+create schema extensions;
+create extension pgcrypto with schema extensions;
+grant usage on schema extensions to anon, authenticated, service_role;
+
+-- Supabase grants everything in public to the API roles by default; migrations must revoke.
+grant usage on schema public to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+
+create schema auth;
+grant usage on schema auth to anon, authenticated, service_role;
+
+create table auth.users (
+  id          uuid primary key,
+  instance_id uuid,
+  aud         varchar(255),
+  role        varchar(255),
+  email       varchar(255),
+  created_at  timestamptz default now()
+);
+
+-- Same definition as Supabase's auth.uid().
+create function auth.uid()
+returns uuid
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid
+$$;
+grant execute on function auth.uid() to anon, authenticated, service_role;
+
+create schema storage;
+create table storage.buckets (
+  id                 text primary key,
+  name               text not null unique,
+  public             boolean default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[],
+  created_at         timestamptz default now()
+);
+
+create publication supabase_realtime;
+```
+
 `supabase/tests/src/db.ts`:
 ```ts
-import pg, { type QueryResultRow } from 'pg';
+import { readdir, readFile } from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
+import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
+import pg from 'pg';
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+type Row = Record<string, unknown>;
 
-let client: pg.Client | undefined;
+/** Minimal driver both targets implement. */
+interface Driver {
+  query<T extends Row>(sql: string, params?: unknown[]): Promise<T[]>;
+  close(): Promise<void>;
+}
+
+const INT8_OID = 20;
+const MIGRATIONS_DIR = new URL('../../migrations/', import.meta.url);
+const BOOTSTRAP_SQL = new URL('./pglite-bootstrap.sql', import.meta.url);
+
+/** In-process Postgres with Supabase emulation and all migrations applied. */
+async function openPglite(): Promise<Driver> {
+  const db = new PGlite({
+    extensions: { pgcrypto },
+    // Match node-postgres: int8 comes back as a string.
+    parsers: { [INT8_OID]: (value: string) => value },
+  });
+  await db.exec(await readFile(BOOTSTRAP_SQL, 'utf8'));
+  const migrations = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.sql')).sort();
+  for (const file of migrations) {
+    await db.exec(await readFile(new URL(file, MIGRATIONS_DIR), 'utf8'));
+  }
+  return {
+    query: async <T extends Row>(sql: string, params: unknown[] = []) =>
+      (await db.query<T>(sql, params)).rows,
+    close: () => db.close(),
+  };
+}
+
+/** Real local Supabase (CI), migrations already applied by `supabase start`. */
+async function openSupabase(): Promise<Driver> {
+  const client = new pg.Client({
+    connectionString:
+      process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+  });
+  await client.connect();
+  return {
+    query: async <T extends Row>(sql: string, params: unknown[] = []) =>
+      (await client.query<T>(sql, params)).rows,
+    close: () => client.end(),
+  };
+}
+
+let driver: Driver | undefined;
 
 export async function connect(): Promise<void> {
-  client = new pg.Client({ connectionString: DATABASE_URL });
-  await client.connect();
+  const target = process.env.DB_TEST_TARGET ?? 'pglite';
+  if (target !== 'pglite' && target !== 'supabase') {
+    throw new Error(`Unknown DB_TEST_TARGET "${target}" (expected "pglite" or "supabase")`);
+  }
+  driver = target === 'supabase' ? await openSupabase() : await openPglite();
 }
 
 export async function disconnect(): Promise<void> {
-  await client?.end();
-  client = undefined;
+  await driver?.close();
+  driver = undefined;
 }
 
 export interface Db {
-  query<T extends QueryResultRow = QueryResultRow>(sql: string, params?: unknown[]): Promise<T[]>;
+  query<T extends Row = Row>(sql: string, params?: unknown[]): Promise<T[]>;
   /** Runs a statement expected to fail and returns its error message. The transaction stays usable. */
   queryError(sql: string, params?: unknown[]): Promise<string>;
   /** Acts as a signed-in user, the way PostgREST does for a JWT with `sub = uid`. */
@@ -818,48 +946,47 @@ export interface Db {
   asPostgres(): Promise<void>;
 }
 
-function makeDb(c: pg.Client): Db {
+function makeDb(d: Driver): Db {
   const setRole = async (role: string, claims: Record<string, string>) => {
-    await c.query(`set local role ${role}`);
-    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
+    await d.query(`set local role ${role}`);
+    await d.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
   };
 
   return {
-    async query<T extends QueryResultRow>(sql: string, params: unknown[] = []) {
-      const result = await c.query<T>(sql, params);
-      return result.rows;
-    },
+    query: (sql, params) => d.query(sql, params),
     async queryError(sql, params = []) {
-      await c.query('savepoint expect_error');
+      await d.query('savepoint expect_error');
       try {
-        await c.query(sql, params);
+        await d.query(sql, params);
       } catch (error) {
-        await c.query('rollback to savepoint expect_error');
+        await d.query('rollback to savepoint expect_error');
         return (error as Error).message;
       }
-      await c.query('release savepoint expect_error');
+      await d.query('release savepoint expect_error');
       throw new Error(`Expected query to fail but it succeeded: ${sql}`);
     },
     asUser: (uid) => setRole('authenticated', { sub: uid, role: 'authenticated' }),
     asAnon: () => setRole('anon', { role: 'anon' }),
     asServiceRole: () => setRole('service_role', { role: 'service_role' }),
     async asPostgres() {
-      await c.query('reset role');
+      await d.query('reset role');
     },
   };
 }
 
 /** Runs `fn` in a transaction that is always rolled back, so tests never leak data. */
 export async function withTx<T>(fn: (db: Db) => Promise<T>): Promise<T> {
-  if (!client) throw new Error('Database not connected');
-  await client.query('begin');
+  if (!driver) throw new Error('Database not connected');
+  await driver.query('begin');
   try {
-    return await fn(makeDb(client));
+    return await fn(makeDb(driver));
   } finally {
-    await client.query('rollback');
+    await driver.query('rollback');
   }
 }
 ```
+
+If the installed PGlite version exposes a different API for `parsers`, `extensions` or the `pgcrypto` contrib import path, adapt `openPglite` to the installed version's documented API while keeping the same behaviour (int8 as string, pgcrypto available in schema `extensions`), and note it in the report.
 
 `supabase/tests/src/setup.ts`:
 ```ts
@@ -962,7 +1089,7 @@ describe('random_base62', () => {
 - [ ] **Step 4: Run the test to verify it fails**
 
 Run: `pnpm db:test`
-Expected: FAIL with `relation "public.profiles" does not exist` / `function public.random_base62(integer) does not exist`.
+Expected: FAIL with `relation "public.profiles" does not exist` / `function public.random_base62(integer) does not exist`. If `supabase/migrations/` does not exist yet, create it empty first (`mkdir supabase/migrations`), so the failure is about the missing schema and not an ENOENT.
 
 - [ ] **Step 5: Write the migration**
 
@@ -1017,11 +1144,11 @@ create trigger on_auth_user_created
 
 - [ ] **Step 6: Apply and run the tests**
 
-Run: `pnpm db:reset`
-Expected: "Finished supabase db reset" with no errors.
-
 Run: `pnpm db:test`
-Expected: PASS (3 tests).
+Expected: PASS (3 tests). PGlite applies all migrations fresh, so no reset step is needed.
+
+Run: `pnpm test`
+Expected: shared + db tests pass.
 
 Run: `pnpm typecheck`
 Expected: exit 0.
@@ -1029,7 +1156,7 @@ Expected: exit 0.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add package.json pnpm-lock.yaml pnpm-workspace.yaml supabase
+git add package.json turbo.json pnpm-lock.yaml pnpm-workspace.yaml supabase
 git commit -m "feat(db): add supabase setup, db test harness and profiles"
 ```
 
@@ -1299,7 +1426,7 @@ alter table public.rate_limits enable row level security;
 
 - [ ] **Step 4: Apply and run the tests**
 
-Run: `pnpm db:reset && pnpm db:test`
+Run: `pnpm db:test`
 Expected: PASS (all profiles + core-tables tests).
 
 - [ ] **Step 5: Commit**
@@ -1542,7 +1669,7 @@ grant execute on function public.current_user_is_pro() to authenticated, service
 
 - [ ] **Step 4: Apply and run the tests**
 
-Run: `pnpm db:reset && pnpm db:test`
+Run: `pnpm db:test`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1893,10 +2020,10 @@ alter publication supabase_realtime add table public.feedback;
 
 - [ ] **Step 4: Apply and run the tests**
 
-Run: `pnpm db:reset && pnpm db:test`
+Run: `pnpm db:test`
 Expected: PASS (all files).
 
-If a test fails on the exact storage column shape, inspect it with `pnpm supabase db dump --schema storage | grep -A20 "CREATE TABLE storage.buckets"` and fix the **test**, not the bucket limits.
+The storage and realtime assertions are also checked against real Supabase in CI (Task 9). If CI later shows the real `storage.buckets` shape differs from the PGlite bootstrap, fix the bootstrap and the test. Never change the bucket limits to make a test pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1913,9 +2040,11 @@ git commit -m "feat(db): add grants, RLS policies, screenshots bucket and realti
 - Create: `.github/workflows/ci.yml`, `README.md`
 
 **Interfaces:**
-- Consumes: root scripts `format:check`, `typecheck`, `test`, `db:start`, `db:test`.
+- Consumes: root scripts `format:check`, `typecheck`, `test`, `db:start`, `db:test`. `db:test` honours `DB_TEST_TARGET=supabase` (Task 5).
 
 - [ ] **Step 1: Write the workflow**
+
+The `check` job runs everything that works without Docker, including the DB tests on PGlite through `pnpm test`. The `db-supabase` job runs the same DB tests against a real local Supabase (GitHub runners have Docker). This is the fidelity check for the PGlite emulation. `supabase start` applies `supabase/migrations` itself.
 
 `.github/workflows/ci.yml`:
 ```yaml
@@ -1941,7 +2070,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-  db:
+  db-supabase:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -1953,6 +2082,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:start
       - run: pnpm db:test
+        env:
+          DB_TEST_TARGET: supabase
 ```
 
 - [ ] **Step 2: Write the README**
@@ -1968,14 +2099,13 @@ Design: `docs/superpowers/specs/2026-09-21-dymcode-design.md`
 ## Requirements
 
 - Node 24+ and pnpm 11+
-- Docker Desktop (for the local Supabase stack)
+- Docker is optional: only needed to run a full local Supabase stack (`pnpm db:start`).
 
 ## Setup
 
 ```bash
 pnpm install
-pnpm db:start   # first run pulls Docker images
-pnpm db:reset   # applies supabase/migrations
+pnpm test
 ```
 
 ## Commands
@@ -1983,27 +2113,33 @@ pnpm db:reset   # applies supabase/migrations
 | Command | What it does |
 |---|---|
 | `pnpm typecheck` | Type-check all packages |
-| `pnpm test` | Unit tests (no database needed) |
-| `pnpm db:test` | Database tests against the local Supabase stack |
-| `pnpm db:reset` | Re-create the local database from migrations |
-| `pnpm db:stop` | Stop the local Supabase stack |
+| `pnpm test` | All tests, including DB tests on in-process PGlite (no Docker) |
+| `pnpm db:test` | DB tests only (PGlite by default) |
+| `DB_TEST_TARGET=supabase pnpm db:test` | DB tests against a running local Supabase (`pnpm db:start`, needs Docker) |
 | `pnpm format` | Format with Prettier |
+
+## Database tests
+
+`supabase/tests` runs every test in a rolled-back transaction and switches Postgres roles
+(`authenticated`, `anon`, `service_role`) to exercise RLS the way PostgREST does. Locally it uses
+PGlite with `supabase/tests/src/pglite-bootstrap.sql` emulating the roles, schemas and functions
+Supabase provides. CI runs the same tests against a real Supabase stack.
 
 ## Layout
 
 - `packages/shared`: widget↔API contract (zod schemas, constants, brand)
 - `supabase/migrations`: database schema, functions, RLS
-- `supabase/tests`: database tests (Vitest + pg, each test in a rolled-back transaction)
+- `supabase/tests`: database tests
 ````
 
 - [ ] **Step 3: Verify everything locally**
 
-Run: `pnpm format:check && pnpm typecheck && pnpm test && pnpm db:reset && pnpm db:test`
-Expected: all commands exit 0.
+Run: `pnpm format:check && pnpm typecheck && pnpm test`
+Expected: all commands exit 0. The `db-supabase` CI job cannot run locally (no Docker); it is verified when the branch is pushed.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add .github README.md
-git commit -m "ci: add format, typecheck, unit and database test jobs"
+git commit -m "ci: add format, typecheck, test and real-supabase db jobs"
 ```

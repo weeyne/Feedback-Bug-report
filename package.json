@@ -1,0 +1,24 @@
+{
+  "name": "dymcode",
+  "private": true,
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "pnpm --filter @dymcode/db-tests test"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.8",
+    "supabase": "^2.117.0",
+    "turbo": "^2.11.2",
+    "typescript": "^7.0.2"
+  }
+}
