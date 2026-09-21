@@ -17,7 +17,11 @@ create table public.projects (
   owner_id        uuid not null references public.profiles on delete cascade,
   public_key      text not null unique default ('pk_' || public.random_base62(16)),
   name            text not null check (char_length(name) between 1 and 80),
-  allowed_origins text[] not null default '{}', -- empty = any origin
+  allowed_origins text[] not null default '{}' -- empty = any origin
+    constraint projects_allowed_origins_check check (
+      cardinality(allowed_origins) <= 20
+      and octet_length(array_to_string(allowed_origins, ',')) <= 4096
+    ),
   primary_color   text not null default '#6366f1' check (primary_color ~ '^#[0-9a-fA-F]{6}$'),
   trigger_text    text not null default 'Feedback' check (char_length(trigger_text) between 1 and 40),
   position        public.widget_position not null default 'bottom-right',

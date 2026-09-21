@@ -10,6 +10,12 @@ alter default privileges in schema public revoke execute on functions from anon,
 -- on new functions to PUBLIC; only a global (no "in schema") revoke removes that.
 alter default privileges revoke execute on functions from public;
 
+-- Make service_role's table access explicit rather than relying on the platform's default
+-- privileges (which the PGlite emulation above deliberately does not grant, to prove it).
+grant select, insert, update, delete on all tables in schema public to service_role;
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to service_role;
+
 grant select on public.profiles to authenticated;
 
 grant select, delete on public.projects to authenticated;
@@ -73,6 +79,7 @@ create policy "feedback: delete own" on public.feedback
       select 1 from public.projects p
       where p.id = feedback.project_id and p.owner_id = (select auth.uid())
     )
+    and (not over_quota or (select public.current_user_is_pro()))
   );
 
 -- 3. Screenshots bucket. Private: the dashboard uses signed URLs created with the service role.
