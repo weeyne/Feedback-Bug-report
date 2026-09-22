@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { isIPv4, isIPv6 } from 'node:net';
 import {
   SCREENSHOT_MAX_BYTES,
   SCREENSHOT_MIME_TYPES,
@@ -15,6 +16,7 @@ import { loadProjectByKey } from './project';
 
 export const MAX_BODY_BYTES = 2.5 * 1024 * 1024;
 const RATE_LIMIT = { max: 5, windowSeconds: 60 } as const;
+const PROJECT_RATE_LIMIT = { max: 30, windowSeconds: 60 } as const;
 const MIN_ELAPSED_MS = 2000;
 const EXTENSIONS: Record<string, string> = {
   'image/webp': 'webp',
@@ -33,10 +35,10 @@ export interface SubmitDeps {
   };
 }
 
-/** Recursively strips U+0000, which Postgres `text`/`jsonb` columns reject. */
+/** Recursively strips U+0000 and replaces lone surrogates (both rejected by Postgres text/jsonb). */
 function stripNul<T>(value: T): T {
   if (typeof value === 'string') {
-    return value.replace(/\u0000/g, '') as unknown as T;
+    return value.replace(/\u0000/g, '').toWellFormed() as unknown as T;
   }
   if (Array.isArray(value)) {
     return value.map((item) => stripNul(item)) as unknown as T;
@@ -47,6 +49,30 @@ function stripNul<T>(value: T): T {
     ) as T;
   }
   return value;
+}
+
+/**
+ * The rate-limit identity of a client: IPv4 as is, IPv6 reduced to its /64 prefix (one subscriber
+ * usually owns a whole /64), IPv4-mapped IPv6 back to plain IPv4.
+ */
+export function rateLimitIdentity(ip: string): string {
+  const address = ip.replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+  if (mapped && isIPv4(mapped[1]!)) return mapped[1]!;
+  if (!isIPv6(address)) return address;
+  const lower = address.toLowerCase();
+  let groups: string[];
+  if (lower.includes('::')) {
+    const [head = '', tail = ''] = lower.split('::');
+    const headParts = head ? head.split(':') : [];
+    const tailParts = tail ? tail.split(':') : [];
+    const zeros = Array<string>(Math.max(0, 8 - headParts.length - tailParts.length)).fill('0');
+    groups = [...headParts, ...zeros, ...tailParts];
+  } else {
+    groups = lower.split(':');
+  }
+  const prefix = groups.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, ''));
+  return `${prefix.join(':')}::/64`;
 }
 
 function describeAgent(userAgent: string): { browser: string; os: string } {
@@ -101,13 +127,22 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
     }
 
     const ipHash = createHash('sha256')
-      .update(clientIp(request.headers) + deps.env.IP_HASH_SALT)
+      .update(rateLimitIdentity(clientIp(request.headers)) + deps.env.IP_HASH_SALT)
       .digest('hex');
     const [limit] = await deps.db.query<{ limited: boolean }>(
       'select public.hit_rate_limit($1, $2, $3) as limited',
       [`submit:${payload.projectKey}:${ipHash}`, RATE_LIMIT.max, RATE_LIMIT.windowSeconds],
     );
     if (limit?.limited) return json({ error: 'rate limited' }, 429, cors);
+    const [projectLimit] = await deps.db.query<{ limited: boolean }>(
+      'select public.hit_rate_limit($1, $2, $3) as limited',
+      [
+        `submit-project:${payload.projectKey}`,
+        PROJECT_RATE_LIMIT.max,
+        PROJECT_RATE_LIMIT.windowSeconds,
+      ],
+    );
+    if (projectLimit?.limited) return json({ error: 'rate limited' }, 429, cors);
 
     const project = await loadProjectByKey(deps.db, payload.projectKey);
     if (!project) return json({ error: 'unknown project' }, 404, cors);
