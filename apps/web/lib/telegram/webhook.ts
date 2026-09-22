@@ -1,3 +1,4 @@
+import { safeEqual } from '../crypto';
 import type { Db } from '../db/types';
 import type { Env } from '../env';
 
@@ -48,7 +49,12 @@ export async function handleTelegramWebhook(
   deps: WebhookDeps,
   request: Request,
 ): Promise<Response> {
-  if (request.headers.get('x-telegram-bot-api-secret-token') !== deps.env.TELEGRAM_WEBHOOK_SECRET) {
+  if (
+    !safeEqual(
+      request.headers.get('x-telegram-bot-api-secret-token'),
+      deps.env.TELEGRAM_WEBHOOK_SECRET,
+    )
+  ) {
     return new Response('unauthorized', { status: 401 });
   }
   try {

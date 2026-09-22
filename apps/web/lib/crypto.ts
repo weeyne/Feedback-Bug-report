@@ -1,4 +1,10 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 
 const VERSION = 'v1';
 const IV_BYTES = 12;
@@ -31,4 +37,11 @@ export function decryptSecret(token: string, base64Key: string): string {
   const decipher = createDecipheriv('aes-256-gcm', keyFrom(base64Key), iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+}
+
+/** Constant-time string comparison (sha256 digests, so lengths never leak or throw). */
+export function safeEqual(actual: string | null, expected: string): boolean {
+  if (actual === null) return false;
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(actual), digest(expected));
 }

@@ -1,3 +1,4 @@
+import { safeEqual } from './crypto';
 import type { Db } from './db/types';
 import type { Env } from './env';
 import { json } from './http';
@@ -62,7 +63,7 @@ export async function runRetention(
 }
 
 export async function handleRetention(deps: RetentionDeps, request: Request): Promise<Response> {
-  if (request.headers.get('authorization') !== `Bearer ${deps.env.CRON_SECRET}`) {
+  if (!safeEqual(request.headers.get('authorization'), `Bearer ${deps.env.CRON_SECRET}`)) {
     return json({ error: 'unauthorized' }, 401);
   }
   try {
