@@ -151,7 +151,10 @@ export function createPanel(options: {
       'aria-modal': 'false',
       'aria-labelledby': 'dc-title',
       hidden: true,
+      // Composed key events would retarget to the host and trigger its shortcuts; keep them here.
       onkeydown: onKeydown,
+      onkeypress: stopPropagation,
+      onkeyup: stopPropagation,
     },
     h(
       'div',
@@ -349,10 +352,14 @@ export function createPanel(options: {
     }
   }
 
+  function stopPropagation(event: Event) {
+    event.stopPropagation();
+  }
+
   function onKeydown(event: Event) {
+    event.stopPropagation();
     const key = (event as KeyboardEvent).key;
     if (key === 'Escape') {
-      event.stopPropagation();
       close();
       return;
     }

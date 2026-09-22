@@ -155,6 +155,35 @@ describe('panel', () => {
     expect(root.activeElement).toBe(q('.dc-trigger'));
   });
 
+  it('keeps key events typed in the panel away from host shortcuts', () => {
+    const { handle, q } = setup();
+    handle.open();
+    const hostListener = vi.fn();
+    const types = ['keydown', 'keypress', 'keyup'] as const;
+    for (const type of types) document.addEventListener(type, hostListener);
+    try {
+      for (const type of types) {
+        q('.dc-message')!.dispatchEvent(
+          new KeyboardEvent(type, { key: 'k', bubbles: true, composed: true }),
+        );
+      }
+      expect(hostListener).not.toHaveBeenCalled();
+    } finally {
+      for (const type of types) document.removeEventListener(type, hostListener);
+    }
+  });
+
+  it('Tab from the last control still wraps to the first after the propagation guard', () => {
+    const { handle, q, root } = setup();
+    handle.open();
+    const badge = q<HTMLAnchorElement>('.dc-badge')!;
+    badge.focus();
+    badge.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, composed: true }),
+    );
+    expect(root.activeElement).toBe(q('.dc-close'));
+  });
+
   it('requires a message', async () => {
     const { handle, q, submit } = setup();
     handle.open();
