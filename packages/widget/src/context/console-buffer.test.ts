@@ -68,4 +68,29 @@ describe('installConsoleBuffer', () => {
     window.dispatchEvent(new ErrorEvent('error', { message: 'late' }));
     expect(buffer.entries()).toEqual([]);
   });
+
+  it('console.error(circularNullProto) does not throw, calls original, and records', () => {
+    const x = Object.create(null);
+    x.self = x;
+    expect(() => console.error(x)).not.toThrow();
+    expect(original).toHaveBeenCalledWith(x);
+    expect(buffer.entries()).toHaveLength(1);
+  });
+
+  it('console.error(throwingToJSON) does not throw and original is called', () => {
+    const obj = {
+      toJSON() {
+        throw new Error('toJSON throws');
+      },
+      toString() {
+        throw new Error('toString throws');
+      },
+      [Symbol.toPrimitive]() {
+        throw new Error('toPrimitive throws');
+      },
+    };
+    expect(() => console.error(obj)).not.toThrow();
+    expect(original).toHaveBeenCalledWith(obj);
+    expect(buffer.entries()).toHaveLength(1);
+  });
 });

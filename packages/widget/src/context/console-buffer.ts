@@ -8,11 +8,22 @@ export interface ConsoleBuffer {
 
 function stringify(value: unknown): string {
   if (typeof value === 'string') return value;
-  if (value instanceof Error) return `${value.name}: ${value.message}`;
+  if (value instanceof Error) {
+    try {
+      return `${value.name}: ${value.message}`;
+    } catch {
+      return '[unserializable]';
+    }
+  }
   try {
-    return JSON.stringify(value) ?? String(value);
+    return JSON.stringify(value) ?? '[unserializable]';
   } catch {
-    return String(value);
+    // JSON.stringify failed; try String() as fallback
+    try {
+      return String(value);
+    } catch {
+      return '[unserializable]';
+    }
   }
 }
 
@@ -47,8 +58,12 @@ export function installConsoleBuffer(win: Window, ownScriptUrl: string): Console
   const winWithConsole = win as Window & { console: Console };
   const original = winWithConsole.console.error;
   const wrapped = function (this: unknown, ...args: unknown[]) {
-    const error = args.find((arg): arg is Error => arg instanceof Error);
-    push(args.map(stringify).join(' '), undefined, undefined, error?.stack);
+    try {
+      const error = args.find((arg): arg is Error => arg instanceof Error);
+      push(args.map(stringify).join(' '), undefined, undefined, error?.stack);
+    } catch {
+      // Recording must never break the host page.
+    }
     return original.apply(this, args);
   } as typeof console.error;
 
