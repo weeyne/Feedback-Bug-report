@@ -75,6 +75,17 @@ After deploying, register the shared bot webhook:
 pnpm --filter @dymcode/web telegram:set-webhook https://<your-domain>/api/telegram/webhook
 ```
 
+## Dashboard
+
+Sign in (GitHub or magic link) to manage projects at `/app`: install snippet, live feedback feed
+with filters and screenshots, per-project widget settings with a live preview, Telegram/Discord
+integrations, billing and account pages. Bilingual (English/Russian) throughout.
+
+## Deploying
+
+See `docs/deploy.md` for the full Vercel + Supabase Cloud deployment guide (environment variables,
+GitHub OAuth, the Telegram webhook and a post-deploy smoke checklist).
+
 ## Layout
 
 - `packages/shared`: widget↔API contract (zod schemas, constants, brand)

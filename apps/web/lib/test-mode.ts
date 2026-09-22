@@ -96,7 +96,14 @@ export async function createTestModeDeps(env: Env): Promise<TestModeDeps> {
 
   const outbox: OutboxEntry[] = [];
   const outboxFetch = (async (input: string | URL | Request, init?: RequestInit) => {
-    outbox.push({ url: String(input), body: await describeBody(init?.body) });
+    const url = String(input);
+    outbox.push({ url, body: await describeBody(init?.body) });
+    if (url.endsWith('/getMe')) {
+      return new Response(
+        JSON.stringify({ ok: true, result: { id: 1, is_bot: true, username: 'e2e_custom_bot' } }),
+        { status: 200 },
+      );
+    }
     return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
   }) as typeof fetch;
 
