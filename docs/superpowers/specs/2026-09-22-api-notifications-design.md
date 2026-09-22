@@ -71,10 +71,16 @@ containing block (e.g. `position: absolute; bottom: 0` with no positioned ancest
 against the relatively-positioned cloned root's own (viewport-sized) box instead of the true
 document/viewport, so its vertical placement can differ from what the page actually shows.
 
-**Fallback.** If E2E shows that the margin offset does not work with the installed modern-screenshot,
-render the full document, crop the viewport region, and offset `position: fixed` clones by `(x, y)` in
-`onCloneEachNode` so they land inside the crop. The E2E tests below are the acceptance criteria for
-either approach.
+**Fallback.** A `margin-top`/`margin-left` offset on the cloned root was tried first and rejected:
+margins only shift normal-flow layout, so they do not move absolutely positioned elements whose
+containing block is the initial containing block (elements with no positioned ancestor) — those
+stayed at their unscrolled document position and fell outside the crop. The `position: relative` +
+`top`/`left` offset above is the shipped approach and passes the scrolled-page E2E test below. If a
+future `modern-screenshot` release changes how it establishes containing blocks for a relatively
+positioned clone root and breaks that test, the documented contingency is to render the full
+document, crop the viewport region, and offset `position: fixed` clones by `(x, y)` in
+`onCloneEachNode` so they land inside the crop. The scrolled-page E2E test is the acceptance test
+for whichever approach is in place.
 
 **E2E (widget package):**
 - `dev/scrolled.html`: a 6000px-tall page with a fixed 60px header of a known color (`#ff00aa`) and a
