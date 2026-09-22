@@ -9,7 +9,8 @@
     "build": "pnpm copy-widget && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "telegram:set-webhook": "node scripts/set-telegram-webhook.mjs"
   },
   "dependencies": {
     "@dymcode/shared": "workspace:*",
