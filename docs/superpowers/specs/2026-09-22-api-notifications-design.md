@@ -98,17 +98,19 @@ for whichever approach is in place.
 apps/web/
 ├── app/
 │   ├── page.tsx                           # placeholder landing
+│   ├── e2e-host/route.ts                  # E2E widget host page; 404 unless test mode
 │   └── api/
 │       ├── v1/widget/config/route.ts
-│       ├── v1/widget/submit/route.ts
+│       ├── v1/widget/submit/route.ts      # maxDuration = 60 (notifications run in after())
 │       ├── telegram/webhook/route.ts
 │       ├── cron/retention/route.ts
-│       └── __test/outbox/route.ts         # 404 unless test mode
+│       ├── e2e-test/outbox/route.ts       # 404 unless test mode
+│       └── e2e-test/usage/route.ts        # 404 unless test mode
 ├── lib/
 │   ├── env.ts            # zod-validated server env
 │   ├── db/types.ts       # interface Db { query<T>(sql, params?): Promise<T[]> }
-│   ├── db/postgres.ts    # postgres.js implementation (prepare: false, max 1 per lambda)
-│   ├── storage.ts        # interface Storage { upload(path, data, contentType), remove(paths) }; supabase-js impl
+│   ├── db/postgres.ts    # postgres.js implementation (prepare: false, max 1 per lambda) + closePostgresDb
+│   ├── storage.ts        # interface Storage { upload(path, data, contentType), download(path), remove(paths) }; supabase-js impl
 │   ├── crypto.ts         # AES-256-GCM encryptSecret/decryptSecret
 │   ├── http.ts           # CORS helpers, client IP, JSON responses
 │   ├── widget/config.ts  # getWidgetConfig(deps, key)
@@ -118,7 +120,6 @@ apps/web/
 │   ├── retention.ts
 │   ├── deps.ts           # production wiring
 │   └── test-mode.ts      # in-memory deps for E2E (never in production)
-├── public/__test/host.html
 ├── scripts/copy-widget.mjs          # packages/widget/dist → public/w/
 ├── scripts/set-telegram-webhook.mjs
 ├── vercel.json                      # cron schedule
@@ -134,29 +135,41 @@ apps/web/
 - **Cache headers:**
   - `/w/widget.js`: `public, max-age=300, s-maxage=3600`;
   - `/w/screenshot.js`: `public, max-age=31536000, immutable` (the URL is versioned with `?v=`).
-- **DB harness reuse.** `@dymcode/db-tests` gains an export `./harness` (`openTestDb()`, `withTx`, fixtures)
-  used by `apps/web` tests. It uses the same `DB_TEST_TARGET` switch (`pglite` default, `supabase` in CI).
+- **DB harness reuse.** `@dymcode/db-tests` gains an export `./harness` (`connect`/`disconnect`,
+  `withTx`, `createPgliteDb`, fixtures) used by `apps/web` tests. It uses the same `DB_TEST_TARGET` switch
+  (`pglite` default, `supabase` in CI). `lib/db/postgres.integration.test.ts` exercises the production
+  postgres.js adapter itself and runs only with `DB_TEST_TARGET=supabase`.
+- **jsonb parameters.** postgres.js JSON-encodes every parameter Postgres describes as `json`/`jsonb`,
+  even a string, while pg and PGlite pass strings through. JSON values are therefore written as
+  `$n::text::jsonb` with a `JSON.stringify`-ed string, which every driver stores as a jsonb object.
 - **Environment** (`lib/env.ts`, validated on first use; missing vars fail loudly):
-  - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`;
+  - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`;
   - `NEXT_PUBLIC_APP_URL`, `SECRETS_ENCRYPTION_KEY` (32 bytes base64), `IP_HASH_SALT`, `CRON_SECRET`;
   - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`;
   - `DYMCODE_TEST_MODE` (optional).
 
-  Local values live in `apps/web/.env.local` (git-ignored).
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` arrives with the dashboard in phase 4. Local values live in
+  `apps/web/.env.local` (git-ignored). The env is read lazily on the first request, so `next build`
+  needs no env at all (CI builds without placeholder values).
 - **Test mode.** `DYMCODE_TEST_MODE=1` wires:
   - PGlite in memory with migrations and a seeded Free project `pk_E2eE2eE2eE2e1234`, with a
     `telegram_shared` integration (chat `424242`) and a Discord integration (encrypted fake webhook URL);
   - in-memory Storage;
   - an outbox `fetch` that records Telegram/Discord calls instead of sending them;
-  - `GET /api/__test/outbox`, which returns the recorded calls.
+  - `GET/DELETE /api/e2e-test/outbox` (recorded calls and stored feedback / reset) and
+    `POST /api/e2e-test/usage` (sets the monthly usage counter);
+  - `GET /e2e-host`, the HTML host page that embeds the widget for Playwright.
 
-  Startup throws if `NODE_ENV === 'production'` and test mode is on. `__test` routes return 404 outside test mode.
+  Startup throws if `NODE_ENV === 'production'` and test mode is on. The `e2e-test` routes and
+  `/e2e-host` return 404 outside test mode (Next excludes `_`-prefixed folders from routing, hence no `__test`).
 
 ## 5. Public widget API
 
 **Common rules:**
 - CORS: reflect the request `Origin`, send `Vary: Origin`, and answer `OPTIONS` with 204 (`Allow-Methods: GET, POST, OPTIONS`, `Allow-Headers: content-type`).
-- Client IP: the first entry of `x-forwarded-for`, else `'unknown'`. It is stored only as `sha256(ip + IP_HASH_SALT)` inside the rate-limit key.
+- Client IP: the first entry of `x-forwarded-for`, else `x-real-ip`, else `'unknown'`. For rate limiting it
+  is normalized first: IPv4 as is, IPv4-mapped IPv6 (`::ffff:a.b.c.d`) as the IPv4 address, other IPv6
+  reduced to its /64 prefix. It is stored only as `sha256(identity + IP_HASH_SALT)` inside the rate-limit key.
 - Unexpected errors → 500 `{ error: 'internal' }`, with details only in the server log.
 
 ### `GET /api/v1/widget/config?key=pk_…`
@@ -175,14 +188,14 @@ apps/web/
 |---|---|---|
 | 1 | `Content-Length` > 2.5MB | 413 |
 | 2 | Parse `formData()`; `payload` JSON passes `SubmitPayloadSchema`; the optional `screenshot` is a Blob ≤ `SCREENSHOT_MAX_BYTES` of a type in `SCREENSHOT_MIME_TYPES` | 400 `{ error, issues? }` |
-| 3 | `select public.hit_rate_limit('submit:' \|\| $key \|\| ':' \|\| $ipHash, 5, 60)` | 429 |
+| 3 | `select public.hit_rate_limit('submit:' \|\| $key \|\| ':' \|\| $ipHash, 5, 60)`, then the per-project cap `hit_rate_limit('submit-project:' \|\| $key, 30, 60)` | 429 |
 | 4 | Load the project by key plus `is_pro(owner_id)` | 404 |
 | 5 | `allowed_origins` non-empty and `Origin` not in it (exact match) | 403 |
 | 6 | Honeypot `website` non-empty or `elapsedMs < 2000` | 200 `{ id: null }`, nothing stored |
 | 7 | `count = consume_quota(owner)`; `over_quota = !pro && count > 20` | — |
-| 8 | `id = randomUUID()`. If a screenshot is present, upload it to `screenshots/{project_id}/{id}.{webp\|jpg\|png}`; on upload failure log it and continue without a screenshot. `insert into feedback` (metadata = payload metadata + `browser`, `os` from `ua-parser-js`) | insert failure → 500 |
+| 8 | `id = randomUUID()`. If a screenshot is present, upload it to `screenshots/{project_id}/{id}.{webp\|jpg\|png}`; on upload failure log it and continue without a screenshot. `insert into feedback` (metadata = payload metadata + `browser`, `os` from `ua-parser-js`, written as `$n::text::jsonb`; strings have U+0000 removed and lone surrogates replaced via `toWellFormed()`) | insert failure → 500 (uploaded screenshot removed) |
 | 9 | 201 `{ id }` | — |
-| 10 | `after()`: not over quota → `dispatch(deps, id)`; over quota and `claim_quota_notice(owner)` → `dispatchQuotaNotice(deps, projectId)` | errors only logged / recorded on integrations |
+| 10 | `after()`: not over quota → `dispatch(deps, id)`; over quota and `claim_quota_notice(owner)` → `dispatchQuotaNotice(deps, projectId)`. The route exports `maxDuration = 60` so this work fits in the function budget | errors only logged / recorded on integrations |
 
 ## 6. Notifications
 
@@ -207,14 +220,21 @@ interface Notifier {
 
 ### `dispatch(deps, feedbackId)`
 1. Load the feedback, its project, `is_pro(owner)`, and the enabled integrations.
-2. Download the screenshot from Storage if `screenshot_path` is set.
+2. Download the screenshot from Storage if `screenshot_path` is set, with a 10 s budget; on timeout
+   or failure the notification is sent without it.
 3. Build a notifier per integration:
    - `telegram_shared`: `TELEGRAM_BOT_TOKEN` + `target`;
-   - `telegram_custom`: decrypted token + `target`, **skipped unless the owner is Pro**;
-   - `discord`: decrypted webhook URL.
+   - `telegram_custom`: decrypted token + `target`, **skipped unless the owner is Pro**; the token must
+     match `^\d+:[\w-]+$`, else `last_error = 'invalid bot token'` and no call;
+   - `discord`: decrypted webhook URL; it must be `https:` on `discord.com`, `discordapp.com`,
+     `ptb.discord.com` or `canary.discord.com` with a path starting `/api/webhooks/`, else
+     `last_error = 'invalid webhook url'` and no call. Discord calls use `redirect: 'error'`.
 
    A decrypt failure records `last_error = 'secret unreadable'` for that integration only.
-4. Send to all of them with `Promise.allSettled`; each call carries `AbortSignal.timeout(5000)`.
+4. Send to all of them in parallel; each call carries `AbortSignal.timeout(5000)`. Any exception while
+   building, sending or recording for one integration is logged (`[dispatch]`) and recorded as
+   `last_error = 'internal error'`; it never affects other integrations or escapes `dispatch`.
+   Network error text has URLs replaced with `<url>` so tokens never reach `last_error`.
 5. Retry once on a retryable failure (HTTP 429/5xx), waiting `min(retry_after, 3)` seconds.
 6. Record the outcome per integration:
    - success → `last_delivered_at = now(), last_error = null`;
@@ -240,13 +260,18 @@ of 20 submissions this month is reached. New feedback is saved; upgrade to Pro t
     full text truncated to 4096;
   - without a screenshot: `sendMessage` only.
 - **Discord:**
-  - `payload_json` with one embed (title = type + project, description = message truncated to 4096,
-    fields for email/URL/browser/OS/errors, color: bug `#ef4444`, idea `#22c55e`, general `#6366f1`)
+  - `payload_json` with one embed (title = type + project, description = message, fields for
+    email/URL/browser/OS/errors, color: bug `#ef4444`, idea `#22c55e`, general `#6366f1`)
     and `allowed_mentions: { parse: [] }`;
+  - the description budget is `min(4000, 6000 − (title + field names + values) − 20)`, so the embed
+    stays within Discord's 6000-character total;
+  - reporter-controlled text (description, email, page) has `[ ] ( ) < >` backslash-escaped, so it
+    cannot form masked links;
   - the screenshot as `files[0]` with `embed.image.url = attachment://screenshot.<ext>`.
 
 ### Shared bot webhook (`POST /api/telegram/webhook`)
-- If `X-Telegram-Bot-Api-Secret-Token` ≠ `TELEGRAM_WEBHOOK_SECRET` → 401.
+- If `X-Telegram-Bot-Api-Secret-Token` ≠ `TELEGRAM_WEBHOOK_SECRET` → 401 (constant-time comparison of
+  sha256 digests; the cron bearer token is compared the same way).
 - Handles `message.text` matching `/^\/start(?:@<bot_username>)?\s+([0-9A-Za-z]{12})$/`:
   - **valid, unexpired code** → upsert the `telegram_shared` integration (`target = chat.id`,
     `enabled = true`, `last_error = null`), delete the code, reply "✅ Connected to <project name>";
@@ -285,6 +310,7 @@ of 20 submissions this month is reached. New feedback is saved; upgrade to Pro t
 | E2E (Playwright, `apps/web` test mode) | (1) widget submit with screenshot → outbox has one Telegram `sendPhoto` and one Discord call, and the DB row has `screenshot_path`; (2) 21st Free submission → exactly one quota notice, no feedback notification; (3) disallowed Origin → no outbox entries, widget shows an error |
 
 **CI changes:**
-- `check`: `@dymcode/web` typecheck, tests, and `next build` with placeholder env.
+- `check`: `@dymcode/web` typecheck (`next typegen && tsc --noEmit`, so a clean checkout has the
+  generated route types), tests, and `next build` (no env needed: it is read lazily).
 - `db-supabase`: also runs the DB-backed `@dymcode/web` tests with `DB_TEST_TARGET=supabase`.
 - `e2e`: also runs the `@dymcode/web` E2E suite.

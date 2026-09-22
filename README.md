@@ -66,6 +66,8 @@ pnpm --filter @dymcode/web e2e     # widget → API → notification E2E in test
 
 Endpoints: `GET /api/v1/widget/config`, `POST /api/v1/widget/submit`, `POST /api/telegram/webhook`,
 `GET /api/cron/retention` (Vercel Cron, `Authorization: Bearer $CRON_SECRET`).
+Submissions are rate limited to 5 per minute per project and client (IPv6 grouped by /64) and 30 per
+minute per project.
 
 After deploying, register the shared bot webhook:
 
