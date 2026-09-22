@@ -1,0 +1,238 @@
+:host {
+  all: initial;
+}
+[hidden] {
+  display: none !important;
+}
+.dc-root {
+  --dc-bg: #ffffff;
+  --dc-fg: #1f2328;
+  --dc-muted: #656d76;
+  --dc-border: #d0d7de;
+  --dc-error: #cf222e;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--dc-fg);
+}
+@media (prefers-color-scheme: dark) {
+  .dc-root {
+    --dc-bg: #161b22;
+    --dc-fg: #e6edf3;
+    --dc-muted: #8d96a0;
+    --dc-border: #30363d;
+    --dc-error: #ff7b72;
+  }
+}
+.dc-root *,
+.dc-root *::before,
+.dc-root *::after {
+  box-sizing: border-box;
+}
+.dc-trigger {
+  position: fixed;
+  bottom: 20px;
+  z-index: 2147483000;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: var(--dc-accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+.dc-panel {
+  position: fixed;
+  bottom: 72px;
+  z-index: 2147483000;
+  width: 340px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 16px;
+  background: var(--dc-bg);
+  border: 1px solid var(--dc-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+[data-position='bottom-right'] .dc-trigger,
+[data-position='bottom-right'] .dc-panel {
+  right: 20px;
+}
+[data-position='bottom-left'] .dc-trigger,
+[data-position='bottom-left'] .dc-panel {
+  left: 20px;
+}
+[data-preview] .dc-trigger,
+[data-preview] .dc-panel {
+  position: absolute;
+}
+@media (max-width: 479px) {
+  .dc-root .dc-panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 90vh;
+    border-radius: 12px 12px 0 0;
+  }
+}
+.dc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dc-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.dc-close {
+  border: 0;
+  background: none;
+  color: var(--dc-muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
+.dc-types {
+  display: flex;
+  margin: 12px 0 4px;
+  border: 1px solid var(--dc-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dc-type {
+  flex: 1;
+  border: 0;
+  padding: 6px;
+  background: transparent;
+  color: var(--dc-fg);
+  font: inherit;
+  cursor: pointer;
+}
+.dc-type[aria-pressed='true'] {
+  background: var(--dc-accent);
+  color: #fff;
+}
+.dc-input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--dc-border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+.dc-root :focus-visible {
+  outline: 2px solid var(--dc-accent);
+  outline-offset: 2px;
+}
+.dc-field-error {
+  margin: 4px 0 0;
+  color: var(--dc-error);
+  font-size: 12px;
+}
+.dc-field-error:empty,
+.dc-status:empty {
+  display: none;
+}
+.dc-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.dc-shot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--dc-muted);
+  font-size: 13px;
+}
+.dc-thumb {
+  flex: none;
+  width: 48px;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid var(--dc-border);
+  border-radius: 4px;
+  background: var(--dc-border);
+}
+.dc-thumb[data-state='loading'] {
+  animation: dc-pulse 1s ease-in-out infinite alternate;
+}
+.dc-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@keyframes dc-pulse {
+  to {
+    opacity: 0.4;
+  }
+}
+.dc-status {
+  margin: 10px 0 0;
+  color: var(--dc-error);
+  font-size: 13px;
+}
+.dc-retry {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dc-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.dc-send {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--dc-accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.dc-send:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.dc-thanks {
+  margin: 20px 0;
+  text-align: center;
+}
+.dc-badge {
+  display: block;
+  margin-top: 12px;
+  color: var(--dc-muted);
+  font-size: 12px;
+  text-align: center;
+  text-decoration: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-root * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

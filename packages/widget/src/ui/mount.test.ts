@@ -1,0 +1,259 @@
+import type { ClientMetadata, WidgetConfig } from '@dymcode/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { SubmitResult } from '../api';
+import { mountWidget, type WidgetHandle } from './mount';
+import type { PanelDeps } from './panel';
+
+const baseConfig: WidgetConfig = {
+  primaryColor: '#6366f1',
+  triggerText: 'Feedback',
+  position: 'bottom-right',
+  showBadge: true,
+  customCss: null,
+  badgeUrl: 'https://dymcode.dev/?ref=pk_AbCdEfGh12345678&utm_source=widget',
+  locale: 'en',
+};
+const metadata: ClientMetadata = {
+  url: 'https://host.example/',
+  referrer: '',
+  userAgent: 'UA',
+  language: 'en',
+  timezone: 'UTC',
+  viewport: { w: 1280, h: 720 },
+  screen: { w: 1920, h: 1080, dpr: 1 },
+  consoleErrors: [],
+};
+const shot = new Blob(['img'], { type: 'image/webp' });
+
+let handle: WidgetHandle | undefined;
+afterEach(() => {
+  handle?.destroy();
+  handle = undefined;
+  vi.useRealTimers();
+});
+
+function setup(
+  options: {
+    deps?: Partial<PanelDeps>;
+    config?: Partial<WidgetConfig>;
+    hideTrigger?: boolean;
+    preview?: boolean;
+  } = {},
+) {
+  let clock = 1000;
+  const submit = vi.fn<(...a: Parameters<PanelDeps['submit']>) => Promise<SubmitResult>>(
+    async () => ({ ok: true }),
+  );
+  const deps: PanelDeps = {
+    projectKey: 'pk_AbCdEfGh12345678',
+    submit,
+    loadCapture: async () => async () => shot,
+    collectMetadata: () => metadata,
+    now: () => clock,
+    ...options.deps,
+  };
+  handle = mountWidget(
+    document.body,
+    { ...baseConfig, ...options.config },
+    {
+      deps,
+      languages: ['en-US'],
+      hideTrigger: options.hideTrigger,
+      preview: options.preview,
+    },
+  );
+  const root = handle.host.shadowRoot!;
+  const q = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector);
+  return { handle, root, q, submit, deps, tick: (ms: number) => (clock += ms) };
+}
+
+describe('mountWidget', () => {
+  it('renders an isolated host with the trigger text as literal text', () => {
+    const { handle, q } = setup({ config: { triggerText: '<img src=x onerror=alert(1)>' } });
+    expect(handle.host.hasAttribute('data-dymcode')).toBe(true);
+    expect(handle.host.shadowRoot).not.toBeNull();
+    expect(q('.dc-trigger')!.textContent).toBe('<img src=x onerror=alert(1)>');
+    expect(q('img')).toBeNull();
+  });
+
+  it('puts custom CSS inside the shadow root only', () => {
+    const { root } = setup({ config: { customCss: '.dc-trigger{border-radius:0}' } });
+    const styles = Array.from(root.querySelectorAll('style'), (s) => s.textContent);
+    expect(styles).toContain('.dc-trigger{border-radius:0}');
+    expect(document.head.innerHTML).not.toContain('border-radius:0');
+  });
+
+  it('applies the accent color, position and locale', () => {
+    const { q } = setup({
+      config: { primaryColor: '#ff0000', position: 'bottom-left', locale: 'ru' },
+    });
+    const root = q('.dc-root')!;
+    expect(root.style.getPropertyValue('--dc-accent')).toBe('#ff0000');
+    expect(root.dataset.position).toBe('bottom-left');
+    expect(q('.dc-title')!.textContent).toBe('Отправить отзыв');
+  });
+
+  it('hides the trigger with hideTrigger', () => {
+    const { q } = setup({ hideTrigger: true });
+    expect(q('.dc-trigger')).toBeNull();
+  });
+
+  it('shows the badge unless disabled', () => {
+    const shown = setup();
+    const badge = shown.q<HTMLAnchorElement>('.dc-badge')!;
+    expect(badge.href).toBe(baseConfig.badgeUrl);
+    expect(badge.rel).toBe('noopener');
+    expect(badge.target).toBe('_blank');
+    shown.handle.destroy();
+    expect(setup({ config: { showBadge: false } }).q('.dc-badge')).toBeNull();
+  });
+});
+
+describe('panel', () => {
+  it('opens from the trigger with focus in the message field', () => {
+    const { q, root } = setup();
+    q('.dc-trigger')!.click();
+    expect(q('.dc-panel')!.hidden).toBe(false);
+    expect(root.activeElement).toBe(q('.dc-message'));
+  });
+
+  it('open(type) preselects the type and its placeholder', () => {
+    const { handle, q } = setup();
+    handle.open('idea');
+    expect(q('.dc-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(q('.dc-type[data-type="bug"]')!.getAttribute('aria-pressed')).toBe('false');
+    expect(q<HTMLTextAreaElement>('.dc-message')!.placeholder).toBe("What's your idea?");
+  });
+
+  it('Escape closes and returns focus to the trigger', () => {
+    const { q, root } = setup();
+    q('.dc-trigger')!.click();
+    q('.dc-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(q('.dc-panel')!.hidden).toBe(true);
+    expect(root.activeElement).toBe(q('.dc-trigger'));
+  });
+
+  it('requires a message', async () => {
+    const { handle, q, submit } = setup();
+    handle.open();
+    q('.dc-send')!.click();
+    expect(q('.dc-message-error')!.textContent).toBe('Write a message first.');
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('validates the email shape', async () => {
+    const { handle, q, submit } = setup();
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'Broken';
+    q<HTMLInputElement>('.dc-email')!.value = 'nope';
+    q('.dc-send')!.click();
+    expect(q('.dc-email-error')!.textContent).toBe('Check the email address.');
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('submits the payload with the screenshot and elapsed time', async () => {
+    const { handle, q, submit, tick } = setup();
+    handle.open('bug');
+    await vi.waitFor(() => expect(q('.dc-thumb')!.dataset.state).toBe('ready'));
+    q<HTMLTextAreaElement>('.dc-message')!.value = '  Checkout fails  ';
+    tick(4200);
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    const [payload, blob] = submit.mock.calls[0]!;
+    expect(payload).toMatchObject({
+      projectKey: 'pk_AbCdEfGh12345678',
+      type: 'bug',
+      message: 'Checkout fails',
+      elapsedMs: 4200,
+      website: '',
+      metadata,
+    });
+    expect(blob).toBe(shot);
+  });
+
+  it('sends without a screenshot when the toggle is off', async () => {
+    const { handle, q, submit } = setup();
+    handle.open();
+    await vi.waitFor(() => expect(q('.dc-thumb')!.dataset.state).toBe('ready'));
+    q<HTMLInputElement>('.dc-shot-toggle')!.checked = false;
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'x';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0]![1]).toBeNull();
+  });
+
+  it('marks the screenshot unavailable when capture is not possible', async () => {
+    const { handle, q, submit } = setup({ deps: { loadCapture: async () => null } });
+    handle.open();
+    await vi.waitFor(() => expect(q('.dc-thumb')!.dataset.state).toBe('unavailable'));
+    const toggle = q<HTMLInputElement>('.dc-shot-toggle')!;
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.checked).toBe(false);
+    expect(q('.dc-shot')!.textContent).toContain('Screenshot unavailable');
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'x';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0]![1]).toBeNull();
+  });
+
+  it('shows thanks, then closes and resets after 2s', async () => {
+    const { handle, q } = setup();
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'Great app';
+    vi.useFakeTimers();
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(q('.dc-thanks')!.hidden).toBe(false));
+    vi.advanceTimersByTime(2000);
+    expect(q('.dc-panel')!.hidden).toBe(true);
+    expect(q<HTMLTextAreaElement>('.dc-message')!.value).toBe('');
+  });
+
+  it('keeps the text and explains rate limiting', async () => {
+    const { handle, q } = setup({
+      deps: { submit: async () => ({ ok: false, reason: 'rate_limited' }) },
+    });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'Again';
+    q('.dc-send')!.click();
+    await vi.waitFor(() =>
+      expect(q('.dc-status')!.textContent).toBe('Too many submissions. Try again later.'),
+    );
+    expect(q<HTMLTextAreaElement>('.dc-message')!.value).toBe('Again');
+    expect(q('.dc-retry')!.hidden).toBe(true);
+  });
+
+  it('offers retry after a network error', async () => {
+    const submit = vi
+      .fn<() => Promise<SubmitResult>>()
+      .mockResolvedValueOnce({ ok: false, reason: 'network' })
+      .mockResolvedValueOnce({ ok: true });
+    const { handle, q } = setup({ deps: { submit } });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'Flaky';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(q('.dc-retry')!.hidden).toBe(false));
+    expect(q('.dc-status')!.textContent).toBe("Couldn't send. Check your connection.");
+    q('.dc-retry')!.click();
+    await vi.waitFor(() => expect(q('.dc-thanks')!.hidden).toBe(false));
+    expect(submit).toHaveBeenCalledTimes(2);
+  });
+
+  it('identify pre-fills the email without overwriting typed input', () => {
+    const { handle, q } = setup();
+    handle.identify({ email: 'ann@example.com' });
+    expect(q<HTMLInputElement>('.dc-email')!.value).toBe('ann@example.com');
+    q<HTMLInputElement>('.dc-email')!.value = 'typed@example.com';
+    handle.identify({ email: 'other@example.com' });
+    expect(q<HTMLInputElement>('.dc-email')!.value).toBe('typed@example.com');
+  });
+
+  it('never submits in preview mode', async () => {
+    const { handle, q, submit } = setup({ preview: true });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'x';
+    q('.dc-send')!.click();
+    await Promise.resolve();
+    expect(submit).not.toHaveBeenCalled();
+    expect(q('.dc-root')!.hasAttribute('data-preview')).toBe(true);
+  });
+});
