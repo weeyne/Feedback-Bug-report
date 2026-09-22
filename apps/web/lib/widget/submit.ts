@@ -144,10 +144,12 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
       ...describeAgent(payload.metadata.userAgent),
     });
     try {
+      // `$7::text::jsonb` with a JSON string: the parameter is typed `text`, so no driver
+      // (postgres.js, pg, PGlite) JSON-encodes it a second time into a jsonb string.
       await deps.db.query(
         `insert into public.feedback
            (id, project_id, type, message, email, screenshot_path, metadata, over_quota)
-         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
+         values ($1, $2, $3, $4, $5, $6, $7::text::jsonb, $8)`,
         [
           id,
           project.id,

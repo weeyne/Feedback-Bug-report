@@ -79,6 +79,24 @@ function setup(db: TestDb) {
   return { deps, storage, notify, runAfter };
 }
 
+/**
+ * Mimics postgres.js: a parameter whose inferred type is json/jsonb (here: cast directly with
+ * `$n::json[b]`) is always serialized with JSON.stringify, even when it already is a string.
+ */
+function postgresJsLike(db: TestDb): Db {
+  return {
+    query: (sql, params = []) => {
+      const jsonParams = new Set(
+        [...sql.matchAll(/\$(\d+)::jsonb?b/g)].map((match) => Number(match[1]) - 1),
+      );
+      return db.query(
+        sql,
+        params.map((value, i) => (jsonParams.has(i) ? JSON.stringify(value) : value)),
+      );
+    },
+  };
+}
+
 async function freeProject(db: TestDb) {
   const owner = await createUser(db);
   return { owner, ...(await createProject(db, owner, 'Acme')) };
@@ -122,6 +140,37 @@ describe('handleSubmit', () => {
       expect(notify.feedback).not.toHaveBeenCalled();
       await runAfter();
       expect(notify.feedback).toHaveBeenCalledWith(id);
+    }));
+
+  it('stores metadata as a jsonb object, not a jsonb string', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      const res = await handleSubmit(deps, request(payload(project.public_key)));
+      expect(res.status).toBe(201);
+      const [row] = await db.query<{ kind: string; url: string }>(
+        `select jsonb_typeof(metadata) as kind, metadata->>'url' as url
+         from public.feedback where project_id = $1`,
+        [project.id],
+      );
+      expect(row).toEqual({ kind: 'object', url: 'https://host.example/checkout' });
+    }));
+
+  it('stores a jsonb object even with a driver that JSON-encodes every json/jsonb param', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      const res = await handleSubmit(
+        { ...deps, db: postgresJsLike(db) },
+        request(payload(project.public_key)),
+      );
+      expect(res.status).toBe(201);
+      const [row] = await db.query<{ kind: string; url: string }>(
+        `select jsonb_typeof(metadata) as kind, metadata->>'url' as url
+         from public.feedback where project_id = $1`,
+        [project.id],
+      );
+      expect(row).toEqual({ kind: 'object', url: 'https://host.example/checkout' });
     }));
 
   it('stores the screenshot under project/feedback id', () =>
