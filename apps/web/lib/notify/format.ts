@@ -21,8 +21,6 @@ export function escapeHtml(text: string): string {
 }
 
 export function escapeHtmlLimited(text: string, maxEscapedLength: number): string {
-  let result = '';
-  let length = 0;
   const entities: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',
@@ -30,26 +28,30 @@ export function escapeHtmlLimited(text: string, maxEscapedLength: number): strin
     '"': '&quot;',
   };
 
+  // Build list of whole escaped tokens
+  const tokens: string[] = [];
+  let totalLength = 0;
+
   for (const char of text) {
     const escaped = entities[char] ?? char;
-    const newLength = length + escaped.length;
+    const newLength = totalLength + escaped.length;
 
     if (newLength > maxEscapedLength) {
-      // Stop before exceeding the budget; check if we have room for the ellipsis
-      if (length + 1 <= maxEscapedLength) {
-        result += '…';
-      } else if (result.length > 0) {
-        // Replace last char with ellipsis if needed
-        result = result.slice(0, -1) + '…';
+      // Budget exceeded; pop tokens until we have room for ellipsis
+      const ellipsisLength = 1; // "…" is 1 char
+      while (tokens.length > 0 && totalLength + ellipsisLength > maxEscapedLength) {
+        const removed = tokens.pop()!;
+        totalLength -= removed.length;
       }
+      tokens.push('…');
       break;
     }
 
-    result += escaped;
-    length = newLength;
+    tokens.push(escaped);
+    totalLength = newLength;
   }
 
-  return result;
+  return tokens.join('');
 }
 
 export const truncate = (text: string, max: number) =>
@@ -88,7 +90,7 @@ export function formatTelegram(m: FeedbackMessage): { full: string; short: strin
     const reducedMessageBudget = Math.max(500, MESSAGE_LIMIT - overhead - 100); // Leave 100 char margin
     messageContent = escapeHtmlLimited(m.message, reducedMessageBudget);
 
-    // Rebuild without console errors first
+    // Rebuild without console errors first, but keep email
     const fallbackLines = [title, '', messageContent, ''];
     if (m.email) fallbackLines.push(`✉️ ${escapeHtmlLimited(m.email, 254)}`);
     fallbackLines.push(`🔗 ${escapeHtmlLimited(m.metadata.url, 300)}`);
@@ -96,19 +98,16 @@ export function formatTelegram(m: FeedbackMessage): { full: string; short: strin
     fallbackLines.push('', link);
     full = fallbackLines.join('\n');
 
-    // If still too long, drop email and further reduce message
+    // If still too long, further reduce message (never drop email)
     if (full.length > FINAL_LIMIT) {
-      const finalBudget = Math.max(300, MESSAGE_LIMIT - (full.length - FINAL_LIMIT) - 150);
+      const finalOverhead = full.length - FINAL_LIMIT;
+      const finalBudget = Math.max(0, MESSAGE_LIMIT - finalOverhead - 200); // aggressive reduction, allow 0
       messageContent = escapeHtmlLimited(m.message, finalBudget);
-      const minimalLines = [
-        title,
-        '',
-        messageContent,
-        '',
-        `🔗 ${escapeHtmlLimited(m.metadata.url, 300)}`,
-        '',
-        link,
-      ];
+      const minimalLines = [title, '', messageContent, ''];
+      if (m.email) minimalLines.push(`✉️ ${escapeHtmlLimited(m.email, 254)}`);
+      minimalLines.push(`🔗 ${escapeHtmlLimited(m.metadata.url, 300)}`);
+      minimalLines.push(`🖥 ${escapeHtml(environmentLine(m))}`);
+      minimalLines.push('', link);
       full = minimalLines.join('\n');
     }
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sampleMessage } from '@/test/notify-fixtures';
-import { escapeHtml, formatTelegram } from './format';
+import { escapeHtml, escapeHtmlLimited, formatTelegram } from './format';
 
 describe('format', () => {
   it('escapes HTML special characters', () => {
@@ -53,5 +53,39 @@ describe('format', () => {
     expect(full.length).toBeGreaterThan(1024);
     expect(short.length).toBeLessThanOrEqual(1024);
     expect(full.length).toBeLessThanOrEqual(4096);
+  });
+
+  it('never splits HTML entities in escapeHtmlLimited', () => {
+    // 601 '&' chars → 601 * 5 = 3005 escaped chars, exceeds 3000 budget
+    const result1 = escapeHtmlLimited('&'.repeat(601), 3000);
+    expect(result1.length).toBeLessThanOrEqual(3000);
+    expect(result1.endsWith('…')).toBe(true);
+    expect(result1).not.toMatch(/&(?!amp;|lt;|gt;|quot;)/);
+
+    // 41 '&' chars → 41 * 5 = 205 escaped chars, exceeds 200 budget
+    const result2 = escapeHtmlLimited('&'.repeat(41), 200);
+    expect(result2.length).toBeLessThanOrEqual(200);
+    expect(result2.endsWith('…')).toBe(true);
+    expect(result2).not.toMatch(/&(?!amp;|lt;|gt;|quot;)/);
+  });
+
+  it('keeps email when shrinking Telegram message for final limits', () => {
+    const heavyMessage = '&'.repeat(2720); // Large escape-heavy message
+    const longEmail = 'very.long.email.address.with.many.characters@subdomain.example.com';
+    const heavyErrors = [
+      { message: '<&>'.repeat(167), at: 1 },
+      { message: '<&>'.repeat(167), at: 2 },
+      { message: '<&>'.repeat(167), at: 3 },
+    ];
+    const { full } = formatTelegram(
+      sampleMessage({
+        message: heavyMessage,
+        email: longEmail,
+        metadata: { ...sampleMessage().metadata, consoleErrors: heavyErrors },
+      }),
+    );
+    expect(full.length).toBeLessThanOrEqual(4096);
+    expect(full).toContain(longEmail);
+    expect(full).not.toMatch(/&(?!amp;|lt;|gt;|quot;|nbsp;)/);
   });
 });
