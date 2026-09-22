@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Toaster } from '@/components/ui/sonner';
-import { getEnv } from '@/lib/env';
+import { getPublicEnv } from '@/lib/public-env';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('meta');
   const locale = await getLocale();
   return {
-    metadataBase: new URL(getEnv().NEXT_PUBLIC_APP_URL),
+    metadataBase: new URL(getPublicEnv().appUrl),
     title: { default: t('title'), template: '%s · Dymcode' },
     description: t('description'),
     openGraph: {

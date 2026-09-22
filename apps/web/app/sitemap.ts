@@ -1,8 +1,8 @@
 import type { MetadataRoute } from 'next';
-import { getEnv } from '@/lib/env';
+import { getPublicEnv } from '@/lib/public-env';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = getEnv().NEXT_PUBLIC_APP_URL;
+  const base = getPublicEnv().appUrl;
   return ['', '/privacy', '/terms', '/login'].map((path) => ({
     url: `${base}${path}`,
     changeFrequency: 'monthly',
