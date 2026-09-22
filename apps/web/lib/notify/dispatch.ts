@@ -214,3 +214,33 @@ export async function dispatchQuotaNotice(deps: DispatchDeps, projectId: string)
     text: quotaNoticeText(deps.env.NEXT_PUBLIC_APP_URL),
   });
 }
+
+export const TEST_NOTICE_TEXT = (projectName: string) =>
+  `✅ Dymcode test message: notifications for "${projectName}" work.`;
+
+/** Dashboard "Send test": one integration, same notifiers and bookkeeping as real deliveries. */
+export async function sendTestNotice(
+  deps: DispatchDeps,
+  integrationId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [row] = await deps.db.query<IntegrationRow & { project_name: string; pro: boolean }>(
+    `select i.id, i.kind::text as kind, i.target, i.secret_encrypted, p.name as project_name,
+            public.is_pro(p.owner_id) as pro
+     from public.integrations i join public.projects p on p.id = i.project_id
+     where i.id = $1`,
+    [integrationId],
+  );
+  if (!row) return { ok: false, error: 'not found' };
+  const notifier = buildNotifier(deps, row, row.pro);
+  if (notifier === null) return { ok: false, error: 'requires Pro' };
+  if (typeof notifier === 'string') {
+    await record(deps.db, row.id, { ok: false, disable: false, error: notifier });
+    return { ok: false, error: notifier };
+  }
+  const result = await deliver(deps, notifier, {
+    kind: 'text',
+    text: TEST_NOTICE_TEXT(row.project_name),
+  });
+  await record(deps.db, row.id, result);
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}

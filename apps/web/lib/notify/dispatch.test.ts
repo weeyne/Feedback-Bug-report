@@ -9,7 +9,13 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { encryptSecret } from '../crypto';
 import { createMemoryStorage } from '../storage';
-import { dispatchFeedback, dispatchQuotaNotice, type DispatchDeps } from './dispatch';
+import {
+  dispatchFeedback,
+  dispatchQuotaNotice,
+  sendTestNotice,
+  TEST_NOTICE_TEXT,
+  type DispatchDeps,
+} from './dispatch';
 
 const KEY = Buffer.alloc(32, 3).toString('base64');
 const SHARED_TOKEN = '111:SHARED';
@@ -344,5 +350,41 @@ describe('dispatchQuotaNotice', () => {
       expect(calls).toHaveLength(2);
       for (const call of calls)
         expect(String(call.init!.body)).toContain('free limit of 20 submissions');
+    }));
+});
+
+describe('sendTestNotice', () => {
+  it('delivers a text notice to exactly one integration and records it', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db, (url) =>
+        url.includes('discord.com')
+          ? new Response(null, { status: 204 })
+          : new Response(JSON.stringify({ ok: true })),
+      );
+      const project = await projectWith(db);
+      await addIntegration(db, project.id, 'telegram_shared', { target: '424242' });
+      const discordId = await addIntegration(db, project.id, 'discord', {
+        secret: encryptSecret(DISCORD, KEY),
+      });
+
+      expect(await sendTestNotice(deps, discordId)).toEqual({ ok: true });
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.url.startsWith(DISCORD)).toBe(true);
+      expect(JSON.parse(String(calls[0]!.init!.body)).content).toContain(TEST_NOTICE_TEXT('Acme'));
+      expect(await integration(db, discordId)).toEqual({
+        enabled: true,
+        last_error: null,
+        delivered: true,
+      });
+    }));
+
+  it('records a configuration error without calling out', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db);
+      const project = await projectWith(db);
+      const id = await addIntegration(db, project.id, 'telegram_shared', { target: null });
+      expect(await sendTestNotice(deps, id)).toEqual({ ok: false, error: 'missing chat id' });
+      expect(calls).toEqual([]);
+      expect((await integration(db, id)).last_error).toBe('missing chat id');
     }));
 });
