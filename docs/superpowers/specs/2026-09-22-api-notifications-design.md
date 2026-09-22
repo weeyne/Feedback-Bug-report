@@ -59,9 +59,17 @@ four consequences:
    - `onCloneEachNode: maskClonedNode`;
    - `timeout: 5000`;
    - `maximumCanvasSize: 4096`;
-   - `style: { marginTop: -y + 'px', marginLeft: -x + 'px' }` applied to the cloned root. Offsetting with
-     margins, not `transform`, keeps fixed elements positioned against the viewport.
+   - `style: { position: 'relative', top: -y + 'px', left: -x + 'px' }` applied to the cloned root.
+     `position: relative` makes the cloned root the containing block for absolutely positioned
+     elements that had no positioned ancestor, so they move with the offset like normal flow;
+     unlike `transform` or `filter`, relative positioning does not become the containing block for
+     `position: fixed` elements, so those stay bound to the viewport.
 3. Encode WebP 0.7, fall back to JPEG 0.8. Return `null` on failure or when the result exceeds `SCREENSHOT_MAX_BYTES`.
+
+**Known edge case.** An absolutely positioned element anchored to the *bottom* of the initial
+containing block (e.g. `position: absolute; bottom: 0` with no positioned ancestor) resolves
+against the relatively-positioned cloned root's own (viewport-sized) box instead of the true
+document/viewport, so its vertical placement can differ from what the page actually shows.
 
 **Fallback.** If E2E shows that the margin offset does not work with the installed modern-screenshot,
 render the full document, crop the viewport region, and offset `position: fixed` clones by `(x, y)` in

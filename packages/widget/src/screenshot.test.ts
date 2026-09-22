@@ -1,6 +1,6 @@
 import { domToCanvas } from 'modern-screenshot';
-import { describe, expect, it, vi } from 'vitest';
-import { capture, maskClonedNode } from './screenshot';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { capture, maskClonedNode, pageBackground } from './screenshot';
 
 vi.mock('modern-screenshot', () => ({
   domToCanvas: vi.fn(async () => document.createElement('canvas')),
@@ -78,5 +78,26 @@ describe('maskClonedNode', () => {
     expect(input.style.filter).toBe('brightness(0)');
     expect(input.style.width).toBe('120px');
     expect(input.value).toBe('');
+  });
+});
+
+describe('pageBackground', () => {
+  afterEach(() => {
+    document.body.style.background = '';
+    document.documentElement.style.background = '';
+  });
+
+  it('uses the body background when set', () => {
+    document.body.style.background = 'rgb(10, 20, 30)';
+    expect(pageBackground()).toBe('rgb(10, 20, 30)');
+  });
+
+  it('falls back to the html background', () => {
+    document.documentElement.style.background = 'rgb(1, 2, 3)';
+    expect(pageBackground()).toBe('rgb(1, 2, 3)');
+  });
+
+  it('falls back to white when both are transparent', () => {
+    expect(pageBackground()).toBe('#ffffff');
   });
 });

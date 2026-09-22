@@ -36,6 +36,18 @@ export function maskClonedNode(node: Node): void {
   }
 }
 
+const TRANSPARENT = /^(transparent|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\))$/;
+
+/** The color a viewer should see behind the page: body, then html, else white. */
+export function pageBackground(): string {
+  for (const el of [document.body, document.documentElement]) {
+    if (!el) continue;
+    const color = getComputedStyle(el).backgroundColor;
+    if (color && !TRANSPARENT.test(color.trim())) return color;
+  }
+  return '#ffffff';
+}
+
 /**
  * Captures the visible viewport without `exclude` (the widget host). Sensitive elements are
  * painted solid black during rendering. Returns null on any failure or if the
@@ -43,31 +55,26 @@ export function maskClonedNode(node: Node): void {
  */
 export async function capture(exclude: Element): Promise<Blob | null> {
   try {
-    const view = {
-      x: window.scrollX,
-      y: window.scrollY,
-      w: window.innerWidth,
-      h: window.innerHeight,
-    };
-    const scale = Math.min(1, MAX_WIDTH / view.w);
-    const page = await domToCanvas(document.documentElement, {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const scale = Math.min(1, MAX_WIDTH / w);
+    // Render only the viewport. `position: relative` on the cloned root makes it the containing
+    // block for absolutely positioned elements that had no positioned ancestor (so they move with
+    // the offset like normal flow), while relative positioning does NOT become the containing
+    // block for position:fixed elements (unlike transform/filter), so those stay viewport-bound.
+    const canvas = await domToCanvas(document.documentElement, {
+      width: w,
+      height: h,
       scale,
+      backgroundColor: pageBackground(),
       timeout: RESOURCE_TIMEOUT_MS,
+      maximumCanvasSize: 4096,
       filter: (node) => node !== exclude,
       onCloneEachNode: maskClonedNode,
+      style: { position: 'relative', top: `${-window.scrollY}px`, left: `${-window.scrollX}px` },
     });
-    // Pixels per CSS px in the rendered page, whatever the library did with devicePixelRatio.
-    const k = page.width / document.documentElement.scrollWidth;
-
-    const out = document.createElement('canvas');
-    out.width = Math.round(view.w * k);
-    out.height = Math.round(view.h * k);
-    const ctx = out.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(page, view.x * k, view.y * k, out.width, out.height, 0, 0, out.width, out.height);
-
-    let blob = await toBlob(out, 'image/webp', 0.7);
-    if (!blob || blob.type !== 'image/webp') blob = await toBlob(out, 'image/jpeg', 0.8);
+    let blob = await toBlob(canvas, 'image/webp', 0.7);
+    if (!blob || blob.type !== 'image/webp') blob = await toBlob(canvas, 'image/jpeg', 0.8);
     return blob && blob.size <= SCREENSHOT_MAX_BYTES ? blob : null;
   } catch {
     return null;
