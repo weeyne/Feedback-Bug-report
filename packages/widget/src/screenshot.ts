@@ -9,8 +9,28 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
 }
 
 /**
+ * Masks sensitive elements inside a cloned node by setting brightness(0) filter.
+ * For password inputs, also clears the value and removes the value attribute.
+ * Never throws; non-matching nodes and non-elements are untouched.
+ */
+export function maskClonedNode(node: Node): void {
+  try {
+    if (!(node instanceof Element)) return;
+    if (!node.matches(MASK_SELECTOR)) return;
+    node.setAttribute('style', `${node.getAttribute('style') ?? ''} filter: brightness(0)`.trim());
+    if (node instanceof HTMLInputElement && node.type === 'password') {
+      node.value = '';
+      node.removeAttribute('value');
+    }
+  } catch {
+    // Never throw
+  }
+}
+
+/**
  * Captures the visible viewport without `exclude` (the widget host). Sensitive elements are
- * painted over. Returns null on any failure or if the image is too large.
+ * masked via brightness(0) filter during rendering. Returns null on any failure or if the
+ * image is too large.
  */
 export async function capture(exclude: Element): Promise<Blob | null> {
   try {
@@ -20,13 +40,11 @@ export async function capture(exclude: Element): Promise<Blob | null> {
       w: window.innerWidth,
       h: window.innerHeight,
     };
-    const masks = Array.from(document.querySelectorAll(MASK_SELECTOR), (el) =>
-      el.getBoundingClientRect(),
-    );
     const scale = Math.min(1, MAX_WIDTH / view.w);
     const page = await domToCanvas(document.documentElement, {
       scale,
       filter: (node) => node !== exclude,
+      onCloneEachNode: maskClonedNode,
     });
     // Pixels per CSS px in the rendered page, whatever the library did with devicePixelRatio.
     const k = page.width / document.documentElement.scrollWidth;
@@ -37,8 +55,6 @@ export async function capture(exclude: Element): Promise<Blob | null> {
     const ctx = out.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(page, view.x * k, view.y * k, out.width, out.height, 0, 0, out.width, out.height);
-    ctx.fillStyle = '#000';
-    for (const r of masks) ctx.fillRect(r.left * k, r.top * k, r.width * k, r.height * k);
 
     let blob = await toBlob(out, 'image/webp', 0.7);
     if (!blob || blob.type !== 'image/webp') blob = await toBlob(out, 'image/jpeg', 0.8);
