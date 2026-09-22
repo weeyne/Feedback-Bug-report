@@ -224,6 +224,111 @@ describe('dispatchFeedback', () => {
     }));
 });
 
+describe('dispatchFeedback hardening', () => {
+  it('records an internal error instead of throwing when building or recording fails', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db);
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const project = await projectWith(db);
+      const tg = await addIntegration(db, project.id, 'telegram_shared', { target: '4242' });
+      // Metadata `{}` (the harness default) makes message formatting throw.
+      const broken = await createFeedback(db, project.id);
+      await expect(dispatchFeedback(deps, broken)).resolves.toBeUndefined();
+      expect(calls).toHaveLength(0);
+      expect(await integration(db, tg)).toMatchObject({
+        enabled: true,
+        last_error: 'internal error',
+      });
+      expect(error).toHaveBeenCalledWith('[dispatch]', expect.any(Error));
+
+      error.mockClear();
+      await db.query('update public.integrations set last_error = null where id = $1', [tg]);
+      const flakyDb = {
+        query: (sql: string, params?: unknown[]) =>
+          /last_delivered_at = now\(\)/.test(sql)
+            ? Promise.reject(new Error('simulated update failure'))
+            : db.query(sql, params),
+      } as DispatchDeps['db'];
+      await expect(
+        dispatchFeedback({ ...deps, db: flakyDb }, await feedback(db, project.id)),
+      ).resolves.toBeUndefined();
+      expect(await integration(db, tg)).toMatchObject({ last_error: 'internal error' });
+      expect(error).toHaveBeenCalledWith('[dispatch]', expect.any(Error));
+      error.mockRestore();
+    }));
+
+  it('rejects Discord webhook URLs outside discord.com /api/webhooks/', () =>
+    withTx(async (db) => {
+      const cases: Array<[string, boolean]> = [
+        ['http://discord.com/api/webhooks/1/a', false],
+        ['https://evil.example/api/webhooks/1/a', false],
+        ['https://discord.com.evil.example/api/webhooks/1/a', false],
+        ['https://discord.com/api/other/1/a', false],
+        ['not a url', false],
+        ['https://discord.com/api/webhooks/1/a', true],
+        ['https://discordapp.com/api/webhooks/1/b', true],
+        ['https://ptb.discord.com/api/webhooks/1/c', true],
+        ['https://canary.discord.com/api/webhooks/1/d', true],
+      ];
+      for (const [url, valid] of cases) {
+        const { deps, calls } = setup(db, () => new Response(null, { status: 204 }));
+        const project = await projectWith(db);
+        const id = await addIntegration(db, project.id, 'discord', {
+          secret: encryptSecret(url, KEY),
+        });
+        await dispatchFeedback(deps, await feedback(db, project.id));
+        expect(
+          calls.map((c) => c.url),
+          url,
+        ).toEqual(valid ? [url] : []);
+        expect((await integration(db, id)).last_error, url).toBe(
+          valid ? null : 'invalid webhook url',
+        );
+        if (valid) expect(calls[0]!.init!.redirect).toBe('error');
+      }
+    }));
+
+  it('rejects malformed custom bot tokens without calling Telegram', () =>
+    withTx(async (db) => {
+      for (const [token, valid] of [
+        ['123:abc/../../evil', false],
+        ['bot:123', false],
+        ['123:A-b_c', true],
+      ] as const) {
+        const { deps, calls } = setup(db);
+        const project = await projectWith(db, { pro: true });
+        const id = await addIntegration(db, project.id, 'telegram_custom', {
+          target: '1',
+          secret: encryptSecret(token, KEY),
+        });
+        await dispatchFeedback(deps, await feedback(db, project.id));
+        expect(
+          calls.map((c) => c.url),
+          token,
+        ).toEqual(valid ? [`https://api.telegram.org/bot${token}/sendMessage`] : []);
+        expect((await integration(db, id)).last_error, token).toBe(
+          valid ? null : 'invalid bot token',
+        );
+      }
+    }));
+
+  it('sends without the screenshot when the download times out', () =>
+    withTx(async (db) => {
+      const { deps, calls, storage } = setup(db);
+      deps.screenshotTimeoutMs = 20;
+      storage.download = () => new Promise(() => {});
+      const project = await projectWith(db);
+      await addIntegration(db, project.id, 'telegram_shared', { target: '4242' });
+      const feedbackId = await feedback(db, project.id);
+      await db.query('update public.feedback set screenshot_path = $1 where id = $2', [
+        `${project.id}/${feedbackId}.webp`,
+        feedbackId,
+      ]);
+      await dispatchFeedback(deps, feedbackId);
+      expect(calls.map((c) => c.url.split('/').pop())).toEqual(['sendMessage']);
+    }));
+});
+
 describe('dispatchQuotaNotice', () => {
   it('sends the limit notice to every enabled channel', () =>
     withTx(async (db) => {

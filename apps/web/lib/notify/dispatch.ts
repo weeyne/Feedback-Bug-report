@@ -9,6 +9,14 @@ import { createTelegramNotifier } from './telegram';
 import type { Attachment, DeliveryResult, Notification, Notifier } from './types';
 
 const MAX_RETRY_WAIT_SEC = 3;
+const SCREENSHOT_TIMEOUT_MS = 10_000;
+const DISCORD_HOSTS = new Set([
+  'discord.com',
+  'discordapp.com',
+  'ptb.discord.com',
+  'canary.discord.com',
+]);
+const BOT_TOKEN = /^\d+:[\w-]+$/;
 const EXTENSION_TYPES: Record<string, string> = {
   webp: 'image/webp',
   jpg: 'image/jpeg',
@@ -21,6 +29,8 @@ export interface DispatchDeps {
   fetch: typeof fetch;
   env: Pick<Env, 'TELEGRAM_BOT_TOKEN' | 'SECRETS_ENCRYPTION_KEY' | 'NEXT_PUBLIC_APP_URL'>;
   sleep?: (ms: number) => Promise<void>;
+  /** Screenshot download budget; on timeout the notification is sent without it. */
+  screenshotTimeoutMs?: number;
 }
 
 interface IntegrationRow extends Row {
@@ -36,6 +46,23 @@ export const quotaNoticeText = (appUrl: string) =>
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+export function isDiscordWebhookUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return (
+    url.protocol === 'https:' &&
+    DISCORD_HOSTS.has(url.hostname) &&
+    url.port === '' &&
+    url.username === '' &&
+    url.password === '' &&
+    url.pathname.startsWith('/api/webhooks/')
+  );
+}
+
 /** null = skip silently; string = configuration error recorded on the integration. */
 function buildNotifier(
   deps: DispatchDeps,
@@ -43,24 +70,46 @@ function buildNotifier(
   pro: boolean,
 ): Notifier | string | null {
   const secret = () => decryptSecret(row.secret_encrypted ?? '', deps.env.SECRETS_ENCRYPTION_KEY);
+  let value: string;
+  switch (row.kind) {
+    case 'telegram_shared':
+      if (!row.target) return 'missing chat id';
+      return createTelegramNotifier({
+        token: deps.env.TELEGRAM_BOT_TOKEN,
+        chatId: row.target,
+        fetch: deps.fetch,
+      });
+    case 'telegram_custom':
+      if (!pro) return null;
+      if (!row.target) return 'missing chat id';
+      try {
+        value = secret();
+      } catch {
+        return 'secret unreadable';
+      }
+      if (!BOT_TOKEN.test(value)) return 'invalid bot token';
+      return createTelegramNotifier({ token: value, chatId: row.target, fetch: deps.fetch });
+    case 'discord':
+      try {
+        value = secret();
+      } catch {
+        return 'secret unreadable';
+      }
+      if (!isDiscordWebhookUrl(value)) return 'invalid webhook url';
+      return createDiscordNotifier({ webhookUrl: value, fetch: deps.fetch });
+  }
+}
+
+/** Resolves null when `promise` does not settle within `ms`. */
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
   try {
-    switch (row.kind) {
-      case 'telegram_shared':
-        if (!row.target) return 'missing chat id';
-        return createTelegramNotifier({
-          token: deps.env.TELEGRAM_BOT_TOKEN,
-          chatId: row.target,
-          fetch: deps.fetch,
-        });
-      case 'telegram_custom':
-        if (!pro) return null;
-        if (!row.target) return 'missing chat id';
-        return createTelegramNotifier({ token: secret(), chatId: row.target, fetch: deps.fetch });
-      case 'discord':
-        return createDiscordNotifier({ webhookUrl: secret(), fetch: deps.fetch });
-    }
-  } catch {
-    return 'secret unreadable';
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -110,13 +159,20 @@ async function fanOut(
      from public.integrations where project_id = $1 and enabled order by created_at`,
     [projectId],
   );
-  await Promise.allSettled(
+  await Promise.all(
     rows.map(async (row) => {
-      const notifier = buildNotifier(deps, row, pro);
-      if (notifier === null) return;
-      if (typeof notifier === 'string')
-        return record(deps.db, row.id, { ok: false, disable: false, error: notifier });
-      return record(deps.db, row.id, await deliver(deps, notifier, notification));
+      try {
+        const notifier = buildNotifier(deps, row, pro);
+        if (notifier === null) return;
+        if (typeof notifier === 'string')
+          return await record(deps.db, row.id, { ok: false, disable: false, error: notifier });
+        await record(deps.db, row.id, await deliver(deps, notifier, notification));
+      } catch (error) {
+        console.error('[dispatch]', error);
+        await record(deps.db, row.id, { ok: false, disable: false, error: 'internal error' }).catch(
+          (recordError: unknown) => console.error('[dispatch]', recordError),
+        );
+      }
     }),
   );
 }
@@ -142,7 +198,10 @@ export async function dispatchFeedback(deps: DispatchDeps, feedbackId: string): 
 
   let screenshot: Attachment | null = null;
   if (row.screenshot_path) {
-    const file = await deps.storage.download(row.screenshot_path).catch(() => null);
+    const file = await withTimeout(
+      deps.storage.download(row.screenshot_path),
+      deps.screenshotTimeoutMs ?? SCREENSHOT_TIMEOUT_MS,
+    ).catch(() => null);
     const extension = row.screenshot_path.split('.').pop() ?? 'webp';
     if (file) {
       screenshot = {

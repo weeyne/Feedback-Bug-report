@@ -5,6 +5,8 @@ import { handleSubmit } from '@/lib/widget/submit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Notifications run in after(): up to two 5 s attempts per channel plus a 10 s screenshot download.
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const deps = await getDeps();
