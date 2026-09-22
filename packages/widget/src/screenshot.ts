@@ -17,7 +17,10 @@ export function maskClonedNode(node: Node): void {
   try {
     if (!(node instanceof Element)) return;
     if (!node.matches(MASK_SELECTOR)) return;
-    node.setAttribute('style', `${node.getAttribute('style') ?? ''} filter: brightness(0)`.trim());
+    const elem = node as HTMLElement | undefined;
+    if (elem?.style?.setProperty) {
+      elem.style.setProperty('filter', 'brightness(0)', 'important');
+    }
     if (node instanceof HTMLInputElement && node.type === 'password') {
       node.value = '';
       node.removeAttribute('value');

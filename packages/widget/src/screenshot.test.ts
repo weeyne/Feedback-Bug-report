@@ -32,4 +32,24 @@ describe('maskClonedNode', () => {
     const text = document.createTextNode('some text');
     expect(() => maskClonedNode(text)).not.toThrow();
   });
+
+  it('preserves existing inline styles without trailing semicolon', () => {
+    const div = document.createElement('div');
+    div.setAttribute('data-feedback-mask', '');
+    div.setAttribute('style', 'width:200px');
+    maskClonedNode(div);
+    expect(div.style.filter).toBe('brightness(0)');
+    expect(div.style.width).toBe('200px');
+  });
+
+  it('preserves existing styles on password input without trailing semicolon', () => {
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.value = 'secret';
+    input.setAttribute('style', 'color:red');
+    maskClonedNode(input);
+    expect(input.style.filter).toBe('brightness(0)');
+    expect(input.style.color).toBe('red');
+    expect(input.value).toBe('');
+  });
 });
