@@ -4,6 +4,7 @@ import type { SubmitResult } from '../api';
 import type { CaptureFn } from '../screenshot-loader';
 import { mountWidget, type WidgetHandle } from './mount';
 import type { PanelDeps } from './panel';
+import baseCss from './styles.css?inline';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -85,11 +86,35 @@ describe('mountWidget', () => {
     expect(q('img')).toBeNull();
   });
 
-  it('puts custom CSS inside the shadow root only', () => {
+  it('adopts base then custom CSS as constructable stylesheets when supported', () => {
     const { root } = setup({ config: { customCss: '.dc-trigger{border-radius:0}' } });
-    const styles = Array.from(root.querySelectorAll('style'), (s) => s.textContent);
-    expect(styles).toContain('.dc-trigger{border-radius:0}');
+    expect(root.querySelectorAll('style')).toHaveLength(0);
+    const sheets = root.adoptedStyleSheets;
+    expect(sheets).toHaveLength(2);
+    const text = (sheet: CSSStyleSheet) => Array.from(sheet.cssRules, (r) => r.cssText).join('');
+    expect(text(sheets[1]!)).toContain('.dc-trigger');
+    expect(text(sheets[1]!)).toContain('border-radius');
+    expect(document.adoptedStyleSheets).toHaveLength(0);
     expect(document.head.innerHTML).not.toContain('border-radius:0');
+  });
+
+  it('falls back to <style> elements, custom after base, without constructable stylesheets', () => {
+    vi.stubGlobal('CSSStyleSheet', undefined);
+    try {
+      const { root } = setup({ config: { customCss: '.dc-trigger{border-radius:0}' } });
+      const styles = Array.from(root.querySelectorAll('style'), (s) => s.textContent);
+      expect(styles).toHaveLength(2);
+      expect(styles[0]).toBe(baseCss);
+      expect(styles[1]).toBe('.dc-trigger{border-radius:0}');
+      expect(document.head.innerHTML).not.toContain('border-radius:0');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('adopts only the base stylesheet without custom CSS', () => {
+    const { root } = setup();
+    expect(root.adoptedStyleSheets).toHaveLength(1);
   });
 
   it('applies the accent color, position and locale', () => {
