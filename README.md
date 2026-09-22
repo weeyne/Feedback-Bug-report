@@ -54,9 +54,31 @@ Embed:
 Host page API: `Dymcode.open('bug' | 'idea' | 'general')`, `Dymcode.identify({ email, id, name })`,
 and the `dymcode:ready` window event. Add `data-hide-trigger` to hide the floating button.
 
+## Web app and API (`apps/web`)
+
+Next.js app serving the public widget API, notifications, the Telegram webhook and the retention cron.
+
+```bash
+pnpm --filter @dymcode/web dev     # builds the widget, copies it to public/w/, starts next dev (needs apps/web/.env.local)
+pnpm --filter @dymcode/web test    # unit + DB tests on PGlite (no Docker, no .env.local needed)
+pnpm --filter @dymcode/web e2e     # widget → API → notification E2E in test mode (fake env, in-memory DB)
+```
+
+Endpoints: `GET /api/v1/widget/config`, `POST /api/v1/widget/submit`, `POST /api/telegram/webhook`,
+`GET /api/cron/retention` (Vercel Cron, `Authorization: Bearer $CRON_SECRET`).
+Submissions are rate limited to 5 per minute per project and client (IPv6 grouped by /64) and 30 per
+minute per project.
+
+After deploying, register the shared bot webhook:
+
+```bash
+pnpm --filter @dymcode/web telegram:set-webhook https://<your-domain>/api/telegram/webhook
+```
+
 ## Layout
 
 - `packages/shared`: widget↔API contract (zod schemas, constants, brand)
 - `packages/widget`: embeddable widget (Shadow DOM, i18n, screenshots)
+- `apps/web`: Next.js API, widget hosting, notifications, Telegram webhook, retention cron
 - `supabase/migrations`: database schema, functions, RLS
 - `supabase/tests`: database tests

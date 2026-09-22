@@ -34,6 +34,9 @@ async function openPglite(): Promise<Driver> {
   };
 }
 
+/** Standalone in-process database with migrations applied (used by apps/web test tooling). */
+export const createPgliteDb = openPglite;
+
 /** Real local Supabase (CI), migrations already applied by `supabase start`. */
 async function openSupabase(): Promise<Driver> {
   const client = new pg.Client({
