@@ -54,6 +54,12 @@ importers:
       '@dymcode/widget':
         specifier: workspace:*
         version: link:../../packages/widget
+      '@electric-sql/pglite':
+        specifier: ^0.5.8
+        version: 0.5.8
+      '@playwright/test':
+        specifier: ^1.63.0
+        version: 1.63.0
       '@types/node':
         specifier: ^24.13.6
         version: 24.13.6

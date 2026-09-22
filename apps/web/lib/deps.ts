@@ -21,6 +21,11 @@ export function getDeps(): Promise<AppDeps> {
 
 async function buildDeps(): Promise<AppDeps> {
   const env = getEnv();
+  if (env.DYMCODE_TEST_MODE === '1') {
+    const { assertTestModeAllowed, createTestModeDeps } = await import('./test-mode');
+    assertTestModeAllowed(env, process.env.NODE_ENV);
+    return createTestModeDeps(env);
+  }
   return {
     db: createPostgresDb(env.DATABASE_URL),
     storage: createSupabaseStorage(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY),
