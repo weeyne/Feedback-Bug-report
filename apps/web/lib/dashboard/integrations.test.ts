@@ -265,3 +265,40 @@ describe('integrationStatus, sendTest, disconnect', () => {
       });
     }));
 });
+
+describe('telegram_custom Pro gating and getMe caching', () => {
+  it('shows disconnected and blocks sendTest once Pro lapses', () =>
+    withTx(async (db) => {
+      const owner = await createUser(db);
+      await grantPro(db, owner);
+      const project = await createProject(db, owner);
+      const { deps, calls } = setup(db);
+      expect(
+        await saveCustomBot(deps, owner, { projectId: project.id, token: TOKEN, chatId: '42' }),
+      ).toEqual({ ok: true, botUsername: 'acme_bot' });
+      await db.query('delete from public.subscriptions where user_id = $1', [owner]);
+      const before = calls.filter((c) => c.url.endsWith('/getMe')).length;
+      const status = await integrationStatus(deps, owner, project.id);
+      const custom = status!.find((s) => s.kind === 'telegram_custom')!;
+      expect(custom.connected).toBe(false);
+      expect(custom.botUsername).toBeUndefined();
+      expect(calls.filter((c) => c.url.endsWith('/getMe')).length).toBe(before);
+      expect(
+        await sendTest(deps, owner, { projectId: project.id, kind: 'telegram_custom' }),
+      ).toEqual({ ok: false, error: 'integrations.proRequired' });
+    }));
+
+  it('caches the getMe lookup across consecutive status polls', () =>
+    withTx(async (db) => {
+      const owner = await createUser(db);
+      await grantPro(db, owner);
+      const project = await createProject(db, owner);
+      const { deps, calls } = setup(db);
+      await saveCustomBot(deps, owner, { projectId: project.id, token: TOKEN, chatId: '42' });
+      // saveCustomBot already resolved and seeded the username; polling status must not re-fetch it.
+      const before = calls.filter((c) => c.url.endsWith('/getMe')).length;
+      await integrationStatus(deps, owner, project.id);
+      await integrationStatus(deps, owner, project.id);
+      expect(calls.filter((c) => c.url.endsWith('/getMe')).length).toBe(before);
+    }));
+});

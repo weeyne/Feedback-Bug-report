@@ -29,6 +29,27 @@ export interface TelegramLink {
 
 const CHAT_ID = /^(-?\d{1,20}|@\w{5,32})$/;
 const TELEGRAM_TIMEOUT_MS = 5000;
+const BOT_USERNAME_TTL_MS = 10 * 60 * 1000;
+
+/** getMe results for telegram_custom bots, keyed by `${integrationId}:${secret_encrypted}` so a
+ *  rotated secret (new ciphertext) always misses. Bounded by pruning expired entries on write. */
+const botUsernameCache = new Map<string, { username: string; expires: number }>();
+
+function cachedBotUsername(key: string): string | null {
+  const entry = botUsernameCache.get(key);
+  if (!entry) return null;
+  if (entry.expires < Date.now()) {
+    botUsernameCache.delete(key);
+    return null;
+  }
+  return entry.username;
+}
+
+function cacheBotUsername(key: string, username: string) {
+  const now = Date.now();
+  for (const [k, v] of botUsernameCache) if (v.expires < now) botUsernameCache.delete(k);
+  botUsernameCache.set(key, { username, expires: now + BOT_USERNAME_TTL_MS });
+}
 
 async function rateLimited(deps: DashDeps, action: string, userId: string): Promise<boolean> {
   const [row] = await deps.db.query<{ limited: boolean }>(
@@ -59,14 +80,17 @@ async function upsert(
   kind: IntegrationKind,
   target: string | null,
   secret: string,
-) {
-  await deps.db.query(
+): Promise<{ id: string; secretEncrypted: string }> {
+  const secretEncrypted = encryptSecret(secret, deps.env.SECRETS_ENCRYPTION_KEY);
+  const [row] = await deps.db.query<{ id: string }>(
     `insert into public.integrations (project_id, kind, target, secret_encrypted, enabled, last_error)
      values ($1, $2::integration_kind, $3, $4, true, null)
      on conflict (project_id, kind) do update
-       set target = excluded.target, secret_encrypted = excluded.secret_encrypted, enabled = true, last_error = null`,
-    [projectId, kind, target, encryptSecret(secret, deps.env.SECRETS_ENCRYPTION_KEY)],
+       set target = excluded.target, secret_encrypted = excluded.secret_encrypted, enabled = true, last_error = null
+     returning id`,
+    [projectId, kind, target, secretEncrypted],
   );
+  return { id: row!.id, secretEncrypted };
 }
 
 export async function createTelegramLink(
@@ -100,7 +124,9 @@ export async function integrationStatus(
   projectId: string,
 ): Promise<IntegrationStatus[] | null> {
   if (!(await ownsProject(deps, userId, projectId))) return null;
+  const pro = await isPro(deps, userId);
   const rows = await deps.db.query<{
+    id: string;
     kind: IntegrationKind;
     enabled: boolean;
     target: string | null;
@@ -108,7 +134,7 @@ export async function integrationStatus(
     last_error: string | null;
     last_delivered_at: Date | string | null;
   }>(
-    `select kind::text as kind, enabled, target, secret_encrypted, last_error, last_delivered_at
+    `select id, kind::text as kind, enabled, target, secret_encrypted, last_error, last_delivered_at
      from public.integrations where project_id = $1`,
     [projectId],
   );
@@ -117,24 +143,38 @@ export async function integrationStatus(
       const row = rows.find((r) => r.kind === kind);
       if (!row)
         return { kind, connected: false, enabled: false, lastError: null, lastDeliveredAt: null };
+      const custom = kind === 'telegram_custom';
       const status: IntegrationStatus = {
         kind,
-        connected: row.enabled && (kind === 'discord' || row.target !== null),
+        connected:
+          row.enabled &&
+          (custom ? pro && row.target !== null : kind === 'discord' || row.target !== null),
         enabled: row.enabled,
         lastError: row.last_error,
         lastDeliveredAt: row.last_delivered_at
           ? new Date(row.last_delivered_at).toISOString()
           : null,
       };
-      if (kind === 'telegram_custom' && row.secret_encrypted) {
-        try {
-          const username = await getMe(
-            deps,
-            decryptSecret(row.secret_encrypted, deps.env.SECRETS_ENCRYPTION_KEY),
-          );
-          if (username) status.botUsername = username;
-        } catch {
-          // Unreadable secret: shown as not connected via lastError on the next delivery.
+      // A lapsed Pro owner keeps their custom bot's row (and dispatch skips it silently, see
+      // buildNotifier) but the dashboard must neither show it connected nor call out to Telegram.
+      if (custom && pro && row.secret_encrypted) {
+        const cacheKey = `${row.id}:${row.secret_encrypted}`;
+        const cached = cachedBotUsername(cacheKey);
+        if (cached) {
+          status.botUsername = cached;
+        } else {
+          try {
+            const username = await getMe(
+              deps,
+              decryptSecret(row.secret_encrypted, deps.env.SECRETS_ENCRYPTION_KEY),
+            );
+            if (username) {
+              status.botUsername = username;
+              cacheBotUsername(cacheKey, username);
+            }
+          } catch {
+            // Unreadable secret: shown as not connected via lastError on the next delivery.
+          }
         }
       }
       return status;
@@ -163,7 +203,8 @@ export async function saveCustomBot(
     text: TEST_NOTICE_TEXT(project.name),
   });
   if (!result.ok) return { ok: false, error: 'integrations.testFailed' };
-  await upsert(deps, project.id, 'telegram_custom', chatId, token);
+  const saved = await upsert(deps, project.id, 'telegram_custom', chatId, token);
+  cacheBotUsername(`${saved.id}:${saved.secretEncrypted}`, botUsername);
   return { ok: true, botUsername };
 }
 
@@ -194,6 +235,8 @@ export async function sendTest(
   if (!INTEGRATION_KINDS.includes(input.kind)) return { ok: false, error: 'errors.notFound' };
   if (!(await ownsProject(deps, userId, input.projectId)))
     return { ok: false, error: 'errors.notFound' };
+  if (input.kind === 'telegram_custom' && !(await isPro(deps, userId)))
+    return { ok: false, error: 'integrations.proRequired' };
   if (await rateLimited(deps, 'send-test', userId))
     return { ok: false, error: 'errors.rateLimited' };
   const [row] = await deps.db.query<{ id: string }>(
