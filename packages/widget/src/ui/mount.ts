@@ -82,9 +82,7 @@ export function mountWidget(
     host,
     open: (type = 'bug') => panel.open(type),
     close: () => panel.close(),
-    identify: (user) => {
-      if (user.email) panel.setEmail(user.email);
-    },
+    identify: (user) => panel.setEmail(user.email ?? ''),
     destroy: () => {
       panel.destroy();
       host.remove();

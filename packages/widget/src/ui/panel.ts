@@ -30,6 +30,7 @@ export interface Panel {
   open(type: FeedbackType): void;
   close(): void;
   isOpen(): boolean;
+  /** Prefills (or clears, with '') the identified email unless the visitor typed their own. */
   setEmail(email: string): void;
   /** Revokes the current screenshot preview URL and cancels the pending auto-close timer. */
   destroy(): void;
@@ -418,8 +419,9 @@ export function createPanel(options: {
     close,
     isOpen: () => !element.hidden,
     setEmail(value: string) {
+      // Replace only what identify() put there before; never text the visitor typed.
+      if (!email.value || email.value === identifiedEmail) email.value = value;
       identifiedEmail = value;
-      if (!email.value) email.value = value;
     },
     destroy,
   };

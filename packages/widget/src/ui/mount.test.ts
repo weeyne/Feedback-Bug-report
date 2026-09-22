@@ -314,6 +314,28 @@ describe('panel', () => {
     expect(q<HTMLInputElement>('.dc-email')!.value).toBe('typed@example.com');
   });
 
+  it('identify replaces a previously identified email', () => {
+    const { handle, q } = setup();
+    handle.identify({ email: 'a@example.com' });
+    handle.identify({ email: 'b@example.com' });
+    expect(q<HTMLInputElement>('.dc-email')!.value).toBe('b@example.com');
+  });
+
+  it('identify without an email clears the prefilled one', () => {
+    const { handle, q } = setup();
+    handle.identify({ email: 'a@example.com' });
+    handle.identify({});
+    expect(q<HTMLInputElement>('.dc-email')!.value).toBe('');
+  });
+
+  it('identify never clears text the visitor typed', () => {
+    const { handle, q } = setup();
+    handle.identify({ email: 'a@example.com' });
+    q<HTMLInputElement>('.dc-email')!.value = 'typed@example.com';
+    handle.identify({});
+    expect(q<HTMLInputElement>('.dc-email')!.value).toBe('typed@example.com');
+  });
+
   it('never submits in preview mode', async () => {
     const { handle, q, submit } = setup({ preview: true });
     handle.open();
