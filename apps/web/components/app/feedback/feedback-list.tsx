@@ -8,6 +8,8 @@ const DOT: Record<string, string> = {
   general: 'bg-indigo-500',
 };
 
+const MAX_HIDDEN_PLACEHOLDER_ROWS = 5;
+
 export async function FeedbackList({
   items,
   hidden,
@@ -53,14 +55,24 @@ export async function FeedbackList({
         </li>
       ))}
       {hidden > 0 && (
-        <li className="px-4 py-3 text-sm" data-testid="feedback-hidden">
-          <div className="select-none blur-[2px]" aria-hidden>
-            ████████ ████ ██████
-          </div>
-          <Link href="/app/billing" className="underline">
-            {t('hidden', { count: hidden })}
-          </Link>
-        </li>
+        <>
+          {Array.from({ length: Math.min(hidden, MAX_HIDDEN_PLACEHOLDER_ROWS) }).map((_, i) => (
+            <li
+              key={`hidden-${i}`}
+              aria-hidden
+              className="flex select-none items-center gap-3 px-4 py-3 text-sm blur-[2px]"
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">████████ ████ ██████</span>
+              <span className="shrink-0 text-xs text-muted-foreground">•• •• ••••</span>
+            </li>
+          ))}
+          <li className="px-4 py-3 text-sm" data-testid="feedback-hidden">
+            <Link href="/app/billing" className="underline">
+              {t('hidden', { count: hidden })}
+            </Link>
+          </li>
+        </>
       )}
       {loadMoreHref && (
         <li className="p-3 text-center">

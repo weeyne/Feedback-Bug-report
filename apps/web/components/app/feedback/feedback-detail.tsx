@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import type { FeedbackDetail } from '@/lib/dashboard/feedback';
 import { FeedbackActions } from './feedback-actions';
+import { ScreenshotViewer } from './screenshot-viewer';
 
 export async function FeedbackDetailPanel({
   feedback,
@@ -53,12 +54,7 @@ export async function FeedbackDetailPanel({
           </a>
         </p>
       )}
-      {screenshot && (
-        <a href={screenshot} target="_blank" rel="noopener noreferrer" className="mt-4 block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={screenshot} alt={t('screenshot')} className="w-full rounded-md border" />
-        </a>
-      )}
+      {screenshot && <ScreenshotViewer src={screenshot} />}
       <dl className="mt-4 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs">
         {rows
           .filter(([, value]) => value)

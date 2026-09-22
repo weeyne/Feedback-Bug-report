@@ -51,7 +51,11 @@ export default async function FeedbackPage({
     hiddenFeedbackCount(deps, user.id, projectId),
     usage(deps, user.id),
   ]);
-  const selected = query.f ? await getFeedback(deps, user.id, query.f) : null;
+  const selectedRaw = query.f ? await getFeedback(deps, user.id, query.f) : null;
+  // getFeedback scopes by owner (RLS), not by project: a feedback id from a different
+  // project of the same owner would otherwise open here and be actionable. Treat a
+  // cross-project id as not found.
+  const selected = selectedRaw && selectedRaw.project_id === projectId ? selectedRaw : null;
   const screenshot = selected?.has_screenshot
     ? await screenshotUrl(deps, user.id, selected.id)
     : null;
