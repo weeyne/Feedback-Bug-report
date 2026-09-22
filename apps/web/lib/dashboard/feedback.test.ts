@@ -69,6 +69,34 @@ describe('feedback use cases', () => {
       expect(resolved.items).toEqual([]);
     }));
 
+  it('never skips or duplicates rows across a sub-millisecond cursor boundary', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const { owner, project, ids } = await seed(db, 51);
+      // ids[1] and ids[0] are the two oldest (last of page 1, only item of page 2); make them
+      // differ by less than a millisecond so a millisecond-truncated cursor would skip ids[0].
+      await db.query(
+        `update public.feedback set created_at = '2026-01-01 00:00:00.123456+00' where id = $1`,
+        [ids[1]],
+      );
+      await db.query(
+        `update public.feedback set created_at = '2026-01-01 00:00:00.123200+00' where id = $1`,
+        [ids[0]],
+      );
+      const first = await listFeedback(deps, owner, { projectId: project.id });
+      expect(first.items).toHaveLength(50);
+      expect(first.items[49]!.id).toBe(ids[1]);
+      expect(first.nextCursor).not.toBeNull();
+      const second = await listFeedback(deps, owner, {
+        projectId: project.id,
+        cursor: first.nextCursor!,
+      });
+      expect(second.items.map((i) => i.id)).toEqual([ids[0]]);
+      expect(second.nextCursor).toBeNull();
+      const allIds = [...first.items, ...second.items].map((i) => i.id);
+      expect(new Set(allIds).size).toBe(51);
+    }));
+
   it('round-trips cursors and rejects garbage', () => {
     const cursor = {
       createdAt: '2026-09-22T10:00:00.000Z',

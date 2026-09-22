@@ -35,6 +35,10 @@ interface ListRow extends Row {
   message: string;
   status: FeedbackStatus;
   created_at: Date | string;
+  /** Microsecond-precision UTC timestamp for cursor pagination; `created_at` loses precision
+   * once it round-trips through a JS `Date` (millisecond resolution), so the cursor is built
+   * from this raw Postgres-formatted string instead. Never exposed on `FeedbackListItem`. */
+  cursor_at: string;
   has_screenshot: boolean;
 }
 
@@ -75,6 +79,7 @@ export async function listFeedback(
   const rows = await withUser(deps.db, userId, (tx) =>
     tx.query<ListRow>(
       `select id, type::text as type, left(message, 200) as message, status::text as status, created_at,
+              to_char(created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at,
               screenshot_path is not null as has_screenshot
        from public.feedback
        where project_id = $1 and status = $2::feedback_status
@@ -92,14 +97,16 @@ export async function listFeedback(
       ],
     ),
   );
-  const page = rows
-    .slice(0, FEEDBACK_PAGE_SIZE)
-    .map((r) => ({ ...r, created_at: iso(r.created_at) }));
-  const last = page[page.length - 1];
+  const pageRows = rows.slice(0, FEEDBACK_PAGE_SIZE);
+  const page = pageRows.map(({ cursor_at: _cursor_at, ...r }) => ({
+    ...r,
+    created_at: iso(r.created_at),
+  }));
+  const last = pageRows[pageRows.length - 1];
   return {
     items: page,
     nextCursor:
-      rows.length > FEEDBACK_PAGE_SIZE && last ? { createdAt: last.created_at, id: last.id } : null,
+      rows.length > FEEDBACK_PAGE_SIZE && last ? { createdAt: last.cursor_at, id: last.id } : null,
   };
 }
 
