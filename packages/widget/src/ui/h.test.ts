@@ -36,4 +36,20 @@ describe('h', () => {
     expect(el.childNodes).toHaveLength(2);
     expect(el.textContent).toBe('xy');
   });
+
+  it('does not let a throwing listener escape click()/dispatchEvent()', () => {
+    const onError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const el = h('button', {
+        onclick: () => {
+          throw new Error('boom');
+        },
+      });
+      expect(() => el.click()).not.toThrow();
+      expect(() => el.dispatchEvent(new Event('click'))).not.toThrow();
+      expect(onError).toHaveBeenCalledTimes(2);
+    } finally {
+      onError.mockRestore();
+    }
+  });
 });

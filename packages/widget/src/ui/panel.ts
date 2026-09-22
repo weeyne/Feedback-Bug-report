@@ -29,9 +29,20 @@ export interface Panel {
   close(): void;
   isOpen(): boolean;
   setEmail(email: string): void;
+  /** Revokes the current screenshot preview URL and cancels the pending auto-close timer. */
+  destroy(): void;
 }
 
 type ShotState = 'loading' | 'ready' | 'unavailable';
+
+/** The actually-focused element, descending into this document's own open shadow trees. */
+function activeElementDeep(): HTMLElement | null {
+  let active: Element | null = document.activeElement;
+  while (active instanceof HTMLElement && active.shadowRoot?.activeElement) {
+    active = active.shadowRoot.activeElement;
+  }
+  return active instanceof HTMLElement ? active : null;
+}
 
 export function createPanel(options: {
   config: WidgetConfig;
@@ -40,7 +51,7 @@ export function createPanel(options: {
   deps: PanelDeps | null;
   /** Excluded from screenshots. */
   host: Element;
-  onClose(): void;
+  onClose(previouslyFocused: HTMLElement | null): void;
 }): Panel {
   const { config, t, deps } = options;
   let type: FeedbackType = 'bug';
@@ -48,9 +59,11 @@ export function createPanel(options: {
   let shot: Blob | null = null;
   let shotUrl: string | null = null;
   let capturing: Promise<void> = Promise.resolve();
+  let captureGeneration = 0;
   let identifiedEmail = '';
   let sending = false;
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  let previouslyFocused: HTMLElement | null = null;
 
   const typeButtons = FEEDBACK_TYPES.map((ft) =>
     h(
@@ -168,31 +181,54 @@ export function createPanel(options: {
     shot = blob;
     thumb.dataset.state = state;
     thumb.replaceChildren();
-    if (shotUrl) URL.revokeObjectURL(shotUrl);
+    if (shotUrl) {
+      try {
+        URL.revokeObjectURL(shotUrl);
+      } catch {
+        // best-effort cleanup only
+      }
+    }
     shotUrl = null;
     const unavailable = state === 'unavailable';
     shotToggle.disabled = unavailable;
     if (unavailable) shotToggle.checked = false;
     shotText.textContent = unavailable ? t.screenshotUnavailable : t.screenshot;
-    if (blob && typeof URL.createObjectURL === 'function') {
-      shotUrl = URL.createObjectURL(blob);
-      thumb.append(h('img', { src: shotUrl, alt: '' }));
+    if (blob) {
+      try {
+        if (typeof URL.createObjectURL === 'function') {
+          shotUrl = URL.createObjectURL(blob);
+          thumb.append(h('img', { src: shotUrl, alt: '' }));
+        }
+      } catch {
+        // no inline preview available; the toggle above still reflects a usable screenshot
+      }
     }
   }
 
+  /** One capture per open: a generation counter drops results from a capture that is no longer current. */
   function startCapture() {
     shotToggle.checked = true;
+    const generation = ++captureGeneration;
     if (!deps) {
       setShot('ready');
       return;
     }
     setShot('loading');
-    capturing = deps
-      .loadCapture()
+    let request: Promise<CaptureFn | null>;
+    try {
+      request = deps.loadCapture();
+    } catch {
+      request = Promise.resolve(null);
+    }
+    capturing = request
       .then((captureFn) => (captureFn ? captureFn(options.host) : null))
       .then(
-        (blob) => setShot(blob ? 'ready' : 'unavailable', blob),
-        () => setShot('unavailable'),
+        (blob) => {
+          if (generation === captureGeneration) setShot(blob ? 'ready' : 'unavailable', blob);
+        },
+        () => {
+          if (generation === captureGeneration) setShot('unavailable');
+        },
       );
   }
 
@@ -212,13 +248,30 @@ export function createPanel(options: {
     showForm();
   }
 
+  /** Monotonic milliseconds; never throws even if `deps.now()` does. */
+  function safeNow(): number {
+    if (!deps) return 0;
+    try {
+      return deps.now();
+    } catch {
+      return 0;
+    }
+  }
+
   function open(next: FeedbackType) {
     clearTimeout(closeTimer);
+    previouslyFocused = activeElementDeep();
     selectType(next);
     if (element.hidden) {
       element.hidden = false;
       showForm();
-      openedAt = deps ? deps.now() : 0;
+      openedAt = safeNow();
+      startCapture();
+    } else if (!thanks.hidden) {
+      // Re-opened while the "thanks" state was still showing: start a clean session instead of
+      // leaving the panel stuck on the previous submission.
+      reset();
+      openedAt = safeNow();
       startCapture();
     }
     message.focus();
@@ -229,13 +282,15 @@ export function createPanel(options: {
     clearTimeout(closeTimer);
     element.hidden = true;
     if (!thanks.hidden) reset();
-    options.onClose();
+    options.onClose(previouslyFocused);
   }
 
   function setBusy(busy: boolean) {
     sendButton.disabled = busy;
     retry.disabled = busy;
     sendButton.textContent = busy ? t.sending : t.send;
+    if (busy) sendButton.setAttribute('aria-busy', 'true');
+    else sendButton.removeAttribute('aria-busy');
   }
 
   function showError(reason: Exclude<SubmitResult, { ok: true }>['reason']) {
@@ -269,14 +324,20 @@ export function createPanel(options: {
         message: text,
         email: mail,
         metadata: deps.collectMetadata(),
-        elapsedMs: deps.now() - openedAt,
+        elapsedMs: safeNow() - openedAt,
         website: honeypot.value,
       });
       const result = await deps.submit(payload, shotToggle.checked ? shot : null);
       if (result.ok) {
-        form.hidden = true;
-        thanks.hidden = false;
-        closeTimer = setTimeout(close, THANKS_CLOSE_MS);
+        if (element.hidden) {
+          // The panel was closed while this send was in flight: settle quietly instead of
+          // popping "thanks" back open, and leave the form clean for the next open().
+          reset();
+        } else {
+          form.hidden = true;
+          thanks.hidden = false;
+          closeTimer = setTimeout(close, THANKS_CLOSE_MS);
+        }
       } else {
         showError(result.reason);
       }
@@ -314,6 +375,18 @@ export function createPanel(options: {
     }
   }
 
+  function destroy() {
+    clearTimeout(closeTimer);
+    if (shotUrl) {
+      try {
+        URL.revokeObjectURL(shotUrl);
+      } catch {
+        // best-effort cleanup only
+      }
+      shotUrl = null;
+    }
+  }
+
   selectType('bug');
 
   return {
@@ -325,5 +398,6 @@ export function createPanel(options: {
       identifiedEmail = value;
       if (!email.value) email.value = value;
     },
+    destroy,
   };
 }

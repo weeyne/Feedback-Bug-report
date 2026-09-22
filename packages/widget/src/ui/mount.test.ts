@@ -1,8 +1,17 @@
 import type { ClientMetadata, WidgetConfig } from '@dymcode/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SubmitResult } from '../api';
+import type { CaptureFn } from '../screenshot-loader';
 import { mountWidget, type WidgetHandle } from './mount';
 import type { PanelDeps } from './panel';
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
 
 const baseConfig: WidgetConfig = {
   primaryColor: '#6366f1',
@@ -106,6 +115,19 @@ describe('mountWidget', () => {
     expect(badge.target).toBe('_blank');
     shown.handle.destroy();
     expect(setup({ config: { showBadge: false } }).q('.dc-badge')).toBeNull();
+  });
+
+  it('fixes the host to the viewport in normal mode but not in preview', () => {
+    const normal = setup();
+    expect(normal.handle.host.style.getPropertyValue('all')).toBe('initial');
+    expect(normal.handle.host.style.getPropertyValue('position')).toBe('fixed');
+    expect(normal.handle.host.style.getPropertyValue('z-index')).toBe('2147483000');
+    normal.handle.destroy();
+
+    const preview = setup({ preview: true });
+    expect(preview.handle.host.style.getPropertyValue('all')).toBe('initial');
+    expect(preview.handle.host.style.getPropertyValue('position')).toBe('');
+    expect(preview.handle.host.style.getPropertyValue('z-index')).toBe('');
   });
 });
 
@@ -255,5 +277,92 @@ describe('panel', () => {
     await Promise.resolve();
     expect(submit).not.toHaveBeenCalled();
     expect(q('.dc-root')!.hasAttribute('data-preview')).toBe(true);
+  });
+
+  it('ignores a stale capture result from a closed-and-reopened panel', async () => {
+    const first = deferred<CaptureFn | null>();
+    const second = deferred<CaptureFn | null>();
+    const loadCapture = vi
+      .fn<PanelDeps['loadCapture']>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const shotA = new Blob(['a'], { type: 'image/webp' });
+    const shotB = new Blob(['b'], { type: 'image/webp' });
+    const { handle, q, submit } = setup({ deps: { loadCapture } });
+
+    handle.open('bug');
+    q('.dc-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    handle.open('bug');
+
+    second.resolve(async () => shotB);
+    await vi.waitFor(() => expect(q('.dc-thumb')!.dataset.state).toBe('ready'));
+
+    first.resolve(async () => shotA);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(q('.dc-thumb')!.dataset.state).toBe('ready');
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'x';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0]![1]).toBe(shotB);
+  });
+
+  it('resets instead of showing thanks when closed while a send is in flight', async () => {
+    const pending = deferred<SubmitResult>();
+    const submit = vi.fn<() => Promise<SubmitResult>>().mockReturnValue(pending.promise);
+    const { handle, q } = setup({ deps: { submit } });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'in flight';
+    q('.dc-send')!.click();
+    q('.dc-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(q('.dc-panel')!.hidden).toBe(true);
+
+    pending.resolve({ ok: true });
+    await vi.waitFor(() => expect(q<HTMLTextAreaElement>('.dc-message')!.value).toBe(''));
+    expect(q('.dc-panel')!.hidden).toBe(true);
+
+    handle.open();
+    expect(q<HTMLTextAreaElement>('.dc-message')!.value).toBe('');
+    expect(q('.dc-thanks')!.hidden).toBe(true);
+    expect(q('.dc-form')!.hidden).toBe(false);
+  });
+
+  it('shows a busy spinner on the send button while sending', async () => {
+    const pending = deferred<SubmitResult>();
+    const submit = vi.fn<() => Promise<SubmitResult>>().mockReturnValue(pending.promise);
+    const { handle, q } = setup({ deps: { submit } });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'busy check';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(q('.dc-send')!.getAttribute('aria-busy')).toBe('true'));
+    pending.resolve({ ok: true });
+    await vi.waitFor(() => expect(q('.dc-send')!.hasAttribute('aria-busy')).toBe(false));
+  });
+
+  it('open() while thanks is showing resets and shows the form again', async () => {
+    const { handle, q } = setup();
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'first';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(q('.dc-thanks')!.hidden).toBe(false));
+
+    handle.open('idea');
+    expect(q('.dc-panel')!.hidden).toBe(false);
+    expect(q('.dc-thanks')!.hidden).toBe(true);
+    expect(q('.dc-form')!.hidden).toBe(false);
+    expect(q<HTMLTextAreaElement>('.dc-message')!.value).toBe('');
+    expect(q('.dc-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('returns focus to the previously focused element when hideTrigger is set', () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    const { handle, q } = setup({ hideTrigger: true });
+    handle.open();
+    q('.dc-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(q('.dc-panel')!.hidden).toBe(true);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
   });
 });

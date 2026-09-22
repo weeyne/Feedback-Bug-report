@@ -35,7 +35,9 @@ export function mountWidget(
 ): WidgetHandle {
   const host = document.createElement('div');
   host.setAttribute('data-dymcode', '');
-  host.style.cssText = 'all: initial;';
+  host.style.cssText = options.preview
+    ? 'all: initial;'
+    : 'all: initial; position: fixed; z-index: 2147483000;';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.append(h('style', {}, styles));
   if (config.customCss) shadow.append(h('style', {}, config.customCss));
@@ -58,7 +60,13 @@ export function mountWidget(
     t: MESSAGES[locale],
     deps: options.preview ? null : (options.deps ?? null),
     host,
-    onClose: () => trigger?.focus(),
+    onClose: (previouslyFocused) => {
+      if (trigger) {
+        trigger.focus();
+      } else if (previouslyFocused?.isConnected) {
+        previouslyFocused.focus();
+      }
+    },
   });
   if (!options.hideTrigger) {
     trigger = createTrigger(config.triggerText, () =>
@@ -77,6 +85,9 @@ export function mountWidget(
     identify: (user) => {
       if (user.email) panel.setEmail(user.email);
     },
-    destroy: () => host.remove(),
+    destroy: () => {
+      panel.destroy();
+      host.remove();
+    },
   };
 }
