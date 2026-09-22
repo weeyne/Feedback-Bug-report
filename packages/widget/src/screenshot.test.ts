@@ -19,6 +19,18 @@ describe('maskClonedNode', () => {
     expect(div.style.filter).toBe('brightness(0)');
   });
 
+  it('paints masked elements solid black so transparent-background text is unreadable', () => {
+    const span = document.createElement('span');
+    span.setAttribute('data-feedback-mask', '');
+    span.setAttribute('style', 'color: green; background: transparent');
+    maskClonedNode(span);
+    expect(span.style.getPropertyValue('background-color')).toBe('#000');
+    expect(span.style.getPropertyPriority('background')).toBe('important');
+    expect(span.style.getPropertyValue('color')).toBe('#000');
+    expect(span.style.getPropertyPriority('color')).toBe('important');
+    expect(span.style.getPropertyPriority('filter')).toBe('important');
+  });
+
   it('does not modify ordinary inputs with values', () => {
     const input = document.createElement('input');
     input.type = 'text';
@@ -46,10 +58,10 @@ describe('maskClonedNode', () => {
     const input = document.createElement('input');
     input.type = 'password';
     input.value = 'secret';
-    input.setAttribute('style', 'color:red');
+    input.setAttribute('style', 'width:120px');
     maskClonedNode(input);
     expect(input.style.filter).toBe('brightness(0)');
-    expect(input.style.color).toBe('red');
+    expect(input.style.width).toBe('120px');
     expect(input.value).toBe('');
   });
 });

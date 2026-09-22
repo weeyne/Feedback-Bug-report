@@ -9,7 +9,9 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
 }
 
 /**
- * Masks sensitive elements inside a cloned node by setting brightness(0) filter.
+ * Masks sensitive elements inside a cloned node: a solid black background and text color (so
+ * glyphs on transparent backgrounds are covered too) plus a brightness(0) filter that blackens
+ * images and children.
  * For password inputs, also clears the value and removes the value attribute.
  * Never throws; non-matching nodes and non-elements are untouched.
  */
@@ -19,6 +21,8 @@ export function maskClonedNode(node: Node): void {
     if (!node.matches(MASK_SELECTOR)) return;
     const elem = node as HTMLElement | undefined;
     if (elem?.style?.setProperty) {
+      elem.style.setProperty('background', '#000', 'important');
+      elem.style.setProperty('color', '#000', 'important');
       elem.style.setProperty('filter', 'brightness(0)', 'important');
     }
     if (node instanceof HTMLInputElement && node.type === 'password') {
@@ -32,7 +36,7 @@ export function maskClonedNode(node: Node): void {
 
 /**
  * Captures the visible viewport without `exclude` (the widget host). Sensitive elements are
- * masked via brightness(0) filter during rendering. Returns null on any failure or if the
+ * painted solid black during rendering. Returns null on any failure or if the
  * image is too large.
  */
 export async function capture(exclude: Element): Promise<Blob | null> {

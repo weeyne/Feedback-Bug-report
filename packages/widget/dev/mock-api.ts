@@ -60,6 +60,7 @@ async function readForm(req: IncomingMessage): Promise<FormData> {
 /** Dev/E2E stand-in for the phase-3 API, validating with the same shared schemas. */
 export function mockApi(): Plugin {
   let last: MockSubmission | null = null;
+  let lastShot: { type: string; bytes: Buffer } | null = null;
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -86,8 +87,10 @@ export function mockApi(): Plugin {
       }
       const file = form.get('screenshot');
       let screenshot: MockSubmission['screenshot'] = null;
+      lastShot = null;
       if (file instanceof Blob) {
         screenshot = { type: file.type, size: file.size };
+        lastShot = { type: file.type, bytes: Buffer.from(await file.arrayBuffer()) };
         const okType = (SCREENSHOT_MIME_TYPES as readonly string[]).includes(file.type);
         if (!okType || file.size > SCREENSHOT_MAX_BYTES) {
           last = { status: 400, payload: json, screenshot };
@@ -110,6 +113,16 @@ export function mockApi(): Plugin {
     }
     if (req.method === 'GET' && url.pathname === '/__mock/last-submission') {
       sendJson(res, 200, last);
+      return true;
+    }
+    if (req.method === 'GET' && url.pathname === '/__mock/last-screenshot') {
+      if (!lastShot) {
+        sendJson(res, 404, { error: 'no screenshot' });
+      } else {
+        res.statusCode = 200;
+        res.setHeader('content-type', lastShot.type);
+        res.end(lastShot.bytes);
+      }
       return true;
     }
     return false;
