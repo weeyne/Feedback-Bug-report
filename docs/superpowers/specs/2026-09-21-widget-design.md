@@ -155,6 +155,12 @@ Phase 1 is on `main`, so the DB change is a **new migration**. The shared schema
 - `consoleErrors`;
 - `user` (only if `identify` provided `id` or `name`).
 
+**Privacy: URL redaction.** Before truncation, `url` and `referrer` have the values of query parameters
+(and of `key=value` pairs inside a query-like hash, e.g. `#access_token=…` or `#/cb?code=…`) replaced with
+`[redacted]` when the parameter name matches, case-insensitively, one of `token`, `access_token`,
+`refresh_token`, `id_token`, `code`, `key`, `secret`, `password`, `pass`, `auth`, `session`, `signature`,
+`sig`. Invalid URLs are passed through unchanged (still truncated).
+
 ### Submit (`api.ts`)
 - `submitFeedback(apiOrigin, payload, screenshot?: Blob)` sends `multipart/form-data`:
   - `payload` = JSON string of `{ projectKey, type, message, email?, metadata, elapsedMs, website }`;
