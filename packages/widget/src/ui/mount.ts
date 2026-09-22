@@ -22,6 +22,7 @@ export interface WidgetHandle {
   host: HTMLElement;
   open(type?: FeedbackType): void;
   close(): void;
+  isOpen(): boolean;
   identify(user: IdentifiedUser): void;
   destroy(): void;
 }
@@ -102,6 +103,7 @@ export function mountWidget(
     host,
     open: (type = 'bug') => panel.open(type),
     close: () => panel.close(),
+    isOpen: () => panel.isOpen(),
     identify: (user) => panel.setEmail(user.email ?? ''),
     destroy: () => {
       panel.destroy();

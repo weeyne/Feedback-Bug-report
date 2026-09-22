@@ -7,6 +7,7 @@ const fakeHandle = () =>
     host: document.createElement('div'),
     open: vi.fn(),
     close: vi.fn(),
+    isOpen: vi.fn(() => false),
     identify: vi.fn(),
     destroy: vi.fn(),
   }) satisfies WidgetHandle;

@@ -118,6 +118,7 @@
     "triggerInvalid": "Button text must be 1–40 characters.",
     "originInvalid": "One of the websites is not a valid address.",
     "tooManyOrigins": "You can list up to 20 websites.",
+    "originsTooLong": "The list of allowed websites is too long (max 4 096 bytes).",
     "cssTooLarge": "Custom CSS must be at most 10 240 bytes.",
     "danger": "Danger zone",
     "deleteProject": "Delete project",

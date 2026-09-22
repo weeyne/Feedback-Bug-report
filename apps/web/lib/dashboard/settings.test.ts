@@ -79,6 +79,15 @@ describe('updateProjectSettings', () => {
           { allowedOrigins: Array.from({ length: 21 }, (_, i) => `s${i}.example.com`) },
           'settings.tooManyOrigins',
         ],
+        [
+          {
+            allowedOrigins: Array.from(
+              { length: 20 },
+              (_, i) => `s${i}-${'x'.repeat(220)}.example.com`,
+            ),
+          },
+          'settings.originsTooLong',
+        ],
         [{ customCss: 'ж'.repeat(5121) }, 'settings.cssTooLarge'],
       ];
       for (const [patch, error] of cases) {

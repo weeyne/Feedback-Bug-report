@@ -15,6 +15,8 @@ import { getProject } from './projects';
 import { isUuid, type ActionResult, type DashDeps } from './result';
 
 export const MAX_ORIGINS = 20;
+// Mirrors the DB check `octet_length(array_to_string(allowed_origins, ',')) <= 4096`.
+export const MAX_ORIGINS_BYTES = 4096;
 
 export interface SettingsInput {
   name: string;
@@ -58,7 +60,9 @@ function normalizeOrigins(inputs: string[]): string[] | string {
     if (!origin) return 'settings.originInvalid';
     if (!origins.includes(origin)) origins.push(origin);
   }
-  return origins.length > MAX_ORIGINS ? 'settings.tooManyOrigins' : origins;
+  if (origins.length > MAX_ORIGINS) return 'settings.tooManyOrigins';
+  if (utf8ByteLength(origins.join(',')) > MAX_ORIGINS_BYTES) return 'settings.originsTooLong';
+  return origins;
 }
 
 export async function updateProjectSettings(
