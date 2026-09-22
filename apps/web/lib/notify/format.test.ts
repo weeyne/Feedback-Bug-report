@@ -27,4 +27,31 @@ describe('format', () => {
     const { full } = formatTelegram(sampleMessage({ message: 'x'.repeat(5000) }));
     expect(full.length).toBeLessThanOrEqual(4096);
   });
+
+  it('handles escape-heavy content without breaking the 4096 limit', () => {
+    const heavyHtml = '<>&"'.repeat(750); // 3000 chars of repeating HTML special chars
+    const errors = [
+      { message: '<&>'.repeat(167), at: 1 }, // ~500 chars
+      { message: '<&>'.repeat(167), at: 2 },
+      { message: '<&>'.repeat(167), at: 3 },
+    ];
+    const { full } = formatTelegram(
+      sampleMessage({
+        message: heavyHtml,
+        metadata: { ...sampleMessage().metadata, consoleErrors: errors },
+      }),
+    );
+    expect(full.length).toBeLessThanOrEqual(4096);
+    // Verify no broken HTML entities (& not followed by valid entity)
+    expect(full).not.toMatch(/&(?!amp;|lt;|gt;|quot;|nbsp;)/);
+  });
+
+  it('truncates escape-heavy messages before exceeding caption limit', () => {
+    const heavyHtml = '<>&"'.repeat(375); // 1500 chars of repeating HTML special chars
+    const { full, short } = formatTelegram(sampleMessage({ message: heavyHtml }));
+    // When full > 1024, short should be used as caption in telegram notifier
+    expect(full.length).toBeGreaterThan(1024);
+    expect(short.length).toBeLessThanOrEqual(1024);
+    expect(full.length).toBeLessThanOrEqual(4096);
+  });
 });
