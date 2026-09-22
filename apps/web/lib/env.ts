@@ -1,7 +1,10 @@
+import { PUBLIC_KEY_PATTERN } from '@dymcode/shared';
 import { z } from 'zod';
 
 const EnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
+  NEXT_PUBLIC_DYMCODE_PROJECT_KEY: z.string().regex(PUBLIC_KEY_PATTERN).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//),
   NEXT_PUBLIC_APP_URL: z.url(),

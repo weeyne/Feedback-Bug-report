@@ -76,7 +76,11 @@ export interface Db {
   asServiceRole(): Promise<void>;
   /** Back to the connection's own role (postgres), e.g. to create fixtures. */
   asPostgres(): Promise<void>;
+  /** Savepoint-scoped transaction inside the test transaction. */
+  transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T>;
 }
+
+let savepointCounter = 0;
 
 function makeDb(d: Driver): Db {
   const setRole = async (role: string, claims: Record<string, string>) => {
@@ -84,7 +88,7 @@ function makeDb(d: Driver): Db {
     await d.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
   };
 
-  return {
+  const db: Db = {
     query: (sql, params) => d.query(sql, params),
     async queryError(sql, params = []) {
       await d.query('savepoint expect_error');
@@ -103,7 +107,20 @@ function makeDb(d: Driver): Db {
     async asPostgres() {
       await d.query('reset role');
     },
+    async transaction(fn) {
+      const name = `sp_${++savepointCounter}`;
+      await d.query(`savepoint ${name}`);
+      try {
+        const result = await fn(db);
+        await d.query(`release savepoint ${name}`);
+        return result;
+      } catch (error) {
+        await d.query(`rollback to savepoint ${name}`);
+        throw error;
+      }
+    },
   };
+  return db;
 }
 
 /** Runs `fn` in a transaction that is always rolled back, so tests never leak data. */

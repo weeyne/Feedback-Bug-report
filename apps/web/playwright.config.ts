@@ -17,6 +17,7 @@ export default defineConfig({
     env: {
       DYMCODE_TEST_MODE: '1',
       NEXT_PUBLIC_SUPABASE_URL: 'http://localhost:54321',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'e2e-publishable-key-0000000000',
       SUPABASE_SERVICE_ROLE_KEY: 'e2e-service-role-key-000000',
       DATABASE_URL: 'postgresql://unused:unused@localhost:5432/unused',
       NEXT_PUBLIC_APP_URL: `http://localhost:${PORT}`,

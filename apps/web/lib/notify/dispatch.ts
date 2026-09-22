@@ -6,17 +6,13 @@ import type { Env } from '../env';
 import type { Storage } from '../storage';
 import { createDiscordNotifier } from './discord';
 import { createTelegramNotifier } from './telegram';
+import { isBotToken, isDiscordWebhookUrl } from './validate';
 import type { Attachment, DeliveryResult, Notification, Notifier } from './types';
+
+export { isDiscordWebhookUrl } from './validate';
 
 const MAX_RETRY_WAIT_SEC = 3;
 const SCREENSHOT_TIMEOUT_MS = 10_000;
-const DISCORD_HOSTS = new Set([
-  'discord.com',
-  'discordapp.com',
-  'ptb.discord.com',
-  'canary.discord.com',
-]);
-const BOT_TOKEN = /^\d+:[\w-]+$/;
 const EXTENSION_TYPES: Record<string, string> = {
   webp: 'image/webp',
   jpg: 'image/jpeg',
@@ -46,23 +42,6 @@ export const quotaNoticeText = (appUrl: string) =>
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function isDiscordWebhookUrl(value: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  return (
-    url.protocol === 'https:' &&
-    DISCORD_HOSTS.has(url.hostname) &&
-    url.port === '' &&
-    url.username === '' &&
-    url.password === '' &&
-    url.pathname.startsWith('/api/webhooks/')
-  );
-}
-
 /** null = skip silently; string = configuration error recorded on the integration. */
 function buildNotifier(
   deps: DispatchDeps,
@@ -87,7 +66,7 @@ function buildNotifier(
       } catch {
         return 'secret unreadable';
       }
-      if (!BOT_TOKEN.test(value)) return 'invalid bot token';
+      if (!isBotToken(value)) return 'invalid bot token';
       return createTelegramNotifier({ token: value, chatId: row.target, fetch: deps.fetch });
     case 'discord':
       try {

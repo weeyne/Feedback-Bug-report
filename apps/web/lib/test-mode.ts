@@ -39,10 +39,16 @@ async function openDatabase(): Promise<Db> {
     .sort();
   for (const file of migrations)
     await db.exec(await readFile(join(root, 'migrations', file), 'utf8'));
-  return {
+  // PGlite's `transaction` serializes concurrent requests on its single connection.
+  const wrap = (q: { query: PGlite['query'] }): Db => ({
     query: async <T extends Row>(sql: string, params: unknown[] = []) =>
-      (await db.query<T>(sql, params)).rows,
-  };
+      (await q.query<T>(sql, params)).rows,
+    transaction: async <T>(fn: (tx: Db) => Promise<T>) =>
+      (await db.transaction(async (tx) =>
+        fn(wrap(tx as unknown as { query: PGlite['query'] })),
+      )) as T,
+  });
+  return wrap(db);
 }
 
 async function describeBody(body: BodyInit | null | undefined): Promise<unknown> {

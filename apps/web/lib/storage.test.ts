@@ -25,3 +25,12 @@ describe('memory storage', () => {
     expect(storage.files.has('b')).toBe(true);
   });
 });
+
+describe('memory storage signed urls', () => {
+  it('returns a data URL for existing files and null otherwise', async () => {
+    const storage = createMemoryStorage();
+    await storage.upload('p/1.webp', new Uint8Array([1, 2, 3]), 'image/webp');
+    expect(await storage.signedUrl('p/1.webp', 300)).toBe('data:image/webp;base64,AQID');
+    expect(await storage.signedUrl('p/missing.webp', 300)).toBeNull();
+  });
+});
