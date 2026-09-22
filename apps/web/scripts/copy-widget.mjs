@@ -12,5 +12,6 @@ if (!existsSync(new URL('widget.js', src))) {
 }
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
-for (const file of ['widget.js', 'screenshot.js']) cpSync(new URL(file, src), new URL(file, dest));
-console.log('Copied widget.js and screenshot.js into apps/web/public/w/');
+for (const file of ['widget.js', 'screenshot.js', 'preview.js'])
+  cpSync(new URL(file, src), new URL(file, dest));
+console.log('Copied widget.js, screenshot.js and preview.js into apps/web/public/w/');
