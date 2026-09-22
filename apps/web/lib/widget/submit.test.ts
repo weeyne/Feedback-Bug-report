@@ -5,7 +5,9 @@ import {
   withTx,
   type TestDb,
 } from '@dymcode/db-tests/harness';
+import { SCREENSHOT_MAX_BYTES } from '@dymcode/shared';
 import { describe, expect, it, vi } from 'vitest';
+import type { Db } from '../db/types';
 import { createMemoryStorage } from '../storage';
 import { handleSubmit, type SubmitDeps } from './submit';
 
@@ -36,19 +38,27 @@ function payload(projectKey: string, overrides: Record<string, unknown> = {}) {
 
 function request(
   body: object | string,
-  opts: { screenshot?: Blob; origin?: string; ip?: string; headers?: Record<string, string> } = {},
+  opts: {
+    screenshot?: Blob;
+    /** `null` omits the Origin header entirely; omitted defaults to 'https://host.example'. */
+    origin?: string | null;
+    ip?: string;
+    headers?: Record<string, string>;
+  } = {},
 ) {
   const form = new FormData();
   form.append('payload', typeof body === 'string' ? body : JSON.stringify(body));
   if (opts.screenshot) form.append('screenshot', opts.screenshot, 'screenshot');
+  const headers: Record<string, string> = {
+    'x-forwarded-for': opts.ip ?? '203.0.113.7',
+    ...opts.headers,
+  };
+  const origin = opts.origin === undefined ? 'https://host.example' : opts.origin;
+  if (origin !== null) headers.origin = origin;
   return new Request('https://dymcode.dev/api/v1/widget/submit', {
     method: 'POST',
     body: form,
-    headers: {
-      origin: opts.origin ?? 'https://host.example',
-      'x-forwarded-for': opts.ip ?? '203.0.113.7',
-      ...opts.headers,
-    },
+    headers,
   });
 }
 
@@ -262,5 +272,82 @@ describe('handleSubmit', () => {
       );
       await handleSubmit(deps, request(payload(project.public_key)));
       expect((await feedbackRows(db, project.id))[0]!.over_quota).toBe(false);
+    }));
+
+  it('does not mark the 20th monthly submission as over quota but does mark the 21st', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      await db.query(
+        `insert into public.usage_counters (owner_id, period, count)
+         values ($1, date_trunc('month', now() at time zone 'utc')::date, 19)`,
+        [project.owner],
+      );
+      await handleSubmit(deps, request(payload(project.public_key)));
+      await handleSubmit(deps, request(payload(project.public_key), { ip: '198.51.100.9' }));
+      const rows = await feedbackRows(db, project.id);
+      expect(rows.map((r) => r.over_quota)).toEqual([false, true]);
+    }));
+
+  it('rejects a request with no Origin header when allowed_origins is configured', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      await db.query(
+        `update public.projects set allowed_origins = '{https://shop.example}' where id = $1`,
+        [project.id],
+      );
+      const res = await handleSubmit(deps, request(payload(project.public_key), { origin: null }));
+      expect(res.status).toBe(403);
+    }));
+
+  it('rejects a screenshot larger than the max size with 400', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      const big = new Blob([new Uint8Array(SCREENSHOT_MAX_BYTES + 1)], { type: 'image/webp' });
+      const res = await handleSubmit(
+        deps,
+        request(payload(project.public_key), { screenshot: big }),
+      );
+      expect(res.status).toBe(400);
+    }));
+
+  it('strips NUL bytes from stored strings while still storing the screenshot', () =>
+    withTx(async (db) => {
+      const { deps, storage } = setup(db);
+      const project = await freeProject(db);
+      const shot = new Blob([new Uint8Array(2000)], { type: 'image/webp' });
+      const res = await handleSubmit(
+        deps,
+        request(payload(project.public_key, { message: 'a\u0000b' }), { screenshot: shot }),
+      );
+      expect(res.status).toBe(201);
+      const { id } = await res.json();
+      const [row] = await feedbackRows(db, project.id);
+      expect(row!.message).toBe('ab');
+      const path = `${project.id}/${id}.webp`;
+      expect(storage.files.has(path)).toBe(true);
+    }));
+
+  it('removes the uploaded screenshot and returns 500 when the insert fails', () =>
+    withTx(async (db) => {
+      const { deps, storage } = setup(db);
+      const project = await freeProject(db);
+      const throwingDb: Db = {
+        query: async (sql, params) => {
+          if (/insert into public\.feedback/.test(sql)) throw new Error('simulated insert failure');
+          return db.query(sql, params);
+        },
+      };
+      const shot = new Blob([new Uint8Array(2000)], { type: 'image/webp' });
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await handleSubmit(
+        { ...deps, db: throwingDb },
+        request(payload(project.public_key), { screenshot: shot }),
+      );
+      expect(res.status).toBe(500);
+      expect(storage.files.size).toBe(0);
+      error.mockRestore();
     }));
 });

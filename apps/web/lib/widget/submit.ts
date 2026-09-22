@@ -33,6 +33,22 @@ export interface SubmitDeps {
   };
 }
 
+/** Recursively strips U+0000, which Postgres `text`/`jsonb` columns reject. */
+function stripNul<T>(value: T): T {
+  if (typeof value === 'string') {
+    return value.replace(/\u0000/g, '') as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => stripNul(item)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => [key, stripNul(val)]),
+    ) as T;
+  }
+  return value;
+}
+
 function describeAgent(userAgent: string): { browser: string; os: string } {
   const result = UAParser(userAgent);
   const join = (...parts: Array<string | undefined>) =>
@@ -121,25 +137,32 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
       }
     }
 
-    const metadata: FeedbackMetadata = {
+    const message = stripNul(payload.message);
+    const email = payload.email ? stripNul(payload.email) : null;
+    const metadata: FeedbackMetadata = stripNul({
       ...payload.metadata,
       ...describeAgent(payload.metadata.userAgent),
-    };
-    await deps.db.query(
-      `insert into public.feedback
-         (id, project_id, type, message, email, screenshot_path, metadata, over_quota)
-       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
-      [
-        id,
-        project.id,
-        payload.type,
-        payload.message,
-        payload.email ?? null,
-        screenshotPath,
-        JSON.stringify(metadata),
-        overQuota,
-      ],
-    );
+    });
+    try {
+      await deps.db.query(
+        `insert into public.feedback
+           (id, project_id, type, message, email, screenshot_path, metadata, over_quota)
+         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
+        [
+          id,
+          project.id,
+          payload.type,
+          message,
+          email,
+          screenshotPath,
+          JSON.stringify(metadata),
+          overQuota,
+        ],
+      );
+    } catch (error) {
+      if (screenshotPath) await deps.storage.remove([screenshotPath]).catch(() => {});
+      throw error;
+    }
 
     deps.after(async () => {
       try {
