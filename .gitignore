@@ -10,3 +10,6 @@ test-results/
 supabase/.branches/
 supabase/.temp/
 .superpowers/
+.next/
+apps/web/public/w/
+*.tsbuildinfo
