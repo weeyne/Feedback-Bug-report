@@ -23,6 +23,94 @@ import type {
 const POLL_MS = 2000;
 const POLL_LIMIT_MS = 60_000;
 
+function IntegrationStatusLabel({ status }: { status: IntegrationStatus }) {
+  const t = useTranslations();
+  const format = useFormatter();
+  return (
+    <div className="text-xs" data-testid={`integration-${status.kind}-status`}>
+      {status.connected ? (
+        <span className="text-green-600">{t('integrations.connected')}</span>
+      ) : status.lastError ? (
+        <span className="text-destructive">
+          {t('integrations.error', { message: status.lastError })}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">{t('integrations.notConnected')}</span>
+      )}
+      {status.lastDeliveredAt && (
+        <span className="ml-2 text-muted-foreground">
+          {t('integrations.lastDelivery', {
+            time: format.relativeTime(new Date(status.lastDeliveredAt)),
+          })}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function IntegrationCard({
+  kind,
+  status,
+  hint,
+  children,
+  locked,
+  pending,
+  onSendTest,
+  onDisconnect,
+}: {
+  kind: IntegrationKind;
+  status: IntegrationStatus;
+  hint: string;
+  children: ReactNode;
+  locked?: boolean;
+  pending: boolean;
+  onSendTest: () => void;
+  onDisconnect: () => void;
+}) {
+  const t = useTranslations();
+  const exists = status.connected || status.lastError !== null;
+  return (
+    <section
+      className="flex flex-col gap-3 rounded-lg border p-4"
+      data-testid={`integration-${kind}`}
+      data-connected={String(status.connected)}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-medium">
+            {t(`integrations.${kind}`)} {locked && <span className="text-xs">🔒 Pro</span>}
+          </h2>
+          <p className="text-sm text-muted-foreground">{hint}</p>
+        </div>
+        <IntegrationStatusLabel status={status} />
+      </div>
+      {children}
+      {exists && (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            data-testid={`send-test-${kind}`}
+            onClick={onSendTest}
+          >
+            {t('integrations.sendTest')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            data-testid={`disconnect-${kind}`}
+            onClick={onDisconnect}
+          >
+            {t('integrations.disconnect')}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function IntegrationsPanel(props: {
   projectId: string;
   bot: string;
@@ -30,7 +118,6 @@ export function IntegrationsPanel(props: {
   initial: IntegrationStatus[];
 }) {
   const t = useTranslations();
-  const format = useFormatter();
   const router = useRouter();
   const [statuses, setStatuses] = useState(props.initial);
   const [link, setLink] = useState<TelegramLink | null>(null);
@@ -74,88 +161,21 @@ export function IntegrationsPanel(props: {
       } else toast.error(errorText(result.error ?? 'errors.generic'));
     });
 
-  const Status = ({ status }: { status: IntegrationStatus }) => (
-    <div className="text-xs" data-testid={`integration-${status.kind}-status`}>
-      {status.connected ? (
-        <span className="text-green-600">{t('integrations.connected')}</span>
-      ) : status.lastError ? (
-        <span className="text-destructive">
-          {t('integrations.error', { message: status.lastError })}
-        </span>
-      ) : (
-        <span className="text-muted-foreground">{t('integrations.notConnected')}</span>
-      )}
-      {status.lastDeliveredAt && (
-        <span className="ml-2 text-muted-foreground">
-          {t('integrations.lastDelivery', {
-            time: format.relativeTime(new Date(status.lastDeliveredAt)),
-          })}
-        </span>
-      )}
-    </div>
-  );
-
-  const Card = ({
-    kind,
-    hint,
-    children,
-    locked,
-  }: {
-    kind: IntegrationKind;
-    hint: string;
-    children: ReactNode;
-    locked?: boolean;
-  }) => {
-    const status = byKind(kind);
-    const exists = status.connected || status.lastError !== null;
-    return (
-      <section
-        className="flex flex-col gap-3 rounded-lg border p-4"
-        data-testid={`integration-${kind}`}
-        data-connected={String(status.connected)}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-medium">
-              {t(`integrations.${kind}`)} {locked && <span className="text-xs">🔒 Pro</span>}
-            </h2>
-            <p className="text-sm text-muted-foreground">{hint}</p>
-          </div>
-          <Status status={status} />
-        </div>
-        {children}
-        {exists && (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pending}
-              data-testid={`send-test-${kind}`}
-              onClick={() =>
-                run(() => sendTestAction(props.projectId, kind), 'integrations.testSent')
-              }
-            >
-              {t('integrations.sendTest')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              data-testid={`disconnect-${kind}`}
-              onClick={() => run(() => disconnectIntegrationAction(props.projectId, kind))}
-            >
-              {t('integrations.disconnect')}
-            </Button>
-          </div>
-        )}
-      </section>
-    );
-  };
-
   const custom = byKind('telegram_custom');
   return (
     <div className="flex flex-col gap-4">
-      <Card kind="telegram_shared" hint={t('integrations.telegram_sharedHint', { bot: props.bot })}>
+      <IntegrationCard
+        kind="telegram_shared"
+        status={byKind('telegram_shared')}
+        hint={t('integrations.telegram_sharedHint', { bot: props.bot })}
+        pending={pending}
+        onSendTest={() =>
+          run(() => sendTestAction(props.projectId, 'telegram_shared'), 'integrations.testSent')
+        }
+        onDisconnect={() =>
+          run(() => disconnectIntegrationAction(props.projectId, 'telegram_shared'))
+        }
+      >
         {link ? (
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
@@ -201,9 +221,21 @@ export function IntegrationsPanel(props: {
             </Button>
           )
         )}
-      </Card>
+      </IntegrationCard>
 
-      <Card kind="telegram_custom" hint={t('integrations.telegram_customHint')} locked={!props.pro}>
+      <IntegrationCard
+        kind="telegram_custom"
+        status={custom}
+        hint={t('integrations.telegram_customHint')}
+        locked={!props.pro}
+        pending={pending}
+        onSendTest={() =>
+          run(() => sendTestAction(props.projectId, 'telegram_custom'), 'integrations.testSent')
+        }
+        onDisconnect={() =>
+          run(() => disconnectIntegrationAction(props.projectId, 'telegram_custom'))
+        }
+      >
         {custom.botUsername && (
           <p className="text-sm">{t('integrations.bot', { username: custom.botUsername })}</p>
         )}
@@ -241,9 +273,18 @@ export function IntegrationsPanel(props: {
             </Button>
           </fieldset>
         </form>
-      </Card>
+      </IntegrationCard>
 
-      <Card kind="discord" hint={t('integrations.discordHint')}>
+      <IntegrationCard
+        kind="discord"
+        status={byKind('discord')}
+        hint={t('integrations.discordHint')}
+        pending={pending}
+        onSendTest={() =>
+          run(() => sendTestAction(props.projectId, 'discord'), 'integrations.testSent')
+        }
+        onDisconnect={() => run(() => disconnectIntegrationAction(props.projectId, 'discord'))}
+      >
         <form
           className="flex flex-wrap gap-2"
           action={(form) =>
@@ -266,7 +307,7 @@ export function IntegrationsPanel(props: {
             {t('integrations.save')}
           </Button>
         </form>
-      </Card>
+      </IntegrationCard>
     </div>
   );
 }

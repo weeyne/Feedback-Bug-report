@@ -48,4 +48,29 @@ describe('deleteAccount', () => {
       expect(await db.query('select 1 from public.projects where id = $1', [mine.id])).toEqual([]);
       expect([...storage.files.keys()]).toEqual([paths[1]]);
     }));
+
+  it('leaves the user and their screenshots untouched when authAdmin.deleteUser fails', () =>
+    withTx(async (db) => {
+      const storage = createMemoryStorage();
+      const failingAdmin: AuthAdmin = {
+        deleteUser: async () => {
+          throw new Error('supabase admin api down');
+        },
+      };
+      const deps = { db, storage, env: parseEnv(VALID_ENV), fetch, authAdmin: failingAdmin };
+      const email = 'owner@example.com';
+      const owner = await createUser(db, email);
+      const project = await createProject(db, owner);
+      const id = await createFeedback(db, project.id);
+      const path = `${project.id}/${id}.webp`;
+      await storage.upload(path, new Uint8Array([1]), 'image/webp');
+      await db.query('update public.feedback set screenshot_path = $1 where id = $2', [path, id]);
+
+      expect(await deleteAccount(deps, { id: owner, email }, email)).toEqual({
+        ok: false,
+        error: 'errors.generic',
+      });
+      expect((await db.query('select 1 from auth.users where id = $1', [owner])).length).toBe(1);
+      expect([...storage.files.keys()]).toEqual([path]);
+    }));
 });

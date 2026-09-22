@@ -15,15 +15,15 @@ export async function deleteAccount(
      where p.owner_id = $1 and f.screenshot_path is not null`,
     [user.id],
   );
-  await removeScreenshots(
-    deps.storage,
-    files.map((f) => f.screenshot_path),
-  );
   try {
     await deps.authAdmin.deleteUser(user.id);
   } catch (error) {
     console.error('[account] delete failed', error);
     return { ok: false, error: 'errors.generic' };
   }
+  await removeScreenshots(
+    deps.storage,
+    files.map((f) => f.screenshot_path),
+  );
   return { ok: true };
 }
