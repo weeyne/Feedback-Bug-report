@@ -33,8 +33,30 @@ pnpm test
 PGlite with `supabase/tests/src/pglite-bootstrap.sql` emulating the roles, schemas and functions
 Supabase provides. CI runs the same tests against a real Supabase stack.
 
+## Widget
+
+`packages/widget` builds the embeddable script (`dist/widget.js`, ≤ 20 KB gzip) and the lazily
+loaded screenshot module (`dist/screenshot.js`).
+
+```bash
+pnpm --filter @dymcode/widget dev     # dev page with a mock API at http://localhost:5173/dev/index.html
+pnpm --filter @dymcode/widget build   # dist/widget.js + dist/screenshot.js
+pnpm --filter @dymcode/widget size    # enforce the size budget
+pnpm --filter @dymcode/widget e2e     # Playwright smoke tests against the built bundle
+```
+
+Embed:
+
+```html
+<script async src="https://dymcode.dev/w/widget.js" data-project-id="pk_…"></script>
+```
+
+Host page API: `Dymcode.open('bug' | 'idea' | 'general')`, `Dymcode.identify({ email, id, name })`,
+and the `dymcode:ready` window event. Add `data-hide-trigger` to hide the floating button.
+
 ## Layout
 
 - `packages/shared`: widget↔API contract (zod schemas, constants, brand)
+- `packages/widget`: embeddable widget (Shadow DOM, i18n, screenshots)
 - `supabase/migrations`: database schema, functions, RLS
 - `supabase/tests`: database tests

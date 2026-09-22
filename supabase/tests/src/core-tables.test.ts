@@ -95,6 +95,24 @@ describe('projects', () => {
       ]);
       expect(rows).toEqual([{ referred_by_project: null }]);
     }));
+
+  it('defaults locale to auto', () =>
+    withTx(async (db) => {
+      const owner = await createUser(db);
+      const { id } = await createProject(db, owner);
+      const rows = await db.query('select locale from public.projects where id = $1', [id]);
+      expect(rows).toEqual([{ locale: 'auto' }]);
+    }));
+
+  it('rejects an unsupported locale', () =>
+    withTx(async (db) => {
+      const owner = await createUser(db);
+      const error = await db.queryError(
+        `insert into public.projects (owner_id, name, locale) values ($1, 'x', 'de')`,
+        [owner],
+      );
+      expect(error).toMatch(/invalid input value for enum widget_locale/);
+    }));
 });
 
 describe('feedback', () => {

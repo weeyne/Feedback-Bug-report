@@ -19,3 +19,6 @@ export const CONSOLE_ERROR_MESSAGE_MAX_LENGTH = 500;
 
 export const PUBLIC_KEY_PATTERN = /^pk_[0-9A-Za-z]{16}$/;
 export const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+export const WIDGET_LOCALES = ['auto', 'en', 'ru', 'uk', 'es'] as const;
+export type WidgetLocale = (typeof WIDGET_LOCALES)[number];

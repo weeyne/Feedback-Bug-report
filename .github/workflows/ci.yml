@@ -19,6 +19,29 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @dymcode/widget build
+      - run: pnpm --filter @dymcode/widget size
+      - run: pnpm --filter @dymcode/widget check:bundle
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dymcode/widget exec playwright install --with-deps chromium
+      - run: pnpm --filter @dymcode/widget e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: widget-e2e-report
+          path: |
+            packages/widget/playwright-report
+            packages/widget/test-results
 
   db-supabase:
     runs-on: ubuntu-latest

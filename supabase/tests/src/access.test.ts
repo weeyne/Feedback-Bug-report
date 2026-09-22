@@ -72,6 +72,17 @@ describe('projects access', () => {
       await db.asAnon();
       expect(await db.queryError('select id from public.projects')).toMatch(/permission denied/);
     }));
+
+  it('allows the owner to update locale', () =>
+    withTx(async (db) => {
+      const { a, projectA } = await seed(db);
+      await db.asUser(a);
+      const rows = await db.query(
+        `update public.projects set locale = 'uk' where id = $1 returning locale`,
+        [projectA.id],
+      );
+      expect(rows).toEqual([{ locale: 'uk' }]);
+    }));
 });
 
 describe('feedback access', () => {
