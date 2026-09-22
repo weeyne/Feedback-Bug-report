@@ -1,3 +1,4 @@
 pnpm-lock.yaml
 docs/
 supabase/.temp/
+apps/web/next-env.d.ts
