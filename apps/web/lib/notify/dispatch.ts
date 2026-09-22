@@ -38,7 +38,7 @@ interface IntegrationRow extends Row {
 
 export const quotaNoticeText = (appUrl: string) =>
   `Your free limit of ${ENTITLEMENTS.free.monthlySubmissions} submissions this month is reached. ` +
-  `New feedback is saved; upgrade to Pro to see it: ${appUrl}/billing`;
+  `New feedback is saved; upgrade to Pro to see it: ${appUrl}/app/billing`;
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -198,7 +198,7 @@ export async function dispatchFeedback(deps: DispatchDeps, feedbackId: string): 
     message: row.message,
     email: row.email,
     metadata: row.metadata,
-    dashboardUrl: `${deps.env.NEXT_PUBLIC_APP_URL}/projects/${row.project_id}/feedback?f=${feedbackId}`,
+    dashboardUrl: `${deps.env.NEXT_PUBLIC_APP_URL}/app/p/${row.project_id}/feedback?f=${feedbackId}`,
     screenshot,
   });
 }

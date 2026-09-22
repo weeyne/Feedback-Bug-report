@@ -107,7 +107,7 @@ describe('dispatchFeedback', () => {
       expect(body.chat_id).toBe('4242');
       expect(body.text).toContain('Broken checkout');
       expect(body.text).toContain(
-        `https://dymcode.dev/projects/${project.id}/feedback?f=${feedbackId}`,
+        `https://dymcode.dev/app/p/${project.id}/feedback?f=${feedbackId}`,
       );
       expect(await integration(db, tg)).toEqual({
         enabled: true,
