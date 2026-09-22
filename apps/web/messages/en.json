@@ -73,6 +73,7 @@
     "emailInvalid": "Enter a valid email address.",
     "sendFailed": "We couldn't send the link. Try again in a minute.",
     "callbackFailed": "That sign-in link is invalid or expired. Request a new one.",
+    "oauthFailed": "GitHub sign-in could not be started. Try again.",
     "signOut": "Sign out"
   },
   "nav": {

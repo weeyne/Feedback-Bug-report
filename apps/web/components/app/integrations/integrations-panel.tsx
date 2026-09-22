@@ -68,7 +68,7 @@ function IntegrationCard({
   onDisconnect: () => void;
 }) {
   const t = useTranslations();
-  const exists = status.connected || status.lastError !== null;
+  const exists = status.enabled || status.connected || status.lastError !== null;
   return (
     <section
       className="flex flex-col gap-3 rounded-lg border p-4"

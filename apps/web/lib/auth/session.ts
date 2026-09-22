@@ -24,7 +24,7 @@ export function parseE2eUser(raw: string | undefined): SessionUser | null {
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  if (getEnv().DYMCODE_TEST_MODE === '1') {
+  if (getEnv().DYMCODE_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
     return parseE2eUser((await cookies()).get(E2E_USER_COOKIE)?.value);
   }
   const supabase = await createSupabaseServerClient();
