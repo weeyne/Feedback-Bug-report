@@ -22,6 +22,10 @@ export const ClientMetadataSchema = z.object({
   viewport: z.object({ w: dimension, h: dimension }),
   screen: z.object({ w: dimension, h: dimension, dpr: z.number().positive().max(10) }),
   consoleErrors: z.array(ConsoleErrorSchema).max(CONSOLE_ERRORS_MAX),
+  /** Set by `Dymcode.identify()` on the host page. */
+  user: z
+    .object({ id: z.string().max(128).optional(), name: z.string().max(128).optional() })
+    .optional(),
 });
 export type ClientMetadata = z.infer<typeof ClientMetadataSchema>;
 

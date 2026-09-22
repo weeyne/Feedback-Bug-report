@@ -94,4 +94,14 @@ describe('SubmitPayloadSchema', () => {
   it('rejects a non-integer elapsedMs', () => {
     expect(parse({ elapsedMs: 1.5 }).success).toBe(false);
   });
+
+  it('accepts an identified user in metadata', () => {
+    expect(parse({ metadata: { ...metadata, user: { id: 'u_1', name: 'Ann' } } }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects an identified user id longer than 128 chars', () => {
+    expect(parse({ metadata: { ...metadata, user: { id: 'x'.repeat(129) } } }).success).toBe(false);
+  });
 });

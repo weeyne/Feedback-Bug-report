@@ -3,6 +3,7 @@ import {
   CUSTOM_CSS_MAX_BYTES,
   HEX_COLOR_PATTERN,
   TRIGGER_TEXT_MAX_LENGTH,
+  WIDGET_LOCALES,
   WIDGET_POSITIONS,
 } from '../constants';
 
@@ -15,5 +16,6 @@ export const WidgetConfigSchema = z.object({
   // Char count approximates the byte limit; the DB enforces octet_length exactly.
   customCss: z.string().max(CUSTOM_CSS_MAX_BYTES).nullable(),
   badgeUrl: z.url(),
+  locale: z.enum(WIDGET_LOCALES),
 });
 export type WidgetConfig = z.infer<typeof WidgetConfigSchema>;

@@ -8,6 +8,7 @@ const valid = {
   showBadge: true,
   customCss: null,
   badgeUrl: 'https://dymcode.dev/?ref=pk_AbCdEfGh12345678&utm_source=widget',
+  locale: 'auto',
 };
 
 const parse = (overrides: Record<string, unknown>) =>
@@ -37,5 +38,20 @@ describe('WidgetConfigSchema', () => {
 
   it('rejects custom css over the size limit', () => {
     expect(parse({ customCss: 'a'.repeat(10_241) }).success).toBe(false);
+  });
+
+  it('accepts every supported locale', () => {
+    for (const locale of ['auto', 'en', 'ru', 'uk', 'es']) {
+      expect(parse({ locale }).success).toBe(true);
+    }
+  });
+
+  it('rejects an unsupported locale', () => {
+    expect(parse({ locale: 'de' }).success).toBe(false);
+  });
+
+  it('requires a locale', () => {
+    const { locale: _, ...withoutLocale } = valid;
+    expect(WidgetConfigSchema.safeParse(withoutLocale).success).toBe(false);
   });
 });
