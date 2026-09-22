@@ -3,15 +3,18 @@ import type { Db, Row } from './types';
 
 const connections = new WeakMap<Db, postgres.Sql>();
 
-function wrap(sql: postgres.Sql | postgres.TransactionSql): Db {
+/** Exported for unit testing the nesting guard without a live Postgres connection. */
+export function wrap(sql: postgres.Sql | postgres.TransactionSql): Db {
   const db: Db = {
     async query<T extends Row>(text: string, params: unknown[] = []) {
       const rows = await sql.unsafe(text, params as never[]);
       return rows as unknown as T[];
     },
     async transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T> {
-      // Nested calls reuse the open transaction.
-      if (!('begin' in sql)) return fn(db);
+      // `sql` is already a TransactionSql (no `begin`) when we're inside a transaction:
+      // nesting must throw rather than silently reuse it — reusing it would let a nested
+      // withUser's `reset role` clear RLS for the rest of the enclosing transaction (fail-open).
+      if (!('begin' in sql)) throw new Error('nested transactions are not supported');
       return (await sql.begin((tx) => fn(wrap(tx)))) as T;
     },
   };
