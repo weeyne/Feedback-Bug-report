@@ -15,7 +15,7 @@ const state = async (page: Page): Promise<State> =>
   (await page.request.get('/api/e2e-test/outbox')).json();
 
 async function submitFromWidget(page: Page, key: string, message: string) {
-  await page.goto(`/__test/host.html?key=${key}`);
+  await page.goto(`/e2e-host?key=${key}`);
   await page.locator('[data-dymcode] .dc-trigger').click();
   await expect(page.locator('.dc-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
     timeout: 15_000,

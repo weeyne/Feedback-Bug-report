@@ -10,7 +10,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `pnpm --filter @dymcode/widget build && node scripts/copy-widget.mjs && pnpm exec next dev --port ${PORT}`,
-    url: `http://localhost:${PORT}/__test/host.html`,
+    url: `http://localhost:${PORT}/e2e-host`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
     // Fake values only: test mode never talks to Supabase, Telegram or Discord.
