@@ -38,5 +38,30 @@
     "generic": "Something went wrong. Try again.",
     "notFound": "Not found.",
     "rateLimited": "Too many attempts. Wait a minute and try again."
+  },
+  "projects": {
+    "newTitle": "Create your project",
+    "name": "Project name",
+    "siteUrl": "Website (optional)",
+    "siteUrlHint": "Used to restrict where the widget can send feedback from.",
+    "create": "Create project",
+    "nameInvalid": "Enter a name from 1 to 80 characters.",
+    "urlInvalid": "Enter a valid website address.",
+    "limitReached": "The Free plan includes one project. Upgrade to Pro for unlimited projects.",
+    "upgrade": "Upgrade to Pro"
+  },
+  "install": {
+    "title": "Install the widget",
+    "intro": "Paste this snippet before the closing </body> tag of your site.",
+    "nextjsTitle": "Next.js / React",
+    "nextjsHint": "Use next/script with strategy \"afterInteractive\" in your root layout.",
+    "customTitle": "Your own button",
+    "customHint": "Add data-hide-trigger and call Dymcode.open('bug') from your UI.",
+    "identifyTitle": "Identify signed-in users",
+    "identifyHint": "Call Dymcode.identify({ email, id, name }) after sign-in.",
+    "waiting": "Waiting for your first feedback…",
+    "received": "🎉 Your first feedback arrived!",
+    "openFeedback": "Open feedback",
+    "connectTelegram": "Connect Telegram"
   }
 }

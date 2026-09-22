@@ -3,47 +3,18 @@ import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { signOut } from '@/app/actions/session';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { ProjectSwitcher, type ShellProject } from './project-switcher';
+import { ProjectNav } from './project-nav';
+import type { ShellProject } from './project-switcher';
 
-async function Nav({
-  projects,
-  currentProjectId,
-  email,
-}: {
-  projects: ShellProject[];
-  currentProjectId: string | null;
-  email: string;
-}) {
+async function Nav({ projects, email }: { projects: ShellProject[]; email: string }) {
   const t = await getTranslations('nav');
   const tAuth = await getTranslations('auth');
-  const base = currentProjectId ? `/app/p/${currentProjectId}` : null;
-  const projectLinks = base
-    ? ([
-        ['feedback', `${base}/feedback`],
-        ['install', `${base}/install`],
-        ['settings', `${base}/settings`],
-        ['integrations', `${base}/integrations`],
-      ] as const)
-    : [];
   return (
     <nav className="flex h-full flex-col gap-4 p-4">
       <Link href="/app" className="text-lg font-semibold">
         Dymcode
       </Link>
-      <ProjectSwitcher projects={projects} currentProjectId={currentProjectId} />
-      <ul className="flex flex-col gap-1 text-sm">
-        {projectLinks.map(([key, href]) => (
-          <li key={key}>
-            <Link
-              href={href}
-              className="block rounded-md px-3 py-2 hover:bg-muted"
-              data-testid={`nav-${key}`}
-            >
-              {t(key)}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <ProjectNav projects={projects} />
       <ul className="mt-auto flex flex-col gap-1 text-sm">
         <li>
           <Link
@@ -76,7 +47,6 @@ async function Nav({
 
 export async function AppShell(props: {
   projects: ShellProject[];
-  currentProjectId: string | null;
   email: string;
   children: ReactNode;
 }) {
