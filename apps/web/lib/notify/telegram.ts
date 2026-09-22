@@ -1,4 +1,4 @@
-import { formatTelegram } from './format';
+import { formatTelegram, redactUrls } from './format';
 import type { DeliveryResult, Notification, Notifier } from './types';
 
 const CAPTION_LIMIT = 1024;
@@ -45,7 +45,7 @@ export function createTelegramNotifier(opts: {
         ok: false,
         retryable: true,
         disable: false,
-        error: `network: ${(error as Error).message}`,
+        error: `network: ${redactUrls((error as Error).message)}`,
       };
     }
   };

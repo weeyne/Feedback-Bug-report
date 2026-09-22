@@ -78,4 +78,86 @@ describe('discord notifier', () => {
       disable: false,
     });
   });
+
+  it('never leaks the webhook URL in network errors', async () => {
+    const offline = notifier((async () => {
+      throw new TypeError(`Failed to parse URL from ${WEBHOOK}/extra`);
+    }) as typeof fetch);
+    const result = await offline.send(sampleMessage());
+    expect(result).toMatchObject({ ok: false, retryable: true });
+    const error = (result as { error: string }).error;
+    expect(error).not.toContain('token');
+    expect(error).not.toContain('discord.com');
+    expect(error).toBe('network: Failed to parse URL from <url>');
+  });
+
+  it('refuses redirects', async () => {
+    const fetchImpl = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response(null, { status: 204 }),
+    );
+    await notifier(fetchImpl as typeof fetch).send(sampleMessage());
+    expect(fetchImpl.mock.calls[0]![1]!.redirect).toBe('error');
+  });
+
+  it('keeps the whole embed within 6000 characters', async () => {
+    const fetchImpl = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response(null, { status: 204 }),
+    );
+    const base = sampleMessage();
+    const long = sampleMessage({
+      projectName: 'P'.repeat(300),
+      message: 'm'.repeat(5000),
+      email: `${'e'.repeat(300)}@example.com`,
+      metadata: {
+        ...base.metadata,
+        url: `https://host.example/${'u'.repeat(2000)}`,
+        browser: 'b'.repeat(1100),
+        consoleErrors: [1, 2, 3].map((at) => ({ message: 'x'.repeat(500), at })),
+      },
+    });
+    await notifier(fetchImpl as typeof fetch).send(long);
+    const embed = JSON.parse(String(fetchImpl.mock.calls[0]![1]!.body)).embeds[0] as {
+      title: string;
+      description: string;
+      fields: Array<{ name: string; value: string }>;
+    };
+    const total =
+      embed.title.length +
+      embed.description.length +
+      embed.fields.reduce((sum, field) => sum + field.name.length + field.value.length, 0);
+    expect(total).toBeLessThanOrEqual(6000);
+    expect(embed.description.length).toBeGreaterThan(0);
+    expect(embed.description.length).toBeLessThanOrEqual(4000);
+
+    await notifier(fetchImpl as typeof fetch).send(sampleMessage({ message: 'm'.repeat(5000) }));
+    const short = JSON.parse(String(fetchImpl.mock.calls[1]![1]!.body)).embeds[0];
+    expect(short.description).toHaveLength(4000);
+  });
+
+  it('escapes masked-link syntax in reporter-controlled text', async () => {
+    const fetchImpl = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response(null, { status: 204 }),
+    );
+    const base = sampleMessage();
+    await notifier(fetchImpl as typeof fetch).send(
+      sampleMessage({
+        message: 'Click [here](https://evil.example) <https://evil.example>',
+        email: '[a](https://evil.example)@x.dev',
+        metadata: { ...base.metadata, url: 'https://host.example/[x](https://evil.example)' },
+      }),
+    );
+    const embed = JSON.parse(String(fetchImpl.mock.calls[0]![1]!.body)).embeds[0] as {
+      description: string;
+      fields: Array<{ name: string; value: string }>;
+    };
+    expect(embed.description).toBe(
+      'Click \\[here\\]\\(https://evil.example\\) \\<https://evil.example\\>',
+    );
+    const field = (name: string) => embed.fields.find((f) => f.name === name)!.value;
+    expect(field('Email')).toBe('\\[a\\]\\(https://evil.example\\)@x.dev');
+    expect(field('Page')).toBe('https://host.example/\\[x\\]\\(https://evil.example\\)');
+  });
 });

@@ -110,4 +110,16 @@ describe('telegram notifier', () => {
       disable: false,
     });
   });
+
+  it('never leaks the bot token in network errors', async () => {
+    const offline = notifier((async () => {
+      throw new TypeError(
+        'Failed to parse URL from https://api.telegram.org/bot123:SECRET/sendMessage',
+      );
+    }) as typeof fetch);
+    const result = await offline.send(sampleMessage());
+    const error = (result as { error: string }).error;
+    expect(error).not.toContain('SECRET');
+    expect(error).toBe('network: Failed to parse URL from <url>');
+  });
 });

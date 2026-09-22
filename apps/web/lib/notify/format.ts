@@ -115,3 +115,6 @@ export function formatTelegram(m: FeedbackMessage): { full: string; short: strin
   const short = `${title}\n${link}`;
   return { full, short };
 }
+
+/** Network error text may embed request URLs (webhook tokens, bot tokens): never store them. */
+export const redactUrls = (text: string) => text.replace(/https?:\/\/\S+/g, '<url>');
