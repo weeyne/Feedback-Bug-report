@@ -117,4 +117,29 @@ describe('boot', () => {
     await vi.waitFor(() => expect(warn).toHaveBeenCalled());
     expect(document.querySelector('[data-dymcode]')).toBeNull();
   });
+
+  it('releases the console buffer when the config cannot load', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 404 })),
+    );
+    const before = console.error;
+    boot(
+      window,
+      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+    );
+    expect(console.error).not.toBe(before);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(console.error).toBe(before);
+  });
+
+  it('schedules startup with an idle callback bounded by a 3s timeout', () => {
+    const idle = vi.fn();
+    vi.stubGlobal('requestIdleCallback', idle);
+    boot(
+      window,
+      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+    );
+    expect(idle).toHaveBeenCalledWith(expect.any(Function), { timeout: 3000 });
+  });
 });

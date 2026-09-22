@@ -142,6 +142,15 @@ describe('mountWidget', () => {
     expect(setup({ config: { showBadge: false } }).q('.dc-badge')).toBeNull();
   });
 
+  it('renders the badge only for an https badge URL', () => {
+    for (const badgeUrl of ['javascript:alert(1)', 'http://dymcode.dev/', '//dymcode.dev/']) {
+      const { handle, q } = setup({ config: { badgeUrl } });
+      expect(q('.dc-badge')).toBeNull();
+      handle.destroy();
+    }
+    expect(setup().q('.dc-badge')).not.toBeNull();
+  });
+
   it('fixes the host to the viewport in normal mode but not in preview', () => {
     const normal = setup();
     expect(normal.handle.host.style.getPropertyValue('all')).toBe('initial');
@@ -337,6 +346,23 @@ describe('panel', () => {
     q<HTMLInputElement>('.dc-email')!.value = 'typed@example.com';
     handle.identify({ email: 'other@example.com' });
     expect(q<HTMLInputElement>('.dc-email')!.value).toBe('typed@example.com');
+  });
+
+  it('offers retry after a server error', async () => {
+    const submit = vi
+      .fn<() => Promise<SubmitResult>>()
+      .mockResolvedValueOnce({ ok: false, reason: 'server' })
+      .mockResolvedValueOnce({ ok: true });
+    const { handle, q } = setup({ deps: { submit } });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'Server down';
+    q('.dc-send')!.click();
+    await vi.waitFor(() => expect(q('.dc-retry')!.hidden).toBe(false));
+    expect(q('.dc-status')!.textContent).toBe("Couldn't send. Try again later.");
+    expect(q<HTMLTextAreaElement>('.dc-message')!.value).toBe('Server down');
+    q('.dc-retry')!.click();
+    await vi.waitFor(() => expect(q('.dc-thanks')!.hidden).toBe(false));
+    expect(submit).toHaveBeenCalledTimes(2);
   });
 
   it('identify replaces a previously identified email', () => {

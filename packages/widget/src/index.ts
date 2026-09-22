@@ -37,7 +37,10 @@ export function boot(win: Window & typeof globalThis, script: HTMLScriptElement 
 
     const start = async () => {
       const config = await fetchConfig(apiOrigin, projectKey);
-      if (!config) return warn('could not load the widget config');
+      if (!config) {
+        buffer.dispose();
+        return warn('could not load the widget config');
+      }
       state.handle = mountWidget(win.document.body, config, {
         hideTrigger: script.hasAttribute('data-hide-trigger'),
         deps: {
@@ -53,7 +56,8 @@ export function boot(win: Window & typeof globalThis, script: HTMLScriptElement 
     };
 
     const run = () => void start().catch(() => warn('failed to start'));
-    if (typeof win.requestIdleCallback === 'function') win.requestIdleCallback(run);
+    if (typeof win.requestIdleCallback === 'function')
+      win.requestIdleCallback(run, { timeout: 3000 });
     else win.setTimeout(run, 1);
   } catch {
     warn('failed to start');

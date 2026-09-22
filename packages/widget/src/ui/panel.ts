@@ -152,13 +152,15 @@ export function createPanel(options: {
     sendButton,
   );
   const thanks = h('p', { class: 'dc-thanks', role: 'status', hidden: true }, t.thanks);
-  const badge = config.showBadge
-    ? h(
-        'a',
-        { class: 'dc-badge', href: config.badgeUrl, target: '_blank', rel: 'noopener' },
-        `${t.poweredBy} ${BRAND.name}`,
-      )
-    : null;
+  // Only an https link: a config value must never become a javascript: or other-scheme URL.
+  const badge =
+    config.showBadge && config.badgeUrl.startsWith('https://')
+      ? h(
+          'a',
+          { class: 'dc-badge', href: config.badgeUrl, target: '_blank', rel: 'noopener' },
+          `${t.poweredBy} ${BRAND.name}`,
+        )
+      : null;
   const element = h(
     'div',
     {
