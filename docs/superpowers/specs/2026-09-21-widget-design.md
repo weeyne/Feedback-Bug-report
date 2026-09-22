@@ -95,7 +95,7 @@ Phase 1 is on `main`, so the DB change is a **new migration**. The shared schema
 
 ### Bootstrap (`index.ts`)
 1. If `window.Dymcode` already exists, exit (double include).
-2. Resolve the script element: use `document.currentScript`, falling back to the first `script[data-project-id]`.
+2. Resolve the script element: use `document.currentScript`, falling back to `script[src*="widget.js"][data-project-id]`, then to the first `script[data-project-id]`.
    Read `data-project-id` and `data-hide-trigger`. If the project id is missing, `console.warn` once and exit.
 3. Install the console buffer immediately (§6.4).
 4. Install `window.Dymcode` (§4).
@@ -108,7 +108,9 @@ Phase 1 is on `main`, so the DB change is a **new migration**. The shared schema
   returns `{ host, open(type?), close(), identify(user), destroy() }`. `deps` injects side effects (submit, screenshot loader, metadata, clock) so the UI is testable; bootstrap wires the real ones.
 - In normal mode the host is a `div` appended to `document.body` with inline style
   `all: initial; position: fixed; z-index: 2147483000`. It gets an open shadow root containing
-  base styles, then `config.customCss` (if non-null) in a separate `<style>`, then the UI.
+  base styles, then `config.customCss` (if non-null), then the UI. Styles are applied as constructable
+  stylesheets (`adoptedStyleSheets`, which also works under a strict `style-src` CSP), falling back to
+  `<style>` elements where unsupported. `@import` rules in custom CSS are ignored in the constructable path.
 - The accent color is set as a CSS custom property on the shadow root host (`--dc-accent`).
 - `preview: true` renders the same UI but disables submission and screenshot capture. Phase 4 uses it for the live preview.
 
