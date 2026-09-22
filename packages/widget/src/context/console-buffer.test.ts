@@ -93,4 +93,66 @@ describe('installConsoleBuffer', () => {
     expect(original).toHaveBeenCalledWith(obj);
     expect(buffer.entries()).toHaveLength(1);
   });
+
+  it('serializes undefined, functions and symbols with String()', () => {
+    console.error('value:', undefined, Symbol('s'), null);
+    expect(buffer.entries()[0]?.message).toBe('value: undefined Symbol(s) null');
+    console.error(function named() {});
+    expect(buffer.entries()[1]?.message).toBe('function named() {}');
+  });
+
+  it('keeps undefined and functions visible inside objects', () => {
+    console.error({ a: undefined, f: () => 1, n: 1 });
+    expect(buffer.entries()[0]?.message).toBe('{"a":undefined,"f":() => 1,"n":1}');
+  });
+
+  it('serializes a huge object quickly into at most 500 chars', () => {
+    const huge: Record<string, unknown> = {};
+    for (let i = 0; i < 50_000; i++)
+      huge[`k${i}`] = { deep: { deeper: { deepest: 'x'.repeat(50) } } };
+    const started = performance.now();
+    console.error(huge);
+    expect(performance.now() - started).toBeLessThan(200);
+    const message = buffer.entries()[0]!.message;
+    expect(message.length).toBeLessThanOrEqual(500);
+    expect(message.startsWith('{"k0":')).toBe(true);
+  });
+
+  it('reads at most 20 entries per level of a large object', () => {
+    const target: Record<string, number> = {};
+    for (let i = 0; i < 1000; i++) target[`k${i}`] = i;
+    let reads = 0;
+    const proxy = new Proxy(target, {
+      get(t, key, receiver) {
+        reads++;
+        return Reflect.get(t, key, receiver);
+      },
+      getOwnPropertyDescriptor(t, key) {
+        reads++;
+        return Reflect.getOwnPropertyDescriptor(t, key);
+      },
+    });
+    console.error(proxy);
+    expect(reads).toBeLessThanOrEqual(25);
+  });
+
+  it('limits nesting depth and marks cycles', () => {
+    const cyclic: Record<string, unknown> = { name: 'c' };
+    cyclic.self = cyclic;
+    console.error({ a: { b: { c: { d: { e: 1 } } } } }, cyclic);
+    expect(buffer.entries()[0]?.message).toBe(
+      '{"a":{"b":{"c":[Object]}}} {"name":"c","self":[Circular]}',
+    );
+  });
+
+  it('never invokes throwing getters on the host object', () => {
+    const getter = vi.fn(() => {
+      throw new Error('getter throws');
+    });
+    const obj = { ok: 1 };
+    Object.defineProperty(obj, 'boom', { get: getter, enumerable: true });
+    expect(() => console.error(obj)).not.toThrow();
+    expect(getter).not.toHaveBeenCalled();
+    expect(buffer.entries()[0]?.message).toBe('{"ok":1,"boom":[Getter]}');
+  });
 });
