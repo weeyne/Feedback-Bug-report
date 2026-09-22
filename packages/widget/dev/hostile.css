@@ -1,0 +1,15 @@
+/* A host site that styles everything aggressively; the widget must be unaffected. */
+* {
+  font: 30px/3 serif !important;
+  box-sizing: content-box !important;
+  color: #0a0 !important;
+}
+button,
+input,
+textarea {
+  all: revert !important;
+  border: 5px dashed red !important;
+}
+div {
+  padding: 20px !important;
+}
