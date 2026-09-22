@@ -16,6 +16,7 @@ import {
   getProject,
   hasFeedback,
   listProjects,
+  ownsProject,
 } from './projects';
 import type { DashDeps } from './result';
 
@@ -78,6 +79,16 @@ describe('projects', () => {
       await grantPro(db, pro);
       await create(deps(db), pro, { name: 'One' });
       expect((await create(deps(db), pro, { name: 'Two' })).ok).toBe(true);
+    }));
+
+  it('reports project ownership', () =>
+    withTx(async (db) => {
+      const a = await createUser(db);
+      const b = await createUser(db);
+      const project = await createProject(db, a);
+      expect(await ownsProject(deps(db), a, project.id)).toBe(true);
+      expect(await ownsProject(deps(db), b, project.id)).toBe(false);
+      expect(await ownsProject(deps(db), a, 'not-a-uuid')).toBe(false);
     }));
 
   it('reports whether a project has received feedback', () =>

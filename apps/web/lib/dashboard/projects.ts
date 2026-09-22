@@ -1,7 +1,7 @@
 import type { WidgetLocale } from '@dymcode/shared';
 import { z } from 'zod';
 import { ENTITLEMENTS } from '../billing/plans';
-import type { Row } from '../db/types';
+import type { Db, Row } from '../db/types';
 import { withUser } from '../db/with-user';
 import { normalizeOrigin } from './origins';
 import { isUuid, type ActionResult, type DashDeps } from './result';
@@ -47,12 +47,17 @@ export async function getProject(
   return row ?? null;
 }
 
-export async function canCreateProject(deps: DashDeps, userId: string): Promise<boolean> {
-  const [row] = await deps.db.query<{ n: number; pro: boolean }>(
+/** Shared by the read-only `canCreateProject` check and `createProject`'s in-transaction re-check. */
+async function countAllowsCreate(db: Db, userId: string): Promise<boolean> {
+  const [row] = await db.query<{ n: number; pro: boolean }>(
     'select count(*)::int as n, public.is_pro($1) as pro from public.projects where owner_id = $1',
     [userId],
   );
   return Boolean(row?.pro) || (row?.n ?? 0) < ENTITLEMENTS.free.maxProjects;
+}
+
+export function canCreateProject(deps: DashDeps, userId: string): Promise<boolean> {
+  return countAllowsCreate(deps.db, userId);
 }
 
 export async function ownsProject(
@@ -89,13 +94,19 @@ export async function createProject(
     if (!origin) return { ok: false, error: 'projects.urlInvalid' };
     origins = [origin];
   }
-  // Projects have no client INSERT policy: created with the service connection after the plan check.
-  if (!(await canCreateProject(deps, userId))) return { ok: false, error: 'projects.limitReached' };
-  const [row] = await deps.db.query<{ id: string }>(
-    'insert into public.projects (owner_id, name, allowed_origins) values ($1, $2, $3::text[]) returning id',
-    [userId, name, origins],
-  );
-  return { ok: true, projectId: row!.id };
+  // Projects have no client INSERT policy: created with the service connection. The plan check and the
+  // insert run inside one transaction, serialized per user by an advisory lock, so two concurrent
+  // creates from the same Free user can't both pass the count check before either inserts.
+  return deps.db.transaction(async (tx) => {
+    await tx.query('select pg_advisory_xact_lock(hashtext($1))', [`create-project:${userId}`]);
+    if (!(await countAllowsCreate(tx, userId)))
+      return { ok: false, error: 'projects.limitReached' };
+    const [row] = await tx.query<{ id: string }>(
+      'insert into public.projects (owner_id, name, allowed_origins) values ($1, $2, $3::text[]) returning id',
+      [userId, name, origins],
+    );
+    return { ok: true, projectId: row!.id };
+  });
 }
 
 export async function hasFeedback(
