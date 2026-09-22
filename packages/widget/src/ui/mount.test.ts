@@ -233,6 +233,22 @@ describe('panel', () => {
     expect(submit.mock.calls[0]![1]).toBeNull();
   });
 
+  it('sends without a screenshot when capture has not finished after 8s', async () => {
+    vi.useFakeTimers();
+    const { handle, q, submit } = setup({
+      deps: { loadCapture: async () => () => new Promise<Blob | null>(() => {}) },
+    });
+    handle.open();
+    q<HTMLTextAreaElement>('.dc-message')!.value = 'Capture hangs';
+    q('.dc-send')!.click();
+    await vi.advanceTimersByTimeAsync(7999);
+    expect(submit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(submit).toHaveBeenCalledOnce();
+    expect(submit.mock.calls[0]![1]).toBeNull();
+  });
+
   it('marks the screenshot unavailable when capture is not possible', async () => {
     const { handle, q, submit } = setup({ deps: { loadCapture: async () => null } });
     handle.open();

@@ -1,5 +1,20 @@
-import { describe, expect, it } from 'vitest';
-import { maskClonedNode } from './screenshot';
+import { domToCanvas } from 'modern-screenshot';
+import { describe, expect, it, vi } from 'vitest';
+import { capture, maskClonedNode } from './screenshot';
+
+vi.mock('modern-screenshot', () => ({
+  domToCanvas: vi.fn(async () => document.createElement('canvas')),
+}));
+
+describe('capture', () => {
+  it('bounds resource loading with a 5s timeout', async () => {
+    await capture(document.createElement('div'));
+    expect(domToCanvas).toHaveBeenCalledWith(
+      document.documentElement,
+      expect.objectContaining({ timeout: 5000 }),
+    );
+  });
+});
 
 describe('maskClonedNode', () => {
   it('clears value and sets filter on password input', () => {

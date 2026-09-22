@@ -13,6 +13,8 @@ import { h } from './h';
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const THANKS_CLOSE_MS = 2000;
+/** Send never waits longer than this for a pending screenshot; it goes out without one instead. */
+const CAPTURE_WAIT_MS = 8000;
 
 export interface PanelDeps {
   projectKey: string;
@@ -34,6 +36,19 @@ export interface Panel {
 }
 
 type ShotState = 'loading' | 'ready' | 'unavailable';
+
+/** Resolves true if `promise` settles within `ms`, false otherwise. Never rejects. */
+function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const cap = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  const done = promise.then(
+    () => true,
+    () => true,
+  );
+  return Promise.race([done, cap]).finally(() => clearTimeout(timer));
+}
 
 /** The actually-focused element, descending into this document's own open shadow trees. */
 function activeElementDeep(): HTMLElement | null {
@@ -320,7 +335,8 @@ export function createPanel(options: {
     status.textContent = '';
     retry.hidden = true;
     try {
-      if (shotToggle.checked) await capturing;
+      let withShot = shotToggle.checked;
+      if (withShot) withShot = await settlesWithin(capturing, CAPTURE_WAIT_MS);
       const payload = buildPayload({
         projectKey: deps.projectKey,
         type,
@@ -330,7 +346,7 @@ export function createPanel(options: {
         elapsedMs: safeNow() - openedAt,
         website: honeypot.value,
       });
-      const result = await deps.submit(payload, shotToggle.checked ? shot : null);
+      const result = await deps.submit(payload, withShot && shotToggle.checked ? shot : null);
       if (result.ok) {
         if (element.hidden) {
           // The panel was closed while this send was in flight: settle quietly instead of

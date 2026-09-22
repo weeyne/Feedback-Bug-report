@@ -2,6 +2,8 @@ import { SCREENSHOT_MAX_BYTES } from '@dymcode/shared/constants';
 import { domToCanvas } from 'modern-screenshot';
 
 const MAX_WIDTH = 1600;
+/** Upper bound for loading images/fonts while rendering, so a stalled resource cannot hang capture. */
+const RESOURCE_TIMEOUT_MS = 5000;
 const MASK_SELECTOR = 'input[type="password"], [data-feedback-mask]';
 
 function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
@@ -50,6 +52,7 @@ export async function capture(exclude: Element): Promise<Blob | null> {
     const scale = Math.min(1, MAX_WIDTH / view.w);
     const page = await domToCanvas(document.documentElement, {
       scale,
+      timeout: RESOURCE_TIMEOUT_MS,
       filter: (node) => node !== exclude,
       onCloneEachNode: maskClonedNode,
     });
