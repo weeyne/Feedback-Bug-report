@@ -6,17 +6,13 @@ import type { Env } from '../env';
 import type { Storage } from '../storage';
 import { createDiscordNotifier } from './discord';
 import { createTelegramNotifier } from './telegram';
+import { isBotToken, isDiscordWebhookUrl } from './validate';
 import type { Attachment, DeliveryResult, Notification, Notifier } from './types';
+
+export { isDiscordWebhookUrl } from './validate';
 
 const MAX_RETRY_WAIT_SEC = 3;
 const SCREENSHOT_TIMEOUT_MS = 10_000;
-const DISCORD_HOSTS = new Set([
-  'discord.com',
-  'discordapp.com',
-  'ptb.discord.com',
-  'canary.discord.com',
-]);
-const BOT_TOKEN = /^\d+:[\w-]+$/;
 const EXTENSION_TYPES: Record<string, string> = {
   webp: 'image/webp',
   jpg: 'image/jpeg',
@@ -42,26 +38,9 @@ interface IntegrationRow extends Row {
 
 export const quotaNoticeText = (appUrl: string) =>
   `Your free limit of ${ENTITLEMENTS.free.monthlySubmissions} submissions this month is reached. ` +
-  `New feedback is saved; upgrade to Pro to see it: ${appUrl}/billing`;
+  `New feedback is saved; upgrade to Pro to see it: ${appUrl}/app/billing`;
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-export function isDiscordWebhookUrl(value: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  return (
-    url.protocol === 'https:' &&
-    DISCORD_HOSTS.has(url.hostname) &&
-    url.port === '' &&
-    url.username === '' &&
-    url.password === '' &&
-    url.pathname.startsWith('/api/webhooks/')
-  );
-}
 
 /** null = skip silently; string = configuration error recorded on the integration. */
 function buildNotifier(
@@ -87,7 +66,7 @@ function buildNotifier(
       } catch {
         return 'secret unreadable';
       }
-      if (!BOT_TOKEN.test(value)) return 'invalid bot token';
+      if (!isBotToken(value)) return 'invalid bot token';
       return createTelegramNotifier({ token: value, chatId: row.target, fetch: deps.fetch });
     case 'discord':
       try {
@@ -219,7 +198,7 @@ export async function dispatchFeedback(deps: DispatchDeps, feedbackId: string): 
     message: row.message,
     email: row.email,
     metadata: row.metadata,
-    dashboardUrl: `${deps.env.NEXT_PUBLIC_APP_URL}/projects/${row.project_id}/feedback?f=${feedbackId}`,
+    dashboardUrl: `${deps.env.NEXT_PUBLIC_APP_URL}/app/p/${row.project_id}/feedback?f=${feedbackId}`,
     screenshot,
   });
 }
@@ -234,4 +213,34 @@ export async function dispatchQuotaNotice(deps: DispatchDeps, projectId: string)
     kind: 'text',
     text: quotaNoticeText(deps.env.NEXT_PUBLIC_APP_URL),
   });
+}
+
+export const TEST_NOTICE_TEXT = (projectName: string) =>
+  `✅ Dymcode test message: notifications for "${projectName}" work.`;
+
+/** Dashboard "Send test": one integration, same notifiers and bookkeeping as real deliveries. */
+export async function sendTestNotice(
+  deps: DispatchDeps,
+  integrationId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [row] = await deps.db.query<IntegrationRow & { project_name: string; pro: boolean }>(
+    `select i.id, i.kind::text as kind, i.target, i.secret_encrypted, p.name as project_name,
+            public.is_pro(p.owner_id) as pro
+     from public.integrations i join public.projects p on p.id = i.project_id
+     where i.id = $1`,
+    [integrationId],
+  );
+  if (!row) return { ok: false, error: 'not found' };
+  const notifier = buildNotifier(deps, row, row.pro);
+  if (notifier === null) return { ok: false, error: 'requires Pro' };
+  if (typeof notifier === 'string') {
+    await record(deps.db, row.id, { ok: false, disable: false, error: notifier });
+    return { ok: false, error: notifier };
+  }
+  const result = await deliver(deps, notifier, {
+    kind: 'text',
+    text: TEST_NOTICE_TEXT(row.project_name),
+  });
+  await record(deps.db, row.id, result);
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

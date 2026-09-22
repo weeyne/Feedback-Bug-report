@@ -22,4 +22,3 @@
 - The retention `attempted` id array grows per run (bounded by the time budget).
 - The CI artifact step is still named `widget-e2e-report` though it also collects web artifacts.
 - Playwright `reuseExistingServer` on :3100 could reuse a non-test server locally.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` is added to `lib/env.ts` in phase 4.

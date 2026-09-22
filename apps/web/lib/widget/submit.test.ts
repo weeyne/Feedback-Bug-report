@@ -94,6 +94,7 @@ function postgresJsLike(db: TestDb): Db {
         params.map((value, i) => (jsonParams.has(i) ? JSON.stringify(value) : value)),
       );
     },
+    transaction: (fn) => db.transaction((tx) => fn(postgresJsLike(tx as TestDb))),
   };
 }
 
@@ -475,6 +476,8 @@ describe('handleSubmit', () => {
           if (/insert into public\.feedback/.test(sql)) throw new Error('simulated insert failure');
           return db.query(sql, params);
         },
+        transaction: (fn) =>
+          db.transaction((tx) => fn({ ...throwingDb, query: (s, p) => tx.query(s, p) })),
       };
       const shot = new Blob([new Uint8Array(2000)], { type: 'image/webp' });
       const error = vi.spyOn(console, 'error').mockImplementation(() => {});

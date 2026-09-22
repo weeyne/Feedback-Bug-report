@@ -163,6 +163,15 @@ describe('mountWidget', () => {
     expect(preview.handle.host.style.getPropertyValue('position')).toBe('');
     expect(preview.handle.host.style.getPropertyValue('z-index')).toBe('');
   });
+
+  it('reports open state through isOpen()', () => {
+    const { handle, q } = setup();
+    expect(handle.isOpen()).toBe(false);
+    handle.open();
+    expect(handle.isOpen()).toBe(true);
+    q('.dc-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(handle.isOpen()).toBe(false);
+  });
 });
 
 describe('panel', () => {

@@ -18,4 +18,16 @@ describe('parseEnv', () => {
     expect(parseEnv({ ...VALID_ENV, DYMCODE_TEST_MODE: '1' }).DYMCODE_TEST_MODE).toBe('1');
     expect(() => parseEnv({ ...VALID_ENV, DYMCODE_TEST_MODE: 'yes' })).toThrow(/DYMCODE_TEST_MODE/);
   });
+
+  it('requires the publishable key and accepts an optional own project key', () => {
+    const { NEXT_PUBLIC_SUPABASE_ANON_KEY: _, ...withoutAnon } = VALID_ENV;
+    expect(() => parseEnv(withoutAnon)).toThrow(/NEXT_PUBLIC_SUPABASE_ANON_KEY/);
+    expect(
+      parseEnv({ ...VALID_ENV, NEXT_PUBLIC_DYMCODE_PROJECT_KEY: 'pk_AbCdEfGh12345678' })
+        .NEXT_PUBLIC_DYMCODE_PROJECT_KEY,
+    ).toBe('pk_AbCdEfGh12345678');
+    expect(() => parseEnv({ ...VALID_ENV, NEXT_PUBLIC_DYMCODE_PROJECT_KEY: 'nope' })).toThrow(
+      /NEXT_PUBLIC_DYMCODE_PROJECT_KEY/,
+    );
+  });
 });

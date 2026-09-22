@@ -13,6 +13,8 @@ export interface Storage {
   download(path: string): Promise<StoredFile | null>;
   /** Returns the paths that were actually removed. Throws if the request itself fails. */
   remove(paths: string[]): Promise<string[]>;
+  /** A time-limited URL the browser can load, or null if the file does not exist. */
+  signedUrl(path: string, expiresInSeconds: number): Promise<string | null>;
 }
 
 export interface MemoryStorage extends Storage {
@@ -42,6 +44,12 @@ export function createMemoryStorage(): MemoryStorage {
       }
       return removed;
     },
+    async signedUrl(path) {
+      const file = storage.files.get(path);
+      return file
+        ? `data:${file.contentType};base64,${Buffer.from(file.data).toString('base64')}`
+        : null;
+    },
   };
   return storage;
 }
@@ -65,6 +73,10 @@ export function createSupabaseStorage(url: string, secretKey: string): Storage {
       const { data, error } = await bucket.remove(paths);
       if (error) throw new Error(`storage remove failed: ${error.message}`);
       return (data ?? []).map((object) => object.name);
+    },
+    async signedUrl(path, expiresInSeconds) {
+      const { data, error } = await bucket.createSignedUrl(path, expiresInSeconds);
+      return error || !data ? null : data.signedUrl;
     },
   };
 }

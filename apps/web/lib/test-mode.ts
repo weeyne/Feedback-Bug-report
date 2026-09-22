@@ -39,10 +39,16 @@ async function openDatabase(): Promise<Db> {
     .sort();
   for (const file of migrations)
     await db.exec(await readFile(join(root, 'migrations', file), 'utf8'));
-  return {
+  // PGlite's `transaction` serializes concurrent requests on its single connection.
+  const wrap = (q: { query: PGlite['query'] }): Db => ({
     query: async <T extends Row>(sql: string, params: unknown[] = []) =>
-      (await db.query<T>(sql, params)).rows,
-  };
+      (await q.query<T>(sql, params)).rows,
+    transaction: async <T>(fn: (tx: Db) => Promise<T>) =>
+      (await db.transaction(async (tx) =>
+        fn(wrap(tx as unknown as { query: PGlite['query'] })),
+      )) as T,
+  });
+  return wrap(db);
 }
 
 async function describeBody(body: BodyInit | null | undefined): Promise<unknown> {
@@ -90,7 +96,14 @@ export async function createTestModeDeps(env: Env): Promise<TestModeDeps> {
 
   const outbox: OutboxEntry[] = [];
   const outboxFetch = (async (input: string | URL | Request, init?: RequestInit) => {
-    outbox.push({ url: String(input), body: await describeBody(init?.body) });
+    const url = String(input);
+    outbox.push({ url, body: await describeBody(init?.body) });
+    if (url.endsWith('/getMe')) {
+      return new Response(
+        JSON.stringify({ ok: true, result: { id: 1, is_bot: true, username: 'e2e_custom_bot' } }),
+        { status: 200 },
+      );
+    }
     return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
   }) as typeof fetch;
 
