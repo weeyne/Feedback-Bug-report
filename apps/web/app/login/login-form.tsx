@@ -1,20 +1,22 @@
 'use client';
 
 import { useActionState } from 'react';
+import { useTranslations } from 'next-intl';
 import { sendMagicLink, signInWithGitHub, type LoginState } from './actions';
 
 export function LoginForm() {
+  const t = useTranslations('auth');
   const [state, action, pending] = useActionState<LoginState, FormData>(sendMagicLink, {
     status: 'idle',
   });
   if (state.status === 'sent') {
-    return <p data-testid="login-sent">Check your inbox for a sign-in link.</p>;
+    return <p data-testid="login-sent">{t('sent')}</p>;
   }
   return (
     <div className="flex flex-col gap-4">
       <form action={signInWithGitHub}>
         <button type="submit" data-testid="login-github">
-          Continue with GitHub
+          {t('github')}
         </button>
       </form>
       <form action={action} className="flex flex-col gap-2">
@@ -22,13 +24,15 @@ export function LoginForm() {
           name="email"
           type="email"
           required
-          placeholder="you@example.com"
+          placeholder={t('emailPlaceholder')}
           data-testid="login-email"
         />
         <button type="submit" disabled={pending} data-testid="login-submit">
-          Email me a sign-in link
+          {t('emailSubmit')}
         </button>
-        {state.status === 'error' && <p role="alert">{state.error}</p>}
+        {state.status === 'error' && state.error && (
+          <p role="alert">{t(state.error.replace('auth.', ''))}</p>
+        )}
       </form>
     </div>
   );

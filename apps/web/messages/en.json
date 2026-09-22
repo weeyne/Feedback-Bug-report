@@ -1,0 +1,42 @@
+{
+  "common": {
+    "save": "Save",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "copy": "Copy",
+    "copied": "Copied",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "language": "Language",
+    "comingSoon": "Coming soon"
+  },
+  "auth": {
+    "title": "Sign in to Dymcode",
+    "github": "Continue with GitHub",
+    "emailPlaceholder": "you@example.com",
+    "emailSubmit": "Email me a sign-in link",
+    "sent": "Check your inbox for a sign-in link.",
+    "emailInvalid": "Enter a valid email address.",
+    "sendFailed": "We couldn't send the link. Try again in a minute.",
+    "callbackFailed": "That sign-in link is invalid or expired. Request a new one.",
+    "signOut": "Sign out"
+  },
+  "nav": {
+    "feedback": "Feedback",
+    "install": "Install",
+    "settings": "Settings",
+    "integrations": "Integrations",
+    "billing": "Billing",
+    "account": "Account",
+    "newProject": "New project",
+    "projects": "Projects",
+    "menu": "Menu"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "notFound": "Not found.",
+    "rateLimited": "Too many attempts. Wait a minute and try again."
+  }
+}
