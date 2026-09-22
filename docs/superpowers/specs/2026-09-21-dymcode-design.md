@@ -273,7 +273,7 @@ All responses from `/api/v1/widget/*` include `Access-Control-Allow-Origin: <req
 `Vary: Origin`. An `OPTIONS` handler is present for safety.
 
 ### `GET /api/v1/widget/config?key=pk_…`
-Returns `{ primaryColor, triggerText, position, showBadge, customCss | null, badgeUrl }`. `showBadge`
+Returns `{ primaryColor, triggerText, position, showBadge, customCss | null, badgeUrl, locale }`. `showBadge`
 is `!(hide_badge && is_pro)` and `customCss` is only returned if the owner is Pro.
 `badgeUrl = https://dymcode.dev/?ref={public_key}&utm_source=widget`.
 Cache headers: `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. Unknown key → 404.
