@@ -20,9 +20,16 @@ export function usePaddle(opts: {
       eventCallback: (event) => {
         if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) onCompleted.current();
       },
-    }).then((instance) => {
-      if (!cancelled && instance) setPaddle(instance);
-    });
+    })
+      .then((instance) => {
+        if (!cancelled && instance) setPaddle(instance);
+      })
+      .catch((error: unknown) =>
+        console.error(
+          '[billing] Paddle.js failed to load',
+          error instanceof Error ? error.message : 'error',
+        ),
+      );
     return () => {
       cancelled = true;
     };

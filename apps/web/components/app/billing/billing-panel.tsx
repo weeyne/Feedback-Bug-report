@@ -51,9 +51,9 @@ export function BillingPanel(props: {
 
   const checkout = (plan: 'monthly' | 'lifetime') =>
     start(async () => {
+      if (!paddle) return void toast.error(t('billing.checkoutFailed'));
       const result = await startCheckoutAction(plan);
       if (!result.ok) return void toast.error(t(result.error));
-      if (!paddle) return void toast.error(t('billing.checkoutFailed'));
       paddle.Checkout.open({
         transactionId: result.transactionId,
         customer: { email: props.email },
