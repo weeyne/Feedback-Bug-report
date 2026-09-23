@@ -105,4 +105,62 @@ describe('Paddle client', () => {
     expect(error).toMatchObject({ status: 403, code: 'forbidden' });
     expect(String(error.message)).not.toContain(PADDLE_ENV.PADDLE_API_KEY);
   });
+
+  describe('ensureCustomer', () => {
+    it('returns the existing customer id without creating one', async () => {
+      const { calls, client } = fake((url) => {
+        expect(url).toBe('https://sandbox-api.paddle.com/customers?email=u%40example.com');
+        return Response.json({ data: [{ id: 'ctm_found' }] });
+      });
+      expect(await client.ensureCustomer('u@example.com')).toBe('ctm_found');
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({ method: 'GET' });
+    });
+
+    it('creates a customer when none is found', async () => {
+      const { calls, client } = fake((url) =>
+        url.includes('/customers?email=')
+          ? Response.json({ data: [] })
+          : Response.json({ data: { id: 'ctm_new' } }, { status: 201 }),
+      );
+      expect(await client.ensureCustomer('new@example.com')).toBe('ctm_new');
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({
+        method: 'GET',
+        url: 'https://sandbox-api.paddle.com/customers?email=new%40example.com',
+      });
+      expect(calls[1]).toMatchObject({
+        method: 'POST',
+        url: 'https://sandbox-api.paddle.com/customers',
+        body: { email: 'new@example.com' },
+      });
+    });
+
+    it('looks up again when creation races another request for the same email', async () => {
+      let posted = false;
+      const { calls, client } = fake((url) => {
+        if (url.includes('/customers?email=')) {
+          return posted
+            ? Response.json({ data: [{ id: 'ctm_race' }] })
+            : Response.json({ data: [] });
+        }
+        posted = true;
+        return Response.json(
+          { error: { code: 'customer_already_exists', detail: 'x' } },
+          { status: 409 },
+        );
+      });
+      expect(await client.ensureCustomer('race@example.com')).toBe('ctm_race');
+      expect(calls).toHaveLength(3);
+    });
+
+    it('rejects other errors as PaddleError', async () => {
+      const { client } = fake(() =>
+        Response.json({ error: { code: 'internal_error' } }, { status: 500 }),
+      );
+      const error = await client.ensureCustomer('u@example.com').catch((e) => e);
+      expect(error).toBeInstanceOf(PaddleError);
+      expect(error).toMatchObject({ status: 500, code: 'internal_error' });
+    });
+  });
 });

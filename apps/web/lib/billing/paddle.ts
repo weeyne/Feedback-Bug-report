@@ -8,6 +8,9 @@ const TIMEOUT_MS = 10_000;
 // `subscription_locked_pending_changes` means something ELSE — another scheduled change
 // is blocking this one — the subscription is NOT cancelled, so that code must still throw.
 const ALREADY_CANCELLED = new Set(['subscription_is_canceled_action_invalid']);
+// Per developer.paddle.com/errors/customers/customer_already_exists: creating a customer with
+// an email that already has one returns 409 with this code. We recover by looking it up again.
+const CUSTOMER_ALREADY_EXISTS = 'customer_already_exists';
 
 export class PaddleError extends Error {
   constructor(
@@ -27,14 +30,20 @@ export interface PaddleClient {
   }): Promise<{ id: string }>;
   cancelSubscription(id: string, when: 'next_billing_period' | 'immediately'): Promise<void>;
   createPortalSession(customerId: string, subscriptionIds: string[]): Promise<string>;
+  /** Looks up the Paddle customer id for this email, creating one if none exists yet. */
+  ensureCustomer(email: string): Promise<string>;
 }
 
 export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch): PaddleClient {
-  async function call<T>(path: string, body: unknown): Promise<T> {
+  async function call<T>(
+    path: string,
+    body?: unknown,
+    method: 'POST' | 'GET' = 'POST',
+  ): Promise<T> {
     const response = await fetchFn(`${config.apiBase}${path}`, {
-      method: 'POST',
+      method,
       headers: { authorization: `Bearer ${config.apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      ...(method === 'POST' ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const json = (await response.json().catch(() => ({}))) as {
@@ -44,6 +53,15 @@ export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch)
     if (!response.ok || !json.data)
       throw new PaddleError(response.status, json.error?.code ?? null);
     return json.data;
+  }
+
+  async function findCustomerByEmail(email: string): Promise<string | null> {
+    const data = await call<Array<{ id: string }>>(
+      `/customers?email=${encodeURIComponent(email)}`,
+      undefined,
+      'GET',
+    );
+    return data[0]?.id ?? null;
   }
 
   return {
@@ -69,6 +87,20 @@ export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch)
         { subscription_ids: subscriptionIds },
       );
       return data.urls.general.overview;
+    },
+    async ensureCustomer(email) {
+      const existing = await findCustomerByEmail(email);
+      if (existing) return existing;
+      try {
+        const created = await call<{ id: string }>('/customers', { email });
+        return created.id;
+      } catch (error) {
+        if (error instanceof PaddleError && error.code === CUSTOMER_ALREADY_EXISTS) {
+          const found = await findCustomerByEmail(email);
+          if (found) return found;
+        }
+        throw error;
+      }
     },
   };
 }

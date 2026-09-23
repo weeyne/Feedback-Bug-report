@@ -4,10 +4,11 @@ import { sendTestNotice, TEST_NOTICE_TEXT } from '../notify/dispatch';
 import { createTelegramNotifier } from '../notify/telegram';
 import { isBotToken, isDiscordWebhookUrl } from '../notify/validate';
 import { getProject, ownsProject } from './projects';
+import { rateLimited } from './rate-limit';
 import type { ActionResult, DashDeps } from './result';
 import { isPro } from './settings';
 
-export const DASHBOARD_RATE_LIMIT = 10;
+export { DASHBOARD_RATE_LIMIT } from './rate-limit';
 export const INTEGRATION_KINDS = ['telegram_shared', 'telegram_custom', 'discord'] as const;
 export type IntegrationKind = (typeof INTEGRATION_KINDS)[number];
 
@@ -49,14 +50,6 @@ function cacheBotUsername(key: string, username: string) {
   const now = Date.now();
   for (const [k, v] of botUsernameCache) if (v.expires < now) botUsernameCache.delete(k);
   botUsernameCache.set(key, { username, expires: now + BOT_USERNAME_TTL_MS });
-}
-
-async function rateLimited(deps: DashDeps, action: string, userId: string): Promise<boolean> {
-  const [row] = await deps.db.query<{ limited: boolean }>(
-    'select public.hit_rate_limit($1, $2, 60) as limited',
-    [`dashboard:${action}:${userId}`, DASHBOARD_RATE_LIMIT],
-  );
-  return Boolean(row?.limited);
 }
 
 async function getMe(deps: DashDeps, token: string): Promise<string | null> {
