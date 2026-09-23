@@ -30,7 +30,6 @@ export default async function BillingPage() {
       {config ? (
         <BillingPanel
           overview={overview}
-          email={user.email}
           environment={config.environment}
           clientToken={config.clientToken}
         />

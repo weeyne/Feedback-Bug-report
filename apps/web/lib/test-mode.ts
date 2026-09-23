@@ -105,7 +105,9 @@ export async function createTestModeDeps(env: Env): Promise<TestModeDeps> {
       );
     }
     if (url.includes('paddle.com/customers?email=')) {
-      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      // E2E users whose email starts with `portal-` already have a Paddle customer.
+      const data = url.includes('?email=portal-') ? [{ id: 'ctm_e2e_portal000000' }] : [];
+      return new Response(JSON.stringify({ data }), { status: 200 });
     }
     if (url.includes('paddle.com/customers/') && url.endsWith('/portal-sessions')) {
       return new Response(

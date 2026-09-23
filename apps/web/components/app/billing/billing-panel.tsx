@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { billingStatusAction, openPortalAction, startCheckoutAction } from '@/app/app/actions';
+import { openPendingTab, pollActivation } from '@/lib/billing/browser';
 import type { BillingOverview } from '@/lib/billing/checkout';
 import { usePaddle } from './use-paddle';
 
@@ -14,7 +15,6 @@ const POLL_LIMIT_MS = 60_000;
 
 export function BillingPanel(props: {
   overview: BillingOverview;
-  email: string;
   environment: 'sandbox' | 'production';
   clientToken: string;
 }) {
@@ -35,18 +35,16 @@ export function BillingPanel(props: {
 
   useEffect(() => {
     if (activation !== 'waiting') return;
-    const started = Date.now();
-    const timer = setInterval(async () => {
-      if ((await billingStatusAction()).pro) {
-        clearInterval(timer);
+    return pollActivation({
+      check: async () => (await billingStatusAction()).pro,
+      onPro: () => {
         setActivation('idle');
         router.refresh();
-      } else if (Date.now() - started > POLL_LIMIT_MS) {
-        clearInterval(timer);
-        setActivation('slow');
-      }
-    }, POLL_MS);
-    return () => clearInterval(timer);
+      },
+      onSlow: () => setActivation('slow'),
+      intervalMs: POLL_MS,
+      limitMs: POLL_LIMIT_MS,
+    });
   }, [activation, router]);
 
   const checkout = (plan: 'monthly' | 'lifetime') =>
@@ -54,19 +52,28 @@ export function BillingPanel(props: {
       if (!paddle) return void toast.error(t('billing.checkoutFailed'));
       const result = await startCheckoutAction(plan);
       if (!result.ok) return void toast.error(t(result.error));
+      // The transaction already carries the server-resolved customer.
       paddle.Checkout.open({
         transactionId: result.transactionId,
-        customer: { email: props.email },
         settings: { displayMode: 'overlay', locale: locale === 'ru' ? 'ru' : 'en' },
       });
     });
 
-  const portal = () =>
+  const portal = () => {
+    // Opened before any await, while the click still counts as a user gesture.
+    const tab = openPendingTab(window);
     start(async () => {
-      const result = await openPortalAction();
-      if (result.ok) window.open(result.url, '_blank', 'noopener,noreferrer');
-      else toast.error(t(result.error));
+      const result = await openPortalAction().catch(
+        () => ({ ok: false, error: 'errors.generic' }) as const,
+      );
+      if (result.ok) {
+        tab.go(result.url);
+      } else {
+        tab.close();
+        toast.error(t(result.error));
+      }
     });
+  };
 
   const date = (iso: string | null) =>
     iso ? format.dateTime(new Date(iso), { dateStyle: 'long' }) : '';

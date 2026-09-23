@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { signPaddle } from '../lib/billing/signature';
 
 const SECRET = 'pdl_ntfset_e2e000000000000'; // playwright.config.ts webServer.env
@@ -59,4 +59,55 @@ test('an unsigned billing webhook is rejected', async ({ page }) => {
     data: '{}',
   });
   expect(res.status()).toBe(401);
+});
+
+async function buyLifetime(page: Page, email: string) {
+  const login = await page.request.post('/api/e2e-test/login', { data: { email } });
+  const { id: userId } = (await login.json()) as { id: string };
+  const body = JSON.stringify({
+    event_id: `evt_e2e_${Date.now()}`,
+    event_type: 'transaction.completed',
+    occurred_at: new Date().toISOString(),
+    data: {
+      id: `txn_e2e_${Date.now()}`,
+      status: 'completed',
+      customer_id: 'ctm_e2e',
+      subscription_id: null,
+      custom_data: { user_id: userId },
+      items: [{ price: { id: LIFETIME } }],
+    },
+  });
+  const res = await page.request.post('/api/billing/webhook', {
+    headers: {
+      'content-type': 'application/json',
+      'paddle-signature': signPaddle(body, SECRET, Math.floor(Date.now() / 1000)),
+    },
+    data: body,
+  });
+  expect(res.status()).toBe(200);
+}
+
+test('the billing portal opens in a tab created on click', async ({ page, context }) => {
+  const PORTAL = 'https://sandbox-customer-portal.paddle.com/e2e'; // lib/test-mode.ts
+  await context.route(`${PORTAL}**`, (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<h1>Portal</h1>' }),
+  );
+  // The test-mode Paddle fake knows a customer for `portal-` emails only.
+  await buyLifetime(page, `portal-${Date.now()}@e2e.dev`);
+  await page.goto('/app/billing');
+  const popup = page.waitForEvent('popup');
+  await page.getByTestId('billing-manage').click();
+  const tab = await popup;
+  await expect(tab).toHaveURL(PORTAL);
+  await expect(page).toHaveURL(/\/app\/billing$/);
+});
+
+test('the pending portal tab is closed when there is no Paddle customer', async ({ page }) => {
+  await buyLifetime(page, `noportal-${Date.now()}@e2e.dev`);
+  await page.goto('/app/billing');
+  const popup = page.waitForEvent('popup');
+  await page.getByTestId('billing-manage').click();
+  const tab = await popup;
+  await tab.waitForEvent('close');
+  await expect(page.getByText(/No billing account yet|Платёжного аккаунта пока нет/)).toBeVisible();
 });

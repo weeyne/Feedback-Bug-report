@@ -137,4 +137,51 @@ describe('deleteAccount', () => {
       });
       expect(await db.query('select 1 from auth.users where id = $1', [owner])).toHaveLength(1);
     }));
+
+  it('keeps the account when billing is disabled but a subscription is still billing', () =>
+    withTx(async (db) => {
+      const email = 'nobilling@example.com';
+      const owner = await createUser(db, email);
+      await db.query(
+        `insert into public.subscriptions (user_id, plan, status, paddle_subscription_id)
+         values ($1, 'pro_monthly', 'past_due', 'sub_unbilled')`,
+        [owner],
+      );
+      const deps = {
+        db,
+        storage: createMemoryStorage(),
+        env: parseEnv(VALID_ENV),
+        fetch,
+        authAdmin: dbAdmin(db),
+        paddle: null,
+      };
+      expect(await deleteAccount(deps, { id: owner, email }, email)).toEqual({
+        ok: false,
+        error: 'errors.generic',
+      });
+      expect(await db.query('select 1 from auth.users where id = $1', [owner])).toHaveLength(1);
+    }));
+
+  it('deletes without billing when no subscription would keep billing', () =>
+    withTx(async (db) => {
+      const email = 'ended@example.com';
+      const owner = await createUser(db, email);
+      await db.query(
+        `insert into public.subscriptions
+           (user_id, plan, status, paddle_subscription_id, paddle_transaction_id, cancel_at_period_end)
+         values ($1, 'pro_monthly', 'active', 'sub_ending', null, true),
+                ($1, 'pro_monthly', 'canceled', 'sub_done', null, false),
+                ($1, 'pro_lifetime', 'paid', null, 'txn_life', false)`,
+        [owner],
+      );
+      const deps = {
+        db,
+        storage: createMemoryStorage(),
+        env: parseEnv(VALID_ENV),
+        fetch,
+        authAdmin: dbAdmin(db),
+      };
+      expect(await deleteAccount(deps, { id: owner, email }, email)).toEqual({ ok: true });
+      expect(await db.query('select 1 from auth.users where id = $1', [owner])).toEqual([]);
+    }));
 });

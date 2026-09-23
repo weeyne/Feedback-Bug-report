@@ -1,6 +1,6 @@
 import type { AuthAdmin } from '../auth/admin';
 import type { PaddleClient } from '../billing/paddle';
-import { PRO_MONTHLY_STATUSES, userSubscriptions } from '../billing/subscriptions';
+import { isProMonthly, userSubscriptions } from '../billing/subscriptions';
 import { removeScreenshots } from './cleanup';
 import type { ActionResult, DashDeps } from './result';
 
@@ -12,18 +12,19 @@ export async function deleteAccount(
   if (confirmEmail.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
     return { ok: false, error: 'account.confirmMismatch' };
   }
+  // Subscriptions that would keep billing after the account is gone.
+  const billable = (await userSubscriptions(deps.db, user.id)).filter(
+    (row) => isProMonthly(row) && row.paddle_subscription_id && !row.cancel_at_period_end,
+  );
+  if (billable.length > 0 && !deps.paddle) {
+    // Billing is not configured, so the subscription cannot be cancelled: keep the account.
+    console.error('[account] delete refused: active subscription and billing is disabled');
+    return { ok: false, error: 'errors.generic' };
+  }
   if (deps.paddle) {
-    const rows = await userSubscriptions(deps.db, user.id);
     try {
-      for (const row of rows) {
-        if (
-          row.plan === 'pro_monthly' &&
-          row.paddle_subscription_id &&
-          !row.cancel_at_period_end &&
-          (PRO_MONTHLY_STATUSES as readonly string[]).includes(row.status)
-        ) {
-          await deps.paddle.cancelSubscription(row.paddle_subscription_id, 'immediately');
-        }
+      for (const row of billable) {
+        await deps.paddle.cancelSubscription(row.paddle_subscription_id!, 'immediately');
       }
     } catch (error) {
       console.error(
