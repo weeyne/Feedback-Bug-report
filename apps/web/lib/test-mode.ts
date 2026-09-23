@@ -104,6 +104,32 @@ export async function createTestModeDeps(env: Env): Promise<TestModeDeps> {
         { status: 200 },
       );
     }
+    if (url.includes('paddle.com/customers?email=')) {
+      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    }
+    if (url.includes('paddle.com/customers/') && url.endsWith('/portal-sessions')) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            urls: { general: { overview: 'https://sandbox-customer-portal.paddle.com/e2e' } },
+          },
+        }),
+        { status: 201 },
+      );
+    }
+    if (url.endsWith('paddle.com/customers')) {
+      return new Response(JSON.stringify({ data: { id: 'ctm_e2e_000000000000' } }), {
+        status: 201,
+      });
+    }
+    if (url.includes('paddle.com/transactions')) {
+      return new Response(JSON.stringify({ data: { id: 'txn_e2e_000000000000' } }), {
+        status: 201,
+      });
+    }
+    if (url.includes('paddle.com/subscriptions/') && url.endsWith('/cancel')) {
+      return new Response(JSON.stringify({ data: { id: 'sub_e2e' } }), { status: 200 });
+    }
     return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
   }) as typeof fetch;
 

@@ -68,7 +68,36 @@ pnpm --filter @dymcode/web telegram:set-webhook https://<domain>/api/telegram/we
 
 The script reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` from `apps/web/.env.local`.
 
-## 5. Smoke checklist
+## 6. Billing (Paddle)
+
+### Sandbox
+
+1. Create a sandbox account at `https://sandbox-vendors.paddle.com` (no identity verification).
+2. Catalog → Products: "Dymcode Pro" with two prices: $9 monthly recurring and $49 one-time. Copy both `pri_…` ids.
+3. Developer tools → Authentication: create an API key and a client-side token.
+4. Developer tools → Notifications: a destination `https://<domain>/api/billing/webhook` for `subscription.*`,
+   `transaction.completed`, `adjustment.created`, `adjustment.updated`. Copy its secret key.
+5. Checkout → Checkout settings: set the default payment link to `https://<domain>/app/billing`.
+6. Apply the database migration to Supabase before deploying this code: `supabase db push` (the owner runs it, or
+   the agent runs it with the owner's explicit approval). Migration `supabase/migrations/20260923000100_paddle_billing.sql`
+   renames columns the webhook depends on — deploying the app before this migration lands makes the webhook fail.
+7. Add `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_MONTHLY`, `PADDLE_PRICE_LIFETIME`,
+   `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` and `NEXT_PUBLIC_PADDLE_ENV=sandbox` to Vercel (Production; the two
+   `NEXT_PUBLIC_` ones as type Config) and to `apps/web/.env.local`, then redeploy.
+8. Test with card `4242 4242 4242 4242`, any future expiry, CVC `100`:
+   - monthly purchase → Pro;
+   - cancel in the portal → "active until";
+   - Lifetime upgrade → the monthly subscription is scheduled to cancel;
+   - a refund from the sandbox dashboard → Free.
+
+### Going live
+
+- Create the live Paddle account and complete verification and domain/site approval. The site needs pricing, Terms,
+  Privacy and Refund pages; a custom domain is likely required.
+- Recreate the product, prices, keys, notification destination and default payment link in the live account.
+- Replace the six variables with live values (`NEXT_PUBLIC_PADDLE_ENV=production`) and redeploy.
+
+## 7. Smoke checklist
 
 - [ ] Sign in with GitHub; sign out; sign in with a magic link. Open the magic link in the **same browser** that
       requested it — Supabase Auth uses PKCE, so the code verifier only exists in that browser's storage.
