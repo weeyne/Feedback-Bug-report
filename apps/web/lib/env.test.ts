@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VALID_ENV } from '@/test/fixtures';
+import { PADDLE_ENV, VALID_ENV } from '@/test/fixtures';
 import { parseEnv } from './env';
 
 describe('parseEnv', () => {
@@ -28,6 +28,17 @@ describe('parseEnv', () => {
     ).toBe('pk_AbCdEfGh12345678');
     expect(() => parseEnv({ ...VALID_ENV, NEXT_PUBLIC_DYMCODE_PROJECT_KEY: 'nope' })).toThrow(
       /NEXT_PUBLIC_DYMCODE_PROJECT_KEY/,
+    );
+  });
+
+  it('accepts no Paddle group or a complete one, and rejects a partial one', () => {
+    expect(parseEnv(VALID_ENV).PADDLE_API_KEY).toBeUndefined();
+    expect(parseEnv({ ...VALID_ENV, ...PADDLE_ENV }).NEXT_PUBLIC_PADDLE_ENV).toBe('sandbox');
+    const { PADDLE_WEBHOOK_SECRET: _, ...partial } = PADDLE_ENV;
+    expect(() => parseEnv({ ...VALID_ENV, ...partial })).toThrow(/PADDLE_WEBHOOK_SECRET/);
+    expect(() => parseEnv({ ...VALID_ENV, ...partial })).not.toThrow(/pdl_sdbx/);
+    expect(() => parseEnv({ ...VALID_ENV, ...PADDLE_ENV, NEXT_PUBLIC_PADDLE_ENV: 'live' })).toThrow(
+      /NEXT_PUBLIC_PADDLE_ENV/,
     );
   });
 });
