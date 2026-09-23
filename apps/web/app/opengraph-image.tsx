@@ -12,11 +12,12 @@ async function manrope(text: string): Promise<ArrayBuffer | null> {
     const css = await (
       await fetch(
         `https://fonts.googleapis.com/css2?family=Manrope:wght@800&text=${encodeURIComponent(text)}`,
+        { signal: AbortSignal.timeout(5000) },
       )
     ).text();
     const url = /src: url\((.+?)\) format\('(?:opentype|truetype)'\)/.exec(css)?.[1];
     if (!url) return null;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     return response.ok ? await response.arrayBuffer() : null;
   } catch {
     return null;
@@ -43,7 +44,6 @@ export default async function OpengraphImage() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={mark} width={140} height={140} alt="" />
         <div style={{ display: 'flex', fontSize: 120, fontWeight: 800, letterSpacing: -4 }}>
           <span style={{ display: 'flex' }}>bugp</span>

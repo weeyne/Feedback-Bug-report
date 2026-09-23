@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* System UI stack: no font download, Cyrillic-capable. */
+  /* Manrope (loaded via next/font), falling back to the system UI stack, Cyrillic-capable. */
   --font-sans:
     var(--font-manrope), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
