@@ -25,7 +25,8 @@ async function manrope(text: string): Promise<ArrayBuffer | null> {
 
 export default async function OpengraphImage() {
   const tagline = en.meta.description;
-  const font = await manrope(`bugping${tagline}`);
+  // Include the dotless ı (U+0131) used by the wordmark so the subset font carries its glyph.
+  const font = await manrope(`bugpıngı${tagline}`);
   const mark = `data:image/svg+xml;base64,${Buffer.from(ladybugDetailedSvg('og')).toString('base64')}`;
   return new ImageResponse(
     <div
@@ -44,22 +45,29 @@ export default async function OpengraphImage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={mark} width={140} height={140} alt="" />
-        <div style={{ fontSize: 120, fontWeight: 800, letterSpacing: -4 }}>bugping</div>
+        <div style={{ display: 'flex', fontSize: 120, fontWeight: 800, letterSpacing: -4 }}>
+          <span style={{ display: 'flex' }}>bugp</span>
+          <span style={{ position: 'relative', display: 'flex' }}>
+            <span style={{ display: 'flex' }}>ı</span>
+            <span
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '0.25em',
+                width: '0.2em',
+                height: '0.2em',
+                transform: 'translateX(-50%)',
+                borderRadius: '9999px',
+                background: '#ff4d3d',
+              }}
+            />
+          </span>
+          <span style={{ display: 'flex' }}>ng</span>
+        </div>
       </div>
       <div style={{ marginTop: 40, fontSize: 44, fontWeight: 800, lineHeight: 1.2, maxWidth: 960 }}>
         {tagline}
       </div>
-      <div
-        style={{
-          position: 'absolute',
-          right: 96,
-          top: 96,
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          background: '#ff4d3d',
-        }}
-      />
     </div>,
     { ...size, fonts: font ? [{ name: 'Manrope', data: font, weight: 800, style: 'normal' }] : [] },
   );

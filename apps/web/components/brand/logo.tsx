@@ -80,7 +80,7 @@ export function Wordmark({ className }: { className?: string }) {
         bugp
         <span className="relative">
           ı
-          <span className="absolute left-1/2 top-[0.12em] size-[0.26em] -translate-x-1/2 rounded-full bg-brand" />
+          <span className="absolute left-1/2 top-[0.25em] size-[0.20em] -translate-x-1/2 rounded-full bg-brand" />
         </span>
         ng
       </span>
