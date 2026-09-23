@@ -27,6 +27,13 @@ export default defineConfig({
       TELEGRAM_BOT_TOKEN: '123456:E2E_token',
       TELEGRAM_BOT_USERNAME: 'dymcode_bot',
       TELEGRAM_WEBHOOK_SECRET: 'e2e-webhook-secret-0123',
+      // Fake values only: test mode never talks to Paddle, the outbox fetch answers.
+      PADDLE_API_KEY: 'pdl_sdbx_apikey_e2e0000000000000000',
+      PADDLE_WEBHOOK_SECRET: 'pdl_ntfset_e2e000000000000',
+      PADDLE_PRICE_MONTHLY: 'pri_e2emonthly0000000000',
+      PADDLE_PRICE_LIFETIME: 'pri_e2elifetime000000000',
+      NEXT_PUBLIC_PADDLE_CLIENT_TOKEN: 'test_e2e0000000000000000',
+      NEXT_PUBLIC_PADDLE_ENV: 'sandbox',
     },
   },
 });

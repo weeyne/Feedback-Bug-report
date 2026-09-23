@@ -12,3 +12,13 @@ export const VALID_ENV = {
   TELEGRAM_BOT_USERNAME: 'dymcode_bot',
   TELEGRAM_WEBHOOK_SECRET: 'webhook-secret-0123456789',
 };
+
+/** A complete fake Paddle group (billing enabled, sandbox). */
+export const PADDLE_ENV = {
+  PADDLE_API_KEY: 'pdl_sdbx_apikey_0123456789abcdefghij',
+  PADDLE_WEBHOOK_SECRET: 'pdl_ntfset_0123456789abcdef',
+  PADDLE_PRICE_MONTHLY: 'pri_monthly0000000000000000',
+  PADDLE_PRICE_LIFETIME: 'pri_lifetime000000000000000',
+  NEXT_PUBLIC_PADDLE_CLIENT_TOKEN: 'test_0123456789abcdef0123',
+  NEXT_PUBLIC_PADDLE_ENV: 'sandbox',
+};

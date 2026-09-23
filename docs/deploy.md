@@ -3,6 +3,14 @@
 Production runs on Vercel (the `apps/web` Next.js app) and Supabase Cloud (Postgres, Auth, Storage).
 Never commit secrets: every value below is entered in the Vercel or Supabase dashboard.
 
+## Before merging phase 5 into main
+
+> **Apply the billing migration to the cloud database first.** Run `supabase db push` so that
+> `supabase/migrations/20260923000100_paddle_billing.sql` is applied BEFORE `phase-5-billing` is merged. Vercel
+> auto-deploys `main`, and `/app/billing` reads the new `paddle_*` columns even when billing is disabled: merging
+> first breaks that page (and the webhook) until the migration lands. The owner runs the command, or the agent
+> runs it with the owner's explicit approval.
+
 ## 1. Supabase
 
 1. Migrations: `supabase link --project-ref <ref>` then `supabase db push` (already done for the dev project).
@@ -68,7 +76,43 @@ pnpm --filter @dymcode/web telegram:set-webhook https://<domain>/api/telegram/we
 
 The script reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` from `apps/web/.env.local`.
 
-## 5. Smoke checklist
+## 5. Billing (Paddle)
+
+### Sandbox
+
+1. Create a sandbox account at `https://sandbox-vendors.paddle.com` (no identity verification).
+2. Catalog → Products: "Dymcode Pro" with two prices: $9 monthly recurring and $49 one-time. Copy both `pri_…` ids.
+3. Developer tools → Authentication: create an API key and a client-side token.
+4. Developer tools → Notifications: a destination `https://<domain>/api/billing/webhook` for `subscription.*`,
+   `transaction.completed`, `adjustment.created`, `adjustment.updated`. Copy its secret key.
+5. Checkout → Checkout settings: set the default payment link to `https://<domain>/app/billing`.
+6. Check that the database migration is applied (see "Before merging phase 5 into main" at the top): migration
+   `supabase/migrations/20260923000100_paddle_billing.sql` renames columns the billing page and the webhook depend on.
+7. Add `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_MONTHLY`, `PADDLE_PRICE_LIFETIME`,
+   `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` and `NEXT_PUBLIC_PADDLE_ENV=sandbox` to Vercel (Production; the two
+   `NEXT_PUBLIC_` ones as type Config) and to `apps/web/.env.local`, then redeploy.
+8. Test with card `4242 4242 4242 4242`, any future expiry, CVC `100`:
+   - monthly purchase → Pro;
+   - cancel in the portal → "active until";
+   - Lifetime upgrade → the monthly subscription is scheduled to cancel;
+   - refunding a Lifetime purchase (full refund, sandbox dashboard) → Free;
+   - refunding a monthly first payment (full refund) → the subscription is cancelled immediately → Free.
+
+### When webhooks fail
+
+The webhook returns 500 when it cannot process an event yet (for example the database is down, the user cannot be
+resolved, or a refund arrives before its purchase), and Paddle retries it for a while. Logs (`[billing/webhook]`)
+show the event id. Once the cause is fixed, re-send the failed events from Paddle → Developer tools →
+Notifications → the events log of the destination.
+
+### Going live
+
+- Create the live Paddle account and complete verification and domain/site approval. The site needs pricing, Terms,
+  Privacy and Refund pages; a custom domain is likely required.
+- Recreate the product, prices, keys, notification destination and default payment link in the live account.
+- Replace the six variables with live values (`NEXT_PUBLIC_PADDLE_ENV=production`) and redeploy.
+
+## 6. Smoke checklist
 
 - [ ] Sign in with GitHub; sign out; sign in with a magic link. Open the magic link in the **same browser** that
       requested it — Supabase Auth uses PKCE, so the code verifier only exists in that browser's storage.

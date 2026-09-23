@@ -15,6 +15,9 @@ export async function SiteFooter() {
           <Link href="/terms" className="hover:underline">
             {t('terms')}
           </Link>
+          <Link href="/refund" className="hover:underline">
+            {t('refund')}
+          </Link>
           <LocaleSwitcher />
         </nav>
       </div>

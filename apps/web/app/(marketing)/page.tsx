@@ -68,6 +68,16 @@ export default async function LandingPage() {
             </div>
           ))}
         </div>
+        <div className="mt-8 flex justify-center">
+          <Button
+            size="lg"
+            nativeButton={false}
+            render={<Link href="/app/billing" />}
+            data-testid="landing-pricing-cta"
+          >
+            {t('choosePlan')}
+          </Button>
+        </div>
       </section>
 
       <section className={section}>

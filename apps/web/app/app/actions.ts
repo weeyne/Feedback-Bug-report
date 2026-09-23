@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import { signOut } from '@/app/actions/session';
 import { getAuthAdmin } from '@/lib/auth/admin';
 import { requireUser } from '@/lib/auth/session';
+import { openPortal, startCheckout } from '@/lib/billing/checkout';
+import { paddleFromDeps } from '@/lib/billing/paddle';
 import { deleteAccount } from '@/lib/dashboard/account';
 import { deleteFeedback, setFeedbackStatus, type FeedbackStatus } from '@/lib/dashboard/feedback';
 import {
@@ -20,7 +22,12 @@ import {
 } from '@/lib/dashboard/integrations';
 import { createProject, hasFeedback } from '@/lib/dashboard/projects';
 import type { ActionResult } from '@/lib/dashboard/result';
-import { deleteProject, updateProjectSettings, type SettingsInput } from '@/lib/dashboard/settings';
+import {
+  deleteProject,
+  isPro,
+  updateProjectSettings,
+  type SettingsInput,
+} from '@/lib/dashboard/settings';
 import { getDeps } from '@/lib/deps';
 
 export async function createProjectAction(input: {
@@ -121,11 +128,29 @@ export async function disconnectIntegrationAction(
   return disconnectIntegration(await getDeps(), user.id, { projectId, kind });
 }
 
+export async function startCheckoutAction(
+  plan: 'monthly' | 'lifetime',
+): Promise<ActionResult<{ transactionId: string }>> {
+  const user = await requireUser();
+  if (plan !== 'monthly' && plan !== 'lifetime') return { ok: false, error: 'errors.generic' };
+  return startCheckout(await getDeps(), user, plan);
+}
+
+export async function openPortalAction(): Promise<ActionResult<{ url: string }>> {
+  const user = await requireUser();
+  return openPortal(await getDeps(), user);
+}
+
+export async function billingStatusAction(): Promise<{ pro: boolean }> {
+  const user = await requireUser();
+  return { pro: await isPro(await getDeps(), user.id) };
+}
+
 export async function deleteAccountAction(confirmEmail: string): Promise<ActionResult> {
   const user = await requireUser();
   const deps = await getDeps();
   const result = await deleteAccount(
-    { ...deps, authAdmin: getAuthAdmin(deps) },
+    { ...deps, authAdmin: getAuthAdmin(deps), paddle: paddleFromDeps(deps) },
     user,
     confirmEmail,
   );
