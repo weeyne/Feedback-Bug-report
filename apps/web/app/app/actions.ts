@@ -138,7 +138,7 @@ export async function startCheckoutAction(
 
 export async function openPortalAction(): Promise<ActionResult<{ url: string }>> {
   const user = await requireUser();
-  return openPortal(await getDeps(), user.id);
+  return openPortal(await getDeps(), user);
 }
 
 export async function billingStatusAction(): Promise<{ pro: boolean }> {

@@ -94,6 +94,7 @@ describe('deleteAccount', () => {
       const paddle: PaddleClient = {
         createTransaction: async () => ({ id: 'x' }),
         createPortalSession: async () => 'x',
+        findCustomer: async () => 'cus_x',
         ensureCustomer: async () => 'cus_x',
         cancelSubscription: async (id, when) => {
           cancelled.push(`${id}:${when}`);
@@ -116,6 +117,7 @@ describe('deleteAccount', () => {
       const paddle: PaddleClient = {
         createTransaction: async () => ({ id: 'x' }),
         createPortalSession: async () => 'x',
+        findCustomer: async () => 'cus_x',
         ensureCustomer: async () => 'cus_x',
         cancelSubscription: async () => {
           throw new Error('paddle down');

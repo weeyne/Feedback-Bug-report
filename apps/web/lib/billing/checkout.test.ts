@@ -6,7 +6,10 @@ import { parseEnv } from '../env';
 import { createMemoryStorage } from '../storage';
 import { billingOverview, openPortal, startCheckout } from './checkout';
 
-function setup(db: TestDb, opts: { disabled?: boolean; fail?: boolean } = {}) {
+function setup(
+  db: TestDb,
+  opts: { disabled?: boolean; fail?: boolean; customers?: Record<string, string> } = {},
+) {
   const calls: Array<{ url: string; method: string; body: any }> = [];
   const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
@@ -16,7 +19,11 @@ function setup(db: TestDb, opts: { disabled?: boolean; fail?: boolean } = {}) {
       body: init?.body ? JSON.parse(String(init.body)) : null,
     });
     if (opts.fail) return Response.json({ error: { code: 'internal_error' } }, { status: 500 });
-    if (url.includes('/customers?email=')) return Response.json({ data: [] });
+    if (url.includes('/customers?email=')) {
+      // Paddle's filter is an exact match: the fake only knows the keys as given.
+      const id = opts.customers?.[decodeURIComponent(url.split('?email=')[1]!)];
+      return Response.json({ data: id ? [{ id }] : [] });
+    }
     if (url.endsWith('/customers'))
       return Response.json({ data: { id: 'ctm_new' } }, { status: 201 });
     if (url.endsWith('/portal-sessions')) {
@@ -101,16 +108,16 @@ describe('billingOverview', () => {
 });
 
 describe('startCheckout', () => {
-  it('creates a transaction for a Free user, ensuring a Paddle customer, and reuses a known customer id', () =>
+  it('creates a transaction for a Free user with a customer resolved from the session email', () =>
     withTx(async (db) => {
       const { deps, calls } = setup(db);
       const u = await createUser(db);
-      const buyer = { id: u, email: 'u@example.com' };
+      const buyer = { id: u, email: ' U@Example.com' };
       expect(await startCheckout(deps, buyer, 'monthly')).toEqual({
         ok: true,
         transactionId: 'txn_new',
       });
-      // No known customer id on file: look it up, then create one, then pass it to the transaction.
+      // Look the normalized email up, create the customer, then pass it to the transaction.
       expect(calls).toHaveLength(3);
       expect(calls[0]).toMatchObject({
         method: 'GET',
@@ -126,20 +133,38 @@ describe('startCheckout', () => {
         custom_data: { user_id: u },
         customer_id: 'ctm_new',
       });
+    }));
 
+  it('ignores a stored customer id and always uses the email-resolved customer', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db, { customers: { 'u@example.com': 'ctm_mine' } });
+      const u = await createUser(db);
+      // A row holding someone else's customer id (e.g. from a checkout opened with their email).
       await addRow(db, u, {
         plan: 'pro_monthly',
         status: 'canceled',
         subscription: 'sub_old',
-        customer: 'ctm_known',
+        customer: 'ctm_victim',
       });
-      await startCheckout(deps, buyer, 'lifetime');
-      // A known customer id on the user's rows: no /customers lookup or creation at all.
-      expect(calls).toHaveLength(4);
-      expect(calls[3]!.body).toMatchObject({
+      const result = await startCheckout(deps, { id: u, email: 'u@example.com' }, 'lifetime');
+      expect(result.ok).toBe(true);
+      expect(calls.map((c) => c.method)).toEqual(['GET', 'POST']);
+      expect(calls[1]!.body).toMatchObject({
         items: [{ price_id: PADDLE_ENV.PADDLE_PRICE_LIFETIME, quantity: 1 }],
-        customer_id: 'ctm_known',
+        customer_id: 'ctm_mine',
       });
+      expect(JSON.stringify(calls)).not.toContain('ctm_victim');
+    }));
+
+  it('fails with checkoutFailed for an empty email without calling Paddle', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db);
+      const u = await createUser(db);
+      expect(await startCheckout(deps, { id: u, email: '  ' }, 'monthly')).toEqual({
+        ok: false,
+        error: 'billing.checkoutFailed',
+      });
+      expect(calls).toEqual([]);
     }));
 
   it('enforces the purchase rules', () =>
@@ -188,9 +213,9 @@ describe('startCheckout', () => {
 describe('openPortal', () => {
   it('opens a portal session for the caller’s own customer only', () =>
     withTx(async (db) => {
-      const { deps, calls } = setup(db);
+      const { deps, calls } = setup(db, { customers: { 'u@example.com': 'ctm_p' } });
       const u = await createUser(db);
-      expect(await openPortal(deps, u)).toEqual({ ok: false, error: 'billing.noCustomer' });
+      const caller = { id: u, email: 'U@example.com ' };
       await addRow(db, u, {
         plan: 'pro_monthly',
         status: 'active',
@@ -204,10 +229,85 @@ describe('openPortal', () => {
         subscription: 'sub_q',
         customer: 'ctm_q',
       });
-      expect(await openPortal(deps, u)).toEqual({ ok: true, url: 'https://portal.example/o' });
+      expect(await openPortal(deps, caller)).toEqual({ ok: true, url: 'https://portal.example/o' });
+      expect(calls[0]).toMatchObject({
+        method: 'GET',
+        url: 'https://sandbox-api.paddle.com/customers?email=u%40example.com',
+      });
       expect(calls.at(-1)).toMatchObject({
         url: 'https://sandbox-api.paddle.com/customers/ctm_p/portal-sessions',
         body: { subscription_ids: ['sub_p'] },
+      });
+    }));
+
+  it('never passes a subscription stored with a foreign customer id', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db, { customers: { 'attacker@example.com': 'ctm_attacker' } });
+      const u = await createUser(db);
+      // The attacker's row holds the victim's customer id (checkout opened with the victim's email).
+      await addRow(db, u, {
+        plan: 'pro_monthly',
+        status: 'active',
+        subscription: 'sub_victim',
+        customer: 'ctm_victim',
+      });
+      await addRow(db, u, {
+        plan: 'pro_monthly',
+        status: 'active',
+        subscription: 'sub_own',
+        customer: 'ctm_attacker',
+      });
+      expect(await openPortal(deps, { id: u, email: 'attacker@example.com' })).toEqual({
+        ok: true,
+        url: 'https://portal.example/o',
+      });
+      expect(calls.at(-1)).toMatchObject({
+        url: 'https://sandbox-api.paddle.com/customers/ctm_attacker/portal-sessions',
+        body: { subscription_ids: ['sub_own'] },
+      });
+      expect(JSON.stringify(calls)).not.toContain('victim');
+    }));
+
+  it('returns noCustomer when Paddle has no customer for the email, even with a stored id', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db);
+      const u = await createUser(db);
+      await addRow(db, u, {
+        plan: 'pro_lifetime',
+        status: 'paid',
+        txn: 'txn_nc',
+        customer: 'ctm_x',
+      });
+      expect(await openPortal(deps, { id: u, email: 'u@example.com' })).toEqual({
+        ok: false,
+        error: 'billing.noCustomer',
+      });
+      // A lookup only: no customer is created and no portal session is opened.
+      expect(calls.map((c) => c.method)).toEqual(['GET']);
+    }));
+
+  it('returns noCustomer for an empty email without calling Paddle', () =>
+    withTx(async (db) => {
+      const { deps, calls } = setup(db);
+      const u = await createUser(db);
+      expect(await openPortal(deps, { id: u, email: ' ' })).toEqual({
+        ok: false,
+        error: 'billing.noCustomer',
+      });
+      expect(calls).toEqual([]);
+    }));
+
+  it('maps Paddle errors to portalFailed and disabled billing to unavailable', () =>
+    withTx(async (db) => {
+      const u = await createUser(db);
+      const caller = { id: u, email: 'u@example.com' };
+      expect(await openPortal(setup(db, { fail: true }).deps, caller)).toEqual({
+        ok: false,
+        error: 'billing.portalFailed',
+      });
+      expect(await openPortal(setup(db, { disabled: true }).deps, caller)).toEqual({
+        ok: false,
+        error: 'billing.unavailable',
       });
     }));
 });

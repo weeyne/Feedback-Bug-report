@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PADDLE_ENV, VALID_ENV } from '@/test/fixtures';
 import { parseEnv } from '../env';
 import { billingConfig } from './config';
-import { createPaddleClient, PaddleError } from './paddle';
+import { createPaddleClient, InvalidCustomerEmail, PaddleError } from './paddle';
 
 const config = billingConfig(parseEnv({ ...VALID_ENV, ...PADDLE_ENV }))!;
 
@@ -106,7 +106,67 @@ describe('Paddle client', () => {
     expect(String(error.message)).not.toContain(PADDLE_ENV.PADDLE_API_KEY);
   });
 
+  describe('findCustomer', () => {
+    it('returns the first matching customer id, or null, without creating one', async () => {
+      const found = fake(() => Response.json({ data: [{ id: 'ctm_a' }, { id: 'ctm_b' }] }));
+      expect(await found.client.findCustomer('u@example.com')).toBe('ctm_a');
+      expect(found.calls).toEqual([
+        expect.objectContaining({
+          method: 'GET',
+          url: 'https://sandbox-api.paddle.com/customers?email=u%40example.com',
+        }),
+      ]);
+      const none = fake(() => Response.json({ data: [] }));
+      expect(await none.client.findCustomer('u@example.com')).toBeNull();
+      expect(none.calls).toHaveLength(1);
+    });
+
+    it('lowercases and trims the email in the query', async () => {
+      const { calls, client } = fake(() => Response.json({ data: [] }));
+      await client.findCustomer('  Mixed.Case@Example.COM ');
+      expect(calls[0]!.url).toBe(
+        'https://sandbox-api.paddle.com/customers?email=mixed.case%40example.com',
+      );
+    });
+
+    it('rejects an empty, blank or comma-separated email without calling Paddle', async () => {
+      const { calls, client } = fake(() => Response.json({ data: [{ id: 'ctm_x' }] }));
+      for (const email of ['', '   ', 'a@example.com,victim@example.com']) {
+        await expect(client.findCustomer(email)).rejects.toBeInstanceOf(InvalidCustomerEmail);
+      }
+      expect(calls).toEqual([]);
+    });
+
+    it('rejects Paddle errors as PaddleError', async () => {
+      const { client } = fake(() =>
+        Response.json({ error: { code: 'forbidden' } }, { status: 403 }),
+      );
+      await expect(client.findCustomer('u@example.com')).rejects.toBeInstanceOf(PaddleError);
+    });
+  });
+
   describe('ensureCustomer', () => {
+    it('lowercases and trims the email for the lookup and the creation', async () => {
+      const { calls, client } = fake((url) =>
+        url.includes('/customers?email=')
+          ? Response.json({ data: [] })
+          : Response.json({ data: { id: 'ctm_new' } }, { status: 201 }),
+      );
+      expect(await client.ensureCustomer(' New@Example.com')).toBe('ctm_new');
+      expect(calls[0]!.url).toBe(
+        'https://sandbox-api.paddle.com/customers?email=new%40example.com',
+      );
+      expect(calls[1]!.body).toEqual({ email: 'new@example.com' });
+    });
+
+    it('rejects an empty, blank or comma-separated email without calling Paddle', async () => {
+      const { calls, client } = fake(() => Response.json({ data: [{ id: 'ctm_x' }] }));
+      for (const email of ['', ' 	 ', 'a@example.com,b@example.com']) {
+        await expect(client.ensureCustomer(email)).rejects.toBeInstanceOf(InvalidCustomerEmail);
+      }
+      expect(calls).toEqual([]);
+    });
+
     it('returns the existing customer id without creating one', async () => {
       const { calls, client } = fake((url) => {
         expect(url).toBe('https://sandbox-api.paddle.com/customers?email=u%40example.com');

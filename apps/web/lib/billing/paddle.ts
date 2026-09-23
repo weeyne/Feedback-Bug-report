@@ -22,6 +22,14 @@ export class PaddleError extends Error {
   }
 }
 
+/** The email cannot identify a Paddle customer (empty, or a comma-separated list). */
+export class InvalidCustomerEmail extends Error {
+  constructor() {
+    super('Invalid customer email');
+    this.name = 'InvalidCustomerEmail';
+  }
+}
+
 export interface PaddleClient {
   createTransaction(input: {
     priceId: string;
@@ -30,8 +38,20 @@ export interface PaddleClient {
   }): Promise<{ id: string }>;
   cancelSubscription(id: string, when: 'next_billing_period' | 'immediately'): Promise<void>;
   createPortalSession(customerId: string, subscriptionIds: string[]): Promise<string>;
+  /** The id of the active Paddle customer with exactly this email, or null. Never creates one. */
+  findCustomer(email: string): Promise<string | null>;
   /** Looks up the Paddle customer id for this email, creating one if none exists yet. */
   ensureCustomer(email: string): Promise<string>;
+}
+
+/**
+ * Lowercases and trims the email. Rejects an empty one, and one with a comma: Paddle reads
+ * `?email=a,b` as a list of emails, which would match someone else's customer.
+ */
+function normalizeEmail(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || normalized.includes(',')) throw new InvalidCustomerEmail();
+  return normalized;
 }
 
 export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch): PaddleClient {
@@ -55,6 +75,7 @@ export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch)
     return json.data;
   }
 
+  // GET /customers?email= is an exact match and returns active customers only.
   async function findCustomerByEmail(email: string): Promise<string | null> {
     const data = await call<Array<{ id: string }>>(
       `/customers?email=${encodeURIComponent(email)}`,
@@ -88,7 +109,11 @@ export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch)
       );
       return data.urls.general.overview;
     },
-    async ensureCustomer(email) {
+    async findCustomer(rawEmail) {
+      return findCustomerByEmail(normalizeEmail(rawEmail));
+    },
+    async ensureCustomer(rawEmail) {
+      const email = normalizeEmail(rawEmail);
       const existing = await findCustomerByEmail(email);
       if (existing) return existing;
       try {

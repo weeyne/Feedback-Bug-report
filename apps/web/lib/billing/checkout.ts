@@ -1,7 +1,7 @@
 import { rateLimited } from '../dashboard/rate-limit';
 import type { ActionResult, DashDeps } from '../dashboard/result';
 import { billingConfig } from './config';
-import { paddleFromDeps } from './paddle';
+import { InvalidCustomerEmail, paddleFromDeps } from './paddle';
 import { PRO_MONTHLY_STATUSES, userSubscriptions, type SubscriptionRow } from './subscriptions';
 
 export type BillingState = 'disabled' | 'free' | 'monthly' | 'past_due' | 'lifetime';
@@ -51,13 +51,11 @@ export async function startCheckout(
   if (plan === 'monthly' && rows.some(isProMonthly)) {
     return { ok: false, error: 'billing.alreadySubscribed' };
   }
-  const knownCustomerId = rows.find((row) => row.paddle_customer_id)?.paddle_customer_id ?? null;
   try {
-    // Never trust an email typed into the Paddle overlay for identity: always attach a
-    // server-known customer id so a buyer can't attach someone else's Paddle customer to
-    // their own row (and later open that other person's portal). Reuse it if we have it;
-    // otherwise resolve/create it from the authenticated user's own email.
-    const customerId = knownCustomerId ?? (await paddle.ensureCustomer(user.email));
+    // Identity comes only from the verified session email. A stored paddle_customer_id is NOT
+    // trusted: it comes from webhook data, and a buyer can open a Paddle.js checkout with any
+    // email, which would store someone else's customer id on the buyer's row.
+    const customerId = await paddle.ensureCustomer(user.email);
     const transaction = await paddle.createTransaction({
       priceId: plan === 'monthly' ? config.priceMonthly : config.priceLifetime,
       userId: user.id,
@@ -72,16 +70,27 @@ export async function startCheckout(
 
 export async function openPortal(
   deps: DashDeps,
-  userId: string,
+  user: { id: string; email: string },
 ): Promise<ActionResult<{ url: string }>> {
   const paddle = paddleFromDeps(deps);
   if (!paddle) return { ok: false, error: 'billing.unavailable' };
-  if (await rateLimited(deps, 'portal', userId)) return { ok: false, error: 'errors.rateLimited' };
-  const rows = await userSubscriptions(deps.db, userId);
-  const customerId = rows.find((row) => row.paddle_customer_id)?.paddle_customer_id;
+  if (await rateLimited(deps, 'portal', user.id)) return { ok: false, error: 'errors.rateLimited' };
+  let customerId: string | null;
+  try {
+    // Resolve the customer from the verified session email, never from a stored id (see above).
+    customerId = await paddle.findCustomer(user.email);
+  } catch (error) {
+    if (error instanceof InvalidCustomerEmail) return { ok: false, error: 'billing.noCustomer' };
+    console.error('[billing] portal failed', error instanceof Error ? error.message : 'error');
+    return { ok: false, error: 'billing.portalFailed' };
+  }
   if (!customerId) return { ok: false, error: 'billing.noCustomer' };
-  const subscriptionIds = rows
-    .filter((row) => isProMonthly(row) && row.paddle_subscription_id)
+  // Only subscriptions that belong to that customer: a row may hold a foreign customer id.
+  const subscriptionIds = (await userSubscriptions(deps.db, user.id))
+    .filter(
+      (row) =>
+        isProMonthly(row) && row.paddle_subscription_id && row.paddle_customer_id === customerId,
+    )
     .map((row) => row.paddle_subscription_id!);
   try {
     return { ok: true, url: await paddle.createPortalSession(customerId, subscriptionIds) };
