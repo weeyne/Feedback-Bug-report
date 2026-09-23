@@ -5,10 +5,16 @@ outside the code: the Telegram bot, the Vercel project, environment variables, S
 settings, the GitHub OAuth app, and Paddle sandbox billing.
 
 Do the steps **in this order**. `https://dymcode.vercel.app` keeps serving the app normally
-throughout the move (see step 2), so nothing that embeds it breaks mid-way, and sign-in and
-billing keep working the whole time. The one deliberate gap is the Telegram bot: once step 7
-switches the shared bot's token, every chat connected through the old bot stops receiving
-deliveries until that chat reconnects to the new one.
+throughout the move (see step 2), so nothing that embeds it breaks mid-way. Sign-in, however,
+does **not** keep working on the old host the whole time: once step 7's redeploy picks up the new
+`NEXT_PUBLIC_APP_URL`, a sign-in *started* on `dymcode.vercel.app` still builds its callback URL
+from that env var, so it points at `https://bugping.vercel.app/auth/callback` — but the PKCE
+verifier cookie was set on the `dymcode.vercel.app` host and isn't sent to `bugping.vercel.app`,
+so the exchange fails and the user lands on `/login?error=callback`. **From step 7 onward, sign in
+only on `https://bugping.vercel.app`.** Billing keeps working on the old host until the app URL
+switches (see step 6's note on the Paddle approved domain). The one deliberate gap is the
+Telegram bot: once step 7 switches the shared bot's token, every chat connected through the old
+bot stops receiving deliveries until that chat reconnects to the new one.
 
 Nothing in this checklist is done by the coding agent. No secret (bot token, webhook secret,
 API key) is ever typed into chat with an AI assistant — only into the Vercel/Supabase/Paddle/
@@ -21,9 +27,18 @@ BotFather dashboards, or read from `apps/web/.env.local` by the commands below.
 - The Bugping code (this branch) must already be merged to `main` and deployed to production
   before you start this checklist.
 - That deploy is safe on its own, before you touch any dashboard: with the old environment
-  variable names and values still in place, the app keeps working exactly as it did before. The
-  only visible change is that the landing page's own feedback widget stays hidden until you set
-  `NEXT_PUBLIC_BUGPING_PROJECT_KEY` (step 4).
+  variable names and values still in place, sign-in, billing and existing embeds keep working.
+  A few things do change with this deploy, though, since the widget code itself is renamed:
+  - The landing page's own feedback widget stays hidden until you set
+    `NEXT_PUBLIC_BUGPING_PROJECT_KEY` (step 4).
+  - Any host page that calls `window.Dymcode` or listens for the `dymcode:ready` event must be
+    updated to `window.Bugping` / `bugping:ready` — the old names no longer exist.
+  - The widget's CSS classes and custom properties are now `.bp-*` / `--bp-*` instead of
+    `.dc-*` / `--dc-*`. Stored custom CSS is migrated to match by the database migration in the
+    last step (step 10) — until that migration is applied, custom CSS a project wrote against
+    `.dc-*` selectors or `--dc-*` variables simply doesn't apply anymore.
+  - New projects created before step 10's migration still get the old default widget color
+    (`#6366f1`), not the new Bugping coral, since the column default only changes then.
 - Vercel auto-deploys every push to `main`. Don't merge anything else into `main` while you work
   through this checklist — an unrelated merge would trigger a redeploy mid-move and could race
   with the environment-variable changes below.
@@ -73,8 +88,9 @@ BotFather dashboards, or read from `apps/web/.env.local` by the commands below.
    explicit `redirectTo` built from `NEXT_PUBLIC_APP_URL` (`apps/web/app/login/actions.ts`), and
    Supabase only falls back to Site URL when a request doesn't specify one — so today's sign-in
    flow keeps working off the Redirect URLs list regardless of what Site URL says.
-4. Doing this step before step 4 matters: when Vercel later auto-deploys with the new
-   `NEXT_PUBLIC_APP_URL`, the callback it will request
+4. Doing this step before step 4 matters: when you trigger the manual redeploy in step 7 that
+   picks up the new `NEXT_PUBLIC_APP_URL` (Vercel does not redeploy on its own just because an
+   environment variable changed — see step 4.7), the callback it will request
    (`https://bugping.vercel.app/auth/callback`) is already on the allow-list, so sign-in is never
    pointed at a URL Supabase doesn't recognize yet.
 
@@ -119,8 +135,11 @@ variables use).
 2. Go to **Catalog** → **Products**. Open the product currently named "Dymcode Pro" (or whatever
    your monthly/lifetime products are named) and rename it to **Bugping Pro**. If Lifetime is a
    separate product, rename it to **Bugping Lifetime**.
-3. Go to **Checkout** → **Checkout settings**. Update the default payment link / approved domain
-   from `dymcode.vercel.app` to `bugping.vercel.app`.
+3. Go to **Checkout** → **Checkout settings**. **Add** `bugping.vercel.app` to the default payment
+   link / approved domain list now, alongside the existing `dymcode.vercel.app` — do not remove
+   `dymcode.vercel.app` yet. Checkout on the old host needs to keep working until the app URL
+   switches over in step 7's redeploy, so leave both domains approved until the smoke test in
+   step 8 passes, then remove `dymcode.vercel.app`.
 4. Go to **Developer tools** → **Notifications**. Open the existing webhook destination and
    change its URL to `https://bugping.vercel.app/api/billing/webhook`.
 5. Nothing else in Paddle needs to change — the API key, webhook secret and price ids stay the
@@ -161,13 +180,21 @@ variables use).
      actually be added as a member of that group. Use the reconnect link on the project's
      **Integrations** page (it adds the bot to the group for you) rather than trying to add it by
      hand from Telegram's own UI.
+4. **Optional**: clear the webhook still registered on the **old** `@dymcode_bot`. Its token stays
+   valid and its webhook URL still points at the old deployment, so Telegram keeps retrying
+   failed deliveries to it indefinitely otherwise (harmless, but noisy). You don't need to type the
+   old token into chat to do this — either:
+   - open `https://api.telegram.org/bot<OLD_TOKEN>/deleteWebhook` yourself in your browser's
+     address bar (typing the token there, not in any chat), or
+   - simply retire the old bot altogether via BotFather (`/mybots` → the old bot → **Revoke
+     current token**, or delete the bot outright) once you're done with it.
 
 ## 8. Smoke test, then clean up the old Supabase redirect entry
 
 Before testing, check the **Allowed websites** setting on your own landing project (dashboard →
 your project → **Settings** → Allowed websites): if it currently restricts submissions to
 `https://dymcode.vercel.app`, add `https://bugping.vercel.app` there first — otherwise the
-widget test in step 5 below is rejected as coming from a disallowed origin.
+widget test in item 5 of the smoke test below is rejected as coming from a disallowed origin.
 
 Test all of this on `https://bugping.vercel.app`:
 
@@ -182,7 +209,9 @@ Test all of this on `https://bugping.vercel.app`:
    purchase — the sandbox test card from `docs/deploy.md` is fine if you want to go further).
 
 Once all of that passes, go back to **Supabase → Authentication → URL Configuration** and remove
-the old `https://dymcode.vercel.app/auth/callback` redirect URL entry.
+the old `https://dymcode.vercel.app/auth/callback` redirect URL entry. Also go back to Paddle
+**Checkout** → **Checkout settings** (step 6.3) and remove `dymcode.vercel.app` from the approved
+domain list, now that checkout has been confirmed working on `bugping.vercel.app`.
 
 ## 9. Optional: retire the old domain
 
@@ -197,17 +226,22 @@ snippet, Paddle destination or Telegram webhook still pointing at `dymcode.verce
 working the moment it becomes a redirect** (a redirect response carries no CORS headers, so the
 widget's own request fails outright).
 
-## 10. Apply the default-color database migration
+## 10. Apply the default-color and custom-CSS database migration
 
-When it's convenient (this does not need to happen during the cutover — it only changes the
-default color new projects get, and backfills projects that never customized their color):
+This does not need to happen during the cutover, but don't leave it too long: until it's applied,
+new projects still get the old default widget color, and any project with custom CSS written
+against the old `.dc-*` classes / `--dc-*` variables (see the note under "Before you start") has
+that CSS silently not apply, since the widget itself now renders `.bp-*` / `--bp-*`.
 
 1. Make sure you're linked to the right Supabase project: `supabase link --project-ref <ref>`.
 2. Run:
    ```bash
    supabase db push
    ```
-3. This applies `supabase/migrations/20260924000100_bugping_default_color.sql`, which changes the
-   `primary_color` default on `public.projects` from `#6366f1` to `#E0321F` and updates any
-   existing project that still has the untouched old default. Projects that picked a custom color
-   are not touched.
+3. This applies `supabase/migrations/20260924000100_bugping_default_color.sql`, which:
+   - changes the `primary_color` default on `public.projects` from `#6366f1` to `#E0321F` and
+     backfills any existing project that still has the untouched old default (case-insensitive,
+     so a hand-typed `#6366F1` counts too) — projects that picked a genuinely custom color are not
+     touched;
+   - rewrites any stored `custom_css` that references the old `.dc-*` classes or `--dc-*` custom
+     properties to the new `.bp-*` / `--bp-*` names, so existing customizations keep applying.
