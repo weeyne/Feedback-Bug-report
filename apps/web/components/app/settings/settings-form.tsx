@@ -17,7 +17,15 @@ import { WidgetPreview } from './widget-preview';
 
 const LOCALE_NAMES = { en: 'English', ru: 'Русский', uk: 'Українська', es: 'Español' } as const;
 
-export function SettingsForm({ project, pro }: { project: ProjectDetail; pro: boolean }) {
+export function SettingsForm({
+  project,
+  pro,
+  appUrl,
+}: {
+  project: ProjectDetail;
+  pro: boolean;
+  appUrl: string;
+}) {
   const t = useTranslations();
   const [pending, start] = useTransition();
   const [form, setForm] = useState<SettingsInput>({
@@ -40,7 +48,7 @@ export function SettingsForm({ project, pro }: { project: ProjectDetail; pro: bo
     position: form.position,
     showBadge: !(pro && form.hideBadge),
     customCss: pro && form.customCss.trim() ? form.customCss : null,
-    badgeUrl: buildBadgeUrl(project.public_key),
+    badgeUrl: buildBadgeUrl(project.public_key, appUrl),
     locale: form.locale,
   };
 

@@ -19,6 +19,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ proje
         key={JSON.stringify(project)}
         project={project}
         pro={await isPro(deps, user.id)}
+        appUrl={deps.env.NEXT_PUBLIC_APP_URL}
       />
       <DeleteProject projectId={project.id} name={project.name} />
     </div>

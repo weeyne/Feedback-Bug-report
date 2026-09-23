@@ -9,7 +9,10 @@ export const BRAND = {
   telegramBot: 'DymcodeBot',
 } as const;
 
-/** Landing-page link used by the "Powered by" badge; `ref` attributes signups to the host project. */
-export function buildBadgeUrl(publicKey: string): string {
-  return `${BRAND.url}/?ref=${encodeURIComponent(publicKey)}&utm_source=widget`;
+/**
+ * Landing-page link used by the "Powered by" badge; `ref` attributes signups to the host project.
+ * `baseUrl` is the deployed app origin (NEXT_PUBLIC_APP_URL); BRAND.url is only a fallback.
+ */
+export function buildBadgeUrl(publicKey: string, baseUrl: string = BRAND.url): string {
+  return `${baseUrl.replace(/\/+$/, '')}/?ref=${encodeURIComponent(publicKey)}&utm_source=widget`;
 }

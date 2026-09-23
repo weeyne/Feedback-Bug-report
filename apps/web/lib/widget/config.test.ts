@@ -11,7 +11,7 @@ import { handleConfig } from './config';
 
 const get = (db: TestDb, key: string) =>
   handleConfig(
-    { db },
+    { db, env: { NEXT_PUBLIC_APP_URL: 'https://app.example' } },
     new Request(`https://dymcode.dev/api/v1/widget/config?key=${key}`, {
       headers: { origin: 'https://host.example' },
     }),
@@ -49,7 +49,7 @@ describe('handleConfig', () => {
         position: 'bottom-right',
         showBadge: true,
         customCss: null,
-        badgeUrl: `https://dymcode.dev/?ref=${project.public_key}&utm_source=widget`,
+        badgeUrl: `https://app.example/?ref=${project.public_key}&utm_source=widget`,
         locale: 'uk',
       });
     }));

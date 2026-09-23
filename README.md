@@ -48,7 +48,7 @@ pnpm --filter @dymcode/widget e2e     # Playwright smoke tests against the built
 Embed:
 
 ```html
-<script async src="https://dymcode.dev/w/widget.js" data-project-id="pk_…"></script>
+<script async src="https://dymcode.vercel.app/w/widget.js" data-project-id="pk_…"></script>
 ```
 
 Host page API: `Dymcode.open('bug' | 'idea' | 'general')`, `Dymcode.identify({ email, id, name })`,

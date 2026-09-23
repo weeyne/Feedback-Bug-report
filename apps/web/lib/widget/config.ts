@@ -1,27 +1,31 @@
 import { buildBadgeUrl, type WidgetConfig } from '@dymcode/shared';
 import type { Db } from '../db/types';
+import type { Env } from '../env';
 import { corsHeaders, json } from '../http';
 import { loadProjectByKey, type ProjectRow } from './project';
 
-export function toWidgetConfig(project: ProjectRow): WidgetConfig {
+export function toWidgetConfig(project: ProjectRow, appUrl: string): WidgetConfig {
   return {
     primaryColor: project.primary_color,
     triggerText: project.trigger_text,
     position: project.position,
     showBadge: !(project.hide_badge && project.pro),
     customCss: project.pro ? project.custom_css : null,
-    badgeUrl: buildBadgeUrl(project.public_key),
+    badgeUrl: buildBadgeUrl(project.public_key, appUrl),
     locale: project.locale,
   };
 }
 
-export async function handleConfig(deps: { db: Db }, request: Request): Promise<Response> {
+export async function handleConfig(
+  deps: { db: Db; env: Pick<Env, 'NEXT_PUBLIC_APP_URL'> },
+  request: Request,
+): Promise<Response> {
   const cors = corsHeaders(request.headers.get('origin'));
   try {
     const key = new URL(request.url).searchParams.get('key') ?? '';
     const project = await loadProjectByKey(deps.db, key);
     if (!project) return json({ error: 'unknown project' }, 404, cors);
-    return json(toWidgetConfig(project), 200, {
+    return json(toWidgetConfig(project, deps.env.NEXT_PUBLIC_APP_URL), 200, {
       ...cors,
       'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
     });
