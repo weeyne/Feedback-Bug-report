@@ -27,7 +27,7 @@ export interface WidgetHandle {
   destroy(): void;
 }
 
-const FALLBACK_ACCENT = '#6366f1';
+const FALLBACK_ACCENT = '#E0321F';
 
 /**
  * Constructable stylesheets are not `<style>` elements, so a strict `style-src` CSP on the host
