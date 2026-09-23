@@ -31,6 +31,7 @@ const dummyValues = {
   time: '12:00',
   username: 'test_user',
   date: 'September 1, 2026',
+  email: 'someone@example.com',
 };
 
 describe('messages', () => {

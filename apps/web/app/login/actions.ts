@@ -8,6 +8,7 @@ import { getEnv } from '@/lib/env';
 export interface LoginState {
   status: 'idle' | 'sent' | 'error';
   error?: string;
+  email?: string;
 }
 
 export async function sendMagicLink(_prev: LoginState, formData: FormData): Promise<LoginState> {
@@ -16,12 +17,17 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     .max(254)
     .safeParse(String(formData.get('email') ?? '').trim());
   if (!email.success) return { status: 'error', error: 'auth.emailInvalid' };
+  if (getEnv().BUGPING_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
+    return { status: 'sent', email: email.data };
+  }
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: email.data,
     options: { emailRedirectTo: `${getEnv().NEXT_PUBLIC_APP_URL}/auth/callback` },
   });
-  return error ? { status: 'error', error: 'auth.sendFailed' } : { status: 'sent' };
+  return error
+    ? { status: 'error', error: 'auth.sendFailed' }
+    : { status: 'sent', email: email.data };
 }
 
 export async function signInWithGitHub(): Promise<void> {

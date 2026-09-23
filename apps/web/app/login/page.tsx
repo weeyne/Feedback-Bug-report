@@ -1,7 +1,10 @@
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { Logo } from '@/components/brand/logo';
 import { getSessionUser } from '@/lib/auth/session';
-import { LoginForm } from './login-form';
+import { LoginCard } from './login-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +17,25 @@ export default async function LoginPage({
   const t = await getTranslations('auth');
   const params = await searchParams;
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
-      {params.error === 'callback' && <p role="alert">{t('callbackFailed')}</p>}
-      {params.error === 'oauth' && <p role="alert">{t('oauthFailed')}</p>}
-      <LoginForm />
+    <main className="relative flex min-h-screen flex-col items-center justify-center gap-8 bg-muted bg-[radial-gradient(var(--input)_1px,transparent_1px)] bg-size-[18px_18px] p-4">
+      <Link
+        href="/"
+        data-testid="login-back"
+        className="absolute left-4 top-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        {t('backToSite')}
+      </Link>
+      <Logo size="lg" href="/" />
+      <LoginCard
+        error={
+          params.error === 'callback'
+            ? t('callbackFailed')
+            : params.error === 'oauth'
+              ? t('oauthFailed')
+              : undefined
+        }
+      />
     </main>
   );
 }
