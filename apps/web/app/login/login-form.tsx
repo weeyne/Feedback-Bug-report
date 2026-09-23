@@ -13,7 +13,13 @@ export function LoginCard({ error }: { error?: string }) {
   const [attempt, setAttempt] = useState(0);
   return (
     <Card className="w-full max-w-[360px] p-6 shadow-[0_12px_40px_rgb(26_20_20/0.06)]">
-      <LoginForm key={attempt} pageError={error} onRestart={() => setAttempt((n) => n + 1)} />
+      <LoginForm
+        key={attempt}
+        // The page-level error (from ?error=callback|oauth) only applies to the first attempt:
+        // once the user restarts with "Use a different email", it must not reappear.
+        pageError={attempt === 0 ? error : undefined}
+        onRestart={() => setAttempt((n) => n + 1)}
+      />
     </Card>
   );
 }
