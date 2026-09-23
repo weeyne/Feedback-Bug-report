@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { signOut } from '@/app/actions/session';
 import { getAuthAdmin } from '@/lib/auth/admin';
 import { requireUser } from '@/lib/auth/session';
+import { paddleFromDeps } from '@/lib/billing/paddle';
 import { deleteAccount } from '@/lib/dashboard/account';
 import { deleteFeedback, setFeedbackStatus, type FeedbackStatus } from '@/lib/dashboard/feedback';
 import {
@@ -125,7 +126,7 @@ export async function deleteAccountAction(confirmEmail: string): Promise<ActionR
   const user = await requireUser();
   const deps = await getDeps();
   const result = await deleteAccount(
-    { ...deps, authAdmin: getAuthAdmin(deps) },
+    { ...deps, authAdmin: getAuthAdmin(deps), paddle: paddleFromDeps(deps) },
     user,
     confirmEmail,
   );

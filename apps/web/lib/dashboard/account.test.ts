@@ -8,6 +8,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { VALID_ENV } from '@/test/fixtures';
 import type { AuthAdmin } from '../auth/admin';
+import type { PaddleClient } from '../billing/paddle';
 import { parseEnv } from '../env';
 import { createMemoryStorage } from '../storage';
 import { deleteAccount } from './account';
@@ -72,5 +73,66 @@ describe('deleteAccount', () => {
       });
       expect((await db.query('select 1 from auth.users where id = $1', [owner])).length).toBe(1);
       expect([...storage.files.keys()]).toEqual([path]);
+    }));
+
+  it('cancels active subscriptions immediately before deleting the account', () =>
+    withTx(async (db) => {
+      const storage = createMemoryStorage();
+      const email = 'sub@example.com';
+      const owner = await createUser(db, email);
+      await db.query(
+        `insert into public.subscriptions (user_id, plan, status, paddle_subscription_id)
+         values ($1, 'pro_monthly', 'active', 'sub_del'), ($1, 'pro_monthly', 'canceled', 'sub_old')`,
+        [owner],
+      );
+      await db.query(
+        `insert into public.subscriptions (user_id, plan, status, paddle_subscription_id, cancel_at_period_end)
+         values ($1, 'pro_monthly', 'active', 'sub_sched', true)`,
+        [owner],
+      );
+      const cancelled: string[] = [];
+      const paddle: PaddleClient = {
+        createTransaction: async () => ({ id: 'x' }),
+        createPortalSession: async () => 'x',
+        ensureCustomer: async () => 'cus_x',
+        cancelSubscription: async (id, when) => {
+          cancelled.push(`${id}:${when}`);
+        },
+      };
+      const deps = { db, storage, env: parseEnv(VALID_ENV), fetch, authAdmin: dbAdmin(db), paddle };
+      expect(await deleteAccount(deps, { id: owner, email }, email)).toEqual({ ok: true });
+      expect(cancelled).toEqual(['sub_del:immediately']);
+    }));
+
+  it('keeps the account when the subscription cannot be cancelled', () =>
+    withTx(async (db) => {
+      const email = 'keep@example.com';
+      const owner = await createUser(db, email);
+      await db.query(
+        `insert into public.subscriptions (user_id, plan, status, paddle_subscription_id)
+         values ($1, 'pro_monthly', 'active', 'sub_keep')`,
+        [owner],
+      );
+      const paddle: PaddleClient = {
+        createTransaction: async () => ({ id: 'x' }),
+        createPortalSession: async () => 'x',
+        ensureCustomer: async () => 'cus_x',
+        cancelSubscription: async () => {
+          throw new Error('paddle down');
+        },
+      };
+      const deps = {
+        db,
+        storage: createMemoryStorage(),
+        env: parseEnv(VALID_ENV),
+        fetch,
+        authAdmin: dbAdmin(db),
+        paddle,
+      };
+      expect(await deleteAccount(deps, { id: owner, email }, email)).toEqual({
+        ok: false,
+        error: 'errors.generic',
+      });
+      expect(await db.query('select 1 from auth.users where id = $1', [owner])).toHaveLength(1);
     }));
 });
