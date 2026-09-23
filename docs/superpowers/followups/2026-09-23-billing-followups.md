@@ -1,6 +1,25 @@
 # Billing follow-ups (after the phase 5 final-review fix wave)
 
 ## Before going live
+- **Verify in the Paddle sandbox that a `past_due` subscription can be cancelled `immediately`.** Paddle's
+  cancellation guide says a `past_due` subscription cannot be changed. If Paddle refuses, the webhook paths that cancel
+  it (a duplicate after Lifetime, a refund, a deleted profile) return 500 until the retries run out, while dunning keeps
+  trying to charge the card. The same applies to account deletion for a `past_due` user. Also record Paddle's error
+  when cancelling a subscription that already has a scheduled cancellation.
+- **Narrow the "both duplicates cancelled" race cheaply.** After a successful `next_billing_period` cancel in
+  `cancelIfDuplicate`, set `cancel_at_period_end = true` on that row (without touching `paddle_occurred_at`), so a
+  late event for the other subscription no longer sees two active duplicates. The advisory lock below closes it fully.
+- **Email changes.** Portal access and checkout resolve the Paddle customer from the current session email. A user
+  who changes their account email after buying gets `billing.noCustomer`, or a portal without their subscription, and
+  a new checkout creates a second Paddle customer. Update the Paddle customer's email when the account email changes.
+- **Webhook customer-id fallback.** `resolveUser` still falls back to the stored `paddle_customer_id` when
+  `custom_data` is absent. An attacker can blank `custom_data` to attribute a subscription they pay for to another
+  user's row. This is harmless today (they pay; duplicates are cancelled), but it trusts the same client-influenced id
+  that the checkout and portal no longer trust.
+- **Amend the phase 5 spec** (`2026-09-23-billing-paddle-design.md` §5–§8). Checkout and the portal now always resolve
+  the customer from the verified session email (`findCustomer` / `ensureCustomer`). Duplicate or refunded monthly
+  subscriptions are cancelled from the webhook, and account deletion refuses when billing is disabled but a paid
+  subscription exists.
 - **Environment consistency check.** Nothing checks that the Paddle keys match `NEXT_PUBLIC_PADDLE_ENV`: a live
   API key (`pdl_live_…`) or client token (`live_…`) with `NEXT_PUBLIC_PADDLE_ENV=sandbox`, or the reverse, only
   fails at the first Paddle call. `parseEnv` could compare the key prefixes with the environment.
