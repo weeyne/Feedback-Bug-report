@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { signOut } from '@/app/actions/session';
+import { Logo } from '@/components/brand/logo';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ProjectNav } from './project-nav';
 import type { ShellProject } from './project-switcher';
@@ -11,9 +12,7 @@ async function Nav({ projects, email }: { projects: ShellProject[]; email: strin
   const tAuth = await getTranslations('auth');
   return (
     <nav className="flex h-full flex-col gap-4 p-4">
-      <Link href="/app" className="text-lg font-semibold">
-        Bugping
-      </Link>
+      <Logo href="/app" />
       <ProjectNav projects={projects} />
       <ul className="mt-auto flex flex-col gap-1 text-sm">
         <li>
@@ -64,7 +63,7 @@ export async function AppShell(props: {
               <Nav {...props} />
             </SheetContent>
           </Sheet>
-          <span className="font-semibold">Bugping</span>
+          <Logo />
         </header>
         <main className="min-w-0 flex-1">{props.children}</main>
       </div>
