@@ -124,6 +124,13 @@ export async function createTestModeDeps(env: Env): Promise<TestModeDeps> {
         status: 201,
       });
     }
+    if (url.includes('paddle.com/transactions/')) {
+      // GET /transactions/{id}: the refund check reads what is left; E2E treats it as fully refunded.
+      return new Response(
+        JSON.stringify({ data: { details: { adjusted_totals: { total: '0' } } } }),
+        { status: 200 },
+      );
+    }
     if (url.includes('paddle.com/transactions')) {
       return new Response(JSON.stringify({ data: { id: 'txn_e2e_000000000000' } }), {
         status: 201,

@@ -262,8 +262,11 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
 async function onAdjustment(ctx: Ctx, raw: unknown) {
   const adj = Adjustment.parse(raw);
   if (adj.status !== 'approved') return;
-  const revokes = adj.action === 'chargeback' || (adj.action === 'refund' && adj.type === 'full');
-  if (!revokes) return;
+  if (adj.action !== 'chargeback' && adj.action !== 'refund') return;
+  // A refund revokes only when nothing is left of the payment. Paddle's top-level `type` is not
+  // reliable for this: a whole-transaction refund made from line items arrives as "partial", and
+  // several partial refunds can add up to the full amount.
+  if (adj.action === 'refund' && (await ctx.paddle.remainingTotal(adj.transaction_id)) > 0) return;
   if (adj.subscription_id) {
     // A monthly payment: cancelling now makes Paddle send subscription.canceled, which removes Pro.
     if (await monthlyRowExists(ctx.db, adj.subscription_id)) {

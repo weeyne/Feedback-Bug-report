@@ -6,11 +6,6 @@
   it (a duplicate after Lifetime, a refund, a deleted profile) return 500 until the retries run out, while dunning keeps
   trying to charge the card. The same applies to account deletion for a `past_due` user. Also record Paddle's error
   when cancelling a subscription that already has a scheduled cancellation.
-- **Several partial refunds that add up to the full amount keep Lifetime.** Only one approved `type: 'full'` refund
-  (or a chargeback) revokes a Lifetime row. Refunding $1 and then the remaining $48 leaves Pro Lifetime active although
-  everything was returned. Found in the sandbox (2026-09-23): once a partial refund exists, Paddle only allows further
-  partial refunds. Revoke when the approved refunds for the transaction reach its total, e.g. by reading the
-  transaction's `details.totals` via the API on each approved refund.
 - **Narrow the "both duplicates cancelled" race cheaply.** After a successful `next_billing_period` cancel in
   `cancelIfDuplicate`, set `cancel_at_period_end = true` on that row (without touching `paddle_occurred_at`), so a
   late event for the other subscription no longer sees two active duplicates. The advisory lock below closes it fully.

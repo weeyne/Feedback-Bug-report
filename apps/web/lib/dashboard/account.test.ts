@@ -96,6 +96,7 @@ describe('deleteAccount', () => {
         createPortalSession: async () => 'x',
         findCustomer: async () => 'cus_x',
         ensureCustomer: async () => 'cus_x',
+        remainingTotal: async () => 0,
         cancelSubscription: async (id, when) => {
           cancelled.push(`${id}:${when}`);
         },
@@ -119,6 +120,7 @@ describe('deleteAccount', () => {
         createPortalSession: async () => 'x',
         findCustomer: async () => 'cus_x',
         ensureCustomer: async () => 'cus_x',
+        remainingTotal: async () => 0,
         cancelSubscription: async () => {
           throw new Error('paddle down');
         },

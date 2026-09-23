@@ -16,9 +16,25 @@ const MONTHLY = PADDLE_ENV.PADDLE_PRICE_MONTHLY;
 const LIFETIME = PADDLE_ENV.PADDLE_PRICE_LIFETIME;
 
 function setup(db: TestDb, opts: { paddleFails?: boolean } = {}) {
+  // Write calls (POST) only; transaction reads are recorded separately in `reads`.
   const calls: Array<{ url: string; body: unknown }> = [];
+  const reads: string[] = [];
+  // Amount left on a transaction after approved refunds (Paddle `details.adjusted_totals.total`).
+  // Unlisted transactions are fully refunded ('0').
+  const remaining = new Map<string, string>();
   const fetchFn = (async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    const url = String(input);
+    if ((init?.method ?? 'GET') === 'GET' && url.includes('/transactions/')) {
+      reads.push(url);
+      if (opts.paddleFails) {
+        return Response.json({ error: { code: 'internal_error' } }, { status: 500 });
+      }
+      const id = decodeURIComponent(url.split('/transactions/')[1]!);
+      return Response.json({
+        data: { id, details: { adjusted_totals: { total: remaining.get(id) ?? '0' } } },
+      });
+    }
+    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
     return opts.paddleFails
       ? Response.json({ error: { code: 'internal_error' } }, { status: 500 })
       : Response.json({ data: { id: 'ok' } });
@@ -30,7 +46,7 @@ function setup(db: TestDb, opts: { paddleFails?: boolean } = {}) {
   const row = async (where: string, value: string) =>
     (await db.query(`select * from public.subscriptions where ${where} = $1`, [value]))[0] as
       Record<string, unknown> | undefined;
-  return { calls, send, pro, row };
+  return { calls, reads, remaining, send, pro, row };
 }
 
 describe('billing webhook', () => {
@@ -197,9 +213,48 @@ describe('billing webhook', () => {
       expect(res.status).toBe(500);
     }));
 
+  it('revokes Lifetime only once the refunds cover the whole payment, whatever their type', () =>
+    withTx(async (db) => {
+      const { send, pro, reads, remaining } = setup(db);
+      const user = await createUser(db);
+      await send(
+        transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_split',
+          occurredAt: '2026-09-10T00:00:00Z',
+        }),
+      );
+      // $1 of $49 refunded: Pro stays.
+      remaining.set('txn_split', '4800');
+      await send(
+        adjustmentEvent({
+          transactionId: 'txn_split',
+          action: 'refund',
+          type: 'partial',
+          status: 'approved',
+          occurredAt: '2026-09-11T00:00:00Z',
+        }),
+      );
+      expect(await pro(user)).toBe(true);
+      expect(reads).toEqual(['https://sandbox-api.paddle.com/transactions/txn_split']);
+      // The remaining $48 refunded as another "partial" adjustment: nothing is left, Pro goes.
+      remaining.set('txn_split', '0');
+      await send(
+        adjustmentEvent({
+          transactionId: 'txn_split',
+          action: 'refund',
+          type: 'partial',
+          status: 'approved',
+          occurredAt: '2026-09-12T00:00:00Z',
+        }),
+      );
+      expect(await pro(user)).toBe(false);
+    }));
+
   it('revokes Lifetime on a full refund or chargeback but not on a partial refund', () =>
     withTx(async (db) => {
-      const { send, pro } = setup(db);
+      const { send, pro, remaining } = setup(db);
       const user = await createUser(db);
       await send(
         transactionCompleted({
@@ -209,6 +264,7 @@ describe('billing webhook', () => {
           occurredAt: '2026-09-10T00:00:00Z',
         }),
       );
+      remaining.set('txn_ref', '4800');
       await send(
         adjustmentEvent({
           transactionId: 'txn_ref',
@@ -229,6 +285,7 @@ describe('billing webhook', () => {
         }),
       );
       expect(await pro(user)).toBe(true);
+      remaining.set('txn_ref', '0');
       await send(
         adjustmentEvent({
           transactionId: 'txn_ref',
@@ -480,7 +537,7 @@ describe('billing webhook', () => {
 
   it('cancels a monthly subscription immediately on a full refund or chargeback', () =>
     withTx(async (db) => {
-      const { send, calls } = setup(db);
+      const { send, calls, remaining } = setup(db);
       const user = await createUser(db);
       await send(
         subscriptionEvent({
@@ -497,6 +554,8 @@ describe('billing webhook', () => {
         subscriptionId: 'sub_refund',
         occurredAt: '2026-09-03T00:00:00Z',
       };
+      // A partial refund leaves money on the transaction: nothing happens.
+      remaining.set('txn_monthly_1', '450');
       await send(
         adjustmentEvent({ ...adjustment, action: 'refund', type: 'partial', status: 'approved' }),
       );
@@ -509,8 +568,11 @@ describe('billing webhook', () => {
         }),
       );
       expect(calls).toEqual([]);
+      // Paddle marks a whole-transaction refund made from line items as top-level `type: "partial"`
+      // (seen in the sandbox on 2026-09-23): only the remaining amount decides.
+      remaining.set('txn_monthly_1', '0');
       const res = await send(
-        adjustmentEvent({ ...adjustment, action: 'refund', type: 'full', status: 'approved' }),
+        adjustmentEvent({ ...adjustment, action: 'refund', type: 'partial', status: 'approved' }),
       );
       expect(res.status).toBe(200);
       expect(calls).toEqual([
@@ -540,6 +602,12 @@ describe('billing webhook', () => {
         adjustmentEvent({ ...adjustment, action: 'chargeback', type: 'full', status: 'approved' }),
       );
       expect(failed.status).toBe(500);
+      // A refund whose transaction cannot be read is retried (500), and nothing is cancelled.
+      const unreadable = await failing.send(
+        adjustmentEvent({ ...adjustment, action: 'refund', type: 'full', status: 'approved' }),
+      );
+      expect(unreadable.status).toBe(500);
+      expect(failing.calls).toHaveLength(1);
     }));
 
   it('returns 500 for a revoking adjustment that arrives before its Lifetime row', () =>

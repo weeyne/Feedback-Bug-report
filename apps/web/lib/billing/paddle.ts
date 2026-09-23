@@ -42,6 +42,11 @@ export interface PaddleClient {
   findCustomer(email: string): Promise<string | null>;
   /** Looks up the Paddle customer id for this email, creating one if none exists yet. */
   ensureCustomer(email: string): Promise<string>;
+  /**
+   * What is left of a transaction after approved refunds, in the smallest currency unit
+   * (Paddle `details.adjusted_totals.total`). 0 means everything was refunded.
+   */
+  remainingTotal(transactionId: string): Promise<number>;
 }
 
 /**
@@ -111,6 +116,17 @@ export function createPaddleClient(config: BillingConfig, fetchFn: typeof fetch)
     },
     async findCustomer(rawEmail) {
       return findCustomerByEmail(normalizeEmail(rawEmail));
+    },
+    async remainingTotal(transactionId) {
+      const data = await call<{ details?: { adjusted_totals?: { total?: string } } }>(
+        `/transactions/${encodeURIComponent(transactionId)}`,
+        undefined,
+        'GET',
+      );
+      const total = Number(data.details?.adjusted_totals?.total);
+      // A missing or malformed total must never read as "fully refunded".
+      if (!Number.isFinite(total)) throw new PaddleError(200, 'missing_adjusted_totals');
+      return total;
     },
     async ensureCustomer(rawEmail) {
       const email = normalizeEmail(rawEmail);

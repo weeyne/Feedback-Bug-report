@@ -96,6 +96,27 @@ describe('Paddle client', () => {
     });
   });
 
+  it('reads what is left of a transaction after refunds', async () => {
+    const { calls, client } = fake(() =>
+      Response.json({ data: { details: { adjusted_totals: { total: '4800' } } } }),
+    );
+    expect(await client.remainingTotal('txn_1')).toBe(4800);
+    expect(calls[0]).toMatchObject({
+      url: 'https://sandbox-api.paddle.com/transactions/txn_1',
+      method: 'GET',
+      body: null,
+    });
+    const refunded = fake(() =>
+      Response.json({ data: { details: { adjusted_totals: { total: '0' } } } }),
+    );
+    expect(await refunded.client.remainingTotal('txn_2')).toBe(0);
+  });
+
+  it('never reads a missing adjusted total as fully refunded', async () => {
+    const { client } = fake(() => Response.json({ data: { details: {} } }));
+    await expect(client.remainingTotal('txn_1')).rejects.toBeInstanceOf(PaddleError);
+  });
+
   it('throws PaddleError without leaking the API key', async () => {
     const { client } = fake(() =>
       Response.json({ error: { code: 'forbidden', detail: 'no' } }, { status: 403 }),
