@@ -1,5 +1,5 @@
 import { createUser, withTx, type TestDb } from '@dymcode/db-tests/harness';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   adjustmentEvent,
   signedRequest,
@@ -318,6 +318,442 @@ describe('billing webhook', () => {
         occurredAt: '2026-09-01T00:00:00Z',
       });
       expect((await send(ghost)).status).toBe(200);
+    }));
+
+  it('cancels a monthly subscription created after a paid Lifetime', () =>
+    withTx(async (db) => {
+      const { send, calls, pro } = setup(db);
+      const user = await createUser(db);
+      await send(
+        transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_dup_life',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      expect(calls).toEqual([]);
+      const res = await send(
+        subscriptionEvent({
+          type: 'subscription.created',
+          userId: user,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_after_life',
+          occurredAt: '2026-09-02T00:00:00Z',
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(calls).toEqual([
+        {
+          url: 'https://sandbox-api.paddle.com/subscriptions/sub_after_life/cancel',
+          body: { effective_from: 'next_billing_period' },
+        },
+      ]);
+      expect(await pro(user)).toBe(true);
+      // Paddle's follow-up event (cancel scheduled) triggers no second call.
+      await send(
+        subscriptionEvent({
+          type: 'subscription.updated',
+          userId: user,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_after_life',
+          scheduledCancel: true,
+          occurredAt: '2026-09-02T00:00:05Z',
+        }),
+      );
+      expect(calls).toHaveLength(1);
+    }));
+
+  it('cancels only the second of two monthly subscriptions', () =>
+    withTx(async (db) => {
+      const { send, calls } = setup(db);
+      const user = await createUser(db);
+      const monthly = { userId: user, priceId: MONTHLY, type: 'subscription.created' };
+      await send(
+        subscriptionEvent({
+          ...monthly,
+          status: 'active',
+          subscriptionId: 'sub_first',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      expect(calls).toEqual([]);
+      await send(
+        subscriptionEvent({
+          ...monthly,
+          status: 'active',
+          subscriptionId: 'sub_second',
+          occurredAt: '2026-09-05T00:00:00Z',
+        }),
+      );
+      expect(calls).toEqual([
+        {
+          url: 'https://sandbox-api.paddle.com/subscriptions/sub_second/cancel',
+          body: { effective_from: 'next_billing_period' },
+        },
+      ]);
+      // Once the second one is scheduled to cancel, events for the first cancel nothing.
+      await send(
+        subscriptionEvent({
+          ...monthly,
+          type: 'subscription.updated',
+          status: 'active',
+          subscriptionId: 'sub_second',
+          scheduledCancel: true,
+          occurredAt: '2026-09-05T00:00:05Z',
+        }),
+      );
+      await send(
+        subscriptionEvent({
+          ...monthly,
+          type: 'subscription.updated',
+          status: 'active',
+          subscriptionId: 'sub_first',
+          occurredAt: '2026-10-01T00:00:00Z',
+        }),
+      );
+      expect(calls).toHaveLength(1);
+    }));
+
+  it('cancels a past_due duplicate immediately and returns 500 when that fails', () =>
+    withTx(async (db) => {
+      const { send, calls } = setup(db);
+      const user = await createUser(db);
+      await send(
+        transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_pd_life',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      const pastDue = subscriptionEvent({
+        type: 'subscription.past_due',
+        userId: user,
+        status: 'past_due',
+        priceId: MONTHLY,
+        subscriptionId: 'sub_pd_dup',
+        occurredAt: '2026-09-02T00:00:00Z',
+      });
+      expect((await send(pastDue)).status).toBe(200);
+      expect(calls).toEqual([
+        {
+          url: 'https://sandbox-api.paddle.com/subscriptions/sub_pd_dup/cancel',
+          body: { effective_from: 'immediately' },
+        },
+      ]);
+      const failing = setup(db, { paddleFails: true });
+      expect((await failing.send({ ...pastDue, event_id: 'evt_pd_retry' })).status).toBe(500);
+    }));
+
+  it('cancels a past_due monthly subscription immediately on a Lifetime purchase', () =>
+    withTx(async (db) => {
+      const { send, calls } = setup(db);
+      const user = await createUser(db);
+      await send(
+        subscriptionEvent({
+          type: 'subscription.past_due',
+          userId: user,
+          status: 'past_due',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_pd_up',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      await send(
+        transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_pd_up',
+          occurredAt: '2026-09-10T00:00:00Z',
+        }),
+      );
+      expect(calls).toEqual([
+        {
+          url: 'https://sandbox-api.paddle.com/subscriptions/sub_pd_up/cancel',
+          body: { effective_from: 'immediately' },
+        },
+      ]);
+    }));
+
+  it('cancels a monthly subscription immediately on a full refund or chargeback', () =>
+    withTx(async (db) => {
+      const { send, calls } = setup(db);
+      const user = await createUser(db);
+      await send(
+        subscriptionEvent({
+          type: 'subscription.created',
+          userId: user,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_refund',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      const adjustment = {
+        transactionId: 'txn_monthly_1',
+        subscriptionId: 'sub_refund',
+        occurredAt: '2026-09-03T00:00:00Z',
+      };
+      await send(
+        adjustmentEvent({ ...adjustment, action: 'refund', type: 'partial', status: 'approved' }),
+      );
+      await send(
+        adjustmentEvent({
+          ...adjustment,
+          action: 'refund',
+          type: 'full',
+          status: 'pending_approval',
+        }),
+      );
+      expect(calls).toEqual([]);
+      const res = await send(
+        adjustmentEvent({ ...adjustment, action: 'refund', type: 'full', status: 'approved' }),
+      );
+      expect(res.status).toBe(200);
+      expect(calls).toEqual([
+        {
+          url: 'https://sandbox-api.paddle.com/subscriptions/sub_refund/cancel',
+          body: { effective_from: 'immediately' },
+        },
+      ]);
+      await send(
+        adjustmentEvent({ ...adjustment, action: 'chargeback', type: 'full', status: 'approved' }),
+      );
+      expect(calls).toHaveLength(2);
+      // An unknown subscription (another product) is ignored.
+      const unknown = await send(
+        adjustmentEvent({
+          ...adjustment,
+          subscriptionId: 'sub_elsewhere',
+          action: 'refund',
+          type: 'full',
+          status: 'approved',
+        }),
+      );
+      expect(unknown.status).toBe(200);
+      expect(calls).toHaveLength(2);
+      const failing = setup(db, { paddleFails: true });
+      const failed = await failing.send(
+        adjustmentEvent({ ...adjustment, action: 'chargeback', type: 'full', status: 'approved' }),
+      );
+      expect(failed.status).toBe(500);
+    }));
+
+  it('returns 500 for a revoking adjustment that arrives before its Lifetime row', () =>
+    withTx(async (db) => {
+      const { send, pro } = setup(db);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const user = await createUser(db);
+        const refund = adjustmentEvent({
+          transactionId: 'txn_early',
+          action: 'refund',
+          type: 'full',
+          status: 'approved',
+          occurredAt: '2026-09-12T00:00:00Z',
+        });
+        expect((await send(refund)).status).toBe(500);
+        expect(errors).toHaveBeenCalledWith(
+          '[billing/webhook] failed',
+          refund.event_id,
+          'no Lifetime row for adjustment',
+          'txn_early',
+        );
+        await send(
+          transactionCompleted({
+            userId: user,
+            priceId: LIFETIME,
+            transactionId: 'txn_early',
+            occurredAt: '2026-09-10T00:00:00Z',
+          }),
+        );
+        expect(await pro(user)).toBe(true);
+        // Paddle's retry now finds the row.
+        expect((await send(refund)).status).toBe(200);
+        expect(await pro(user)).toBe(false);
+        // The ordering guard still ignores an older adjustment for an existing row (no 500).
+        const older = adjustmentEvent({
+          transactionId: 'txn_early',
+          action: 'chargeback',
+          type: 'full',
+          status: 'approved',
+          occurredAt: '2026-09-11T00:00:00Z',
+        });
+        expect((await send(older)).status).toBe(200);
+      } finally {
+        errors.mockRestore();
+      }
+    }));
+
+  it('treats an invalid custom_data user_id as absent', () =>
+    withTx(async (db) => {
+      const { send, row } = setup(db);
+      const user = await createUser(db);
+      await send(
+        subscriptionEvent({
+          type: 'subscription.created',
+          userId: user,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_soft',
+          customerId: 'ctm_soft',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      for (const [i, customData] of [{ user_id: 'not-a-uuid' }, 'garbage', 42].entries()) {
+        const event = subscriptionEvent({
+          type: 'subscription.updated',
+          status: 'past_due',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_soft',
+          customerId: 'ctm_soft',
+          occurredAt: `2026-09-0${i + 2}T00:00:00Z`,
+        });
+        (event.data as Record<string, unknown>).custom_data = customData;
+        expect((await send(event)).status).toBe(200);
+      }
+      expect(await row('paddle_subscription_id', 'sub_soft')).toMatchObject({
+        user_id: user,
+        status: 'past_due',
+      });
+    }));
+
+  it('ignores other prices before validating the rest of the payload', () =>
+    withTx(async (db) => {
+      const { send } = setup(db);
+      const event = subscriptionEvent({
+        type: 'subscription.created',
+        status: 'active',
+        priceId: 'pri_other_product',
+        subscriptionId: 'sub_malformed',
+        occurredAt: '2026-09-01T00:00:00Z',
+      });
+      (event.data as Record<string, unknown>).status = 42;
+      expect((await send(event)).status).toBe(200);
+      const txn = transactionCompleted({
+        priceId: 'pri_other_product',
+        occurredAt: '2026-09-01T00:00:00Z',
+      });
+      (txn.data as Record<string, unknown>).customer_id = { nested: true };
+      expect((await send(txn)).status).toBe(200);
+    }));
+
+  it('accepts events for a known subscription whose price id changed', () =>
+    withTx(async (db) => {
+      const { send, row } = setup(db);
+      const user = await createUser(db);
+      await send(
+        subscriptionEvent({
+          type: 'subscription.created',
+          userId: user,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_repriced',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      await send(
+        subscriptionEvent({
+          type: 'subscription.canceled',
+          userId: user,
+          status: 'canceled',
+          priceId: 'pri_monthly_v2',
+          subscriptionId: 'sub_repriced',
+          occurredAt: '2026-10-01T00:00:00Z',
+        }),
+      );
+      expect(await row('paddle_subscription_id', 'sub_repriced')).toMatchObject({
+        status: 'canceled',
+      });
+    }));
+
+  it('cancels a Pro-granting subscription of a deleted profile immediately', () =>
+    withTx(async (db) => {
+      const { send, calls } = setup(db);
+      const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const ghost = '00000000-0000-4000-8000-00000000abcd';
+        const event = subscriptionEvent({
+          type: 'subscription.activated',
+          userId: ghost,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_ghost_active',
+          occurredAt: '2026-09-01T00:00:00Z',
+        });
+        expect((await send(event)).status).toBe(200);
+        expect(calls).toEqual([
+          {
+            url: 'https://sandbox-api.paddle.com/subscriptions/sub_ghost_active/cancel',
+            body: { effective_from: 'immediately' },
+          },
+        ]);
+        expect(warnings).toHaveBeenCalledWith(
+          '[billing/webhook] profile deleted',
+          event.event_id,
+          'subscription.activated',
+          'sub_ghost_active',
+        );
+        expect(JSON.stringify(warnings.mock.calls)).not.toContain(ghost);
+        // Already scheduled to cancel, or no longer Pro-granting: nothing to cancel.
+        for (const extra of [{ scheduledCancel: true, status: 'active' }, { status: 'canceled' }]) {
+          await send(
+            subscriptionEvent({
+              type: 'subscription.updated',
+              userId: ghost,
+              priceId: MONTHLY,
+              subscriptionId: 'sub_ghost_active',
+              occurredAt: '2026-09-02T00:00:00Z',
+              ...extra,
+            }),
+          );
+        }
+        expect(calls).toHaveLength(1);
+        const failing = setup(db, { paddleFails: true });
+        expect((await failing.send({ ...event, event_id: 'evt_ghost_retry' })).status).toBe(500);
+      } finally {
+        warnings.mockRestore();
+      }
+    }));
+
+  it('rejects invalid timestamps with 400 without logging them', () =>
+    withTx(async (db) => {
+      const { send, row } = setup(db);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const user = await createUser(db);
+        const base = {
+          type: 'subscription.created',
+          userId: user,
+          status: 'active',
+          priceId: MONTHLY,
+          subscriptionId: 'sub_time',
+        };
+        const badOccurred = subscriptionEvent({ ...base, occurredAt: 'yesterday-ish' });
+        expect((await send(badOccurred)).status).toBe(400);
+        const noOffset = subscriptionEvent({ ...base, occurredAt: '2026-09-01T00:00:00' });
+        expect((await send(noOffset)).status).toBe(400);
+        const badEnds = subscriptionEvent({
+          ...base,
+          occurredAt: '2026-09-01T00:00:00Z',
+          endsAt: 'soon-SECRET-VALUE',
+        });
+        expect((await send(badEnds)).status).toBe(400);
+        expect(JSON.stringify(errors.mock.calls)).not.toContain('SECRET-VALUE');
+        expect(await row('paddle_subscription_id', 'sub_time')).toBeUndefined();
+        // Paddle's real format (microseconds, Z) is accepted.
+        const good = subscriptionEvent({
+          ...base,
+          occurredAt: '2026-09-01T00:00:00.123456Z',
+          endsAt: '2026-10-01T00:00:00.654321Z',
+        });
+        expect((await send(good)).status).toBe(200);
+      } finally {
+        errors.mockRestore();
+      }
     }));
 
   it('ignores subscriptions for other prices', () =>

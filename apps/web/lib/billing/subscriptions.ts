@@ -2,6 +2,13 @@ import type { Db, Row } from '../db/types';
 
 export const PRO_MONTHLY_STATUSES = ['active', 'trialing', 'past_due'] as const;
 
+export const isProMonthlyStatus = (status: string) =>
+  (PRO_MONTHLY_STATUSES as readonly string[]).includes(status);
+
+/** A `pro_monthly` row whose status grants Pro (mirrors SQL `public.is_pro`). */
+export const isProMonthly = (row: { plan: string; status: string }) =>
+  row.plan === 'pro_monthly' && isProMonthlyStatus(row.status);
+
 export interface SubscriptionRow extends Row {
   id: string;
   plan: 'pro_monthly' | 'pro_lifetime';

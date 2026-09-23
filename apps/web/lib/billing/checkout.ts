@@ -2,7 +2,7 @@ import { rateLimited } from '../dashboard/rate-limit';
 import type { ActionResult, DashDeps } from '../dashboard/result';
 import { billingConfig } from './config';
 import { InvalidCustomerEmail, paddleFromDeps } from './paddle';
-import { PRO_MONTHLY_STATUSES, userSubscriptions, type SubscriptionRow } from './subscriptions';
+import { isProMonthly, userSubscriptions } from './subscriptions';
 
 export type BillingState = 'disabled' | 'free' | 'monthly' | 'past_due' | 'lifetime';
 
@@ -12,9 +12,6 @@ export interface BillingOverview {
   cancelAtPeriodEnd: boolean;
   hasCustomer: boolean;
 }
-
-const isProMonthly = (row: SubscriptionRow) =>
-  row.plan === 'pro_monthly' && (PRO_MONTHLY_STATUSES as readonly string[]).includes(row.status);
 
 export async function billingOverview(deps: DashDeps, userId: string): Promise<BillingOverview> {
   const rows = await userSubscriptions(deps.db, userId);

@@ -64,6 +64,7 @@ export function adjustmentEvent(input: {
   type: 'full' | 'partial';
   status: string;
   occurredAt: string;
+  subscriptionId?: string | null;
 }) {
   return {
     event_id: nextId('evt'),
@@ -75,6 +76,7 @@ export function adjustmentEvent(input: {
       type: input.type,
       status: input.status,
       transaction_id: input.transactionId,
+      subscription_id: input.subscriptionId ?? null,
     },
   };
 }
