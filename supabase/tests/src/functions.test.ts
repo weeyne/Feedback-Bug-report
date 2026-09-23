@@ -14,12 +14,11 @@ describe('is_pro', () => {
     ['pro_lifetime', 'paid', null, true],
     ['pro_lifetime', 'refunded', null, false],
     ['pro_monthly', 'active', '1 month', true],
-    ['pro_monthly', 'on_trial', '7 days', true],
+    ['pro_monthly', 'trialing', '7 days', true],
     ['pro_monthly', 'past_due', '-1 day', true],
-    ['pro_monthly', 'cancelled', '1 day', true],
-    ['pro_monthly', 'cancelled', '-1 day', false],
-    ['pro_monthly', 'expired', '-1 day', false],
-    ['pro_monthly', 'unpaid', '-1 day', false],
+    ['pro_monthly', 'paused', '1 day', false],
+    ['pro_monthly', 'canceled', '1 day', false],
+    ['pro_monthly', 'canceled', '-1 day', false],
   ] as const)('%s / %s (period end %s) -> %s', (plan, status, periodEnd, expected) =>
     withTx(async (db) => {
       const uid = await createUser(db);
