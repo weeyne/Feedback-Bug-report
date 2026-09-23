@@ -9,7 +9,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
         <Link href="/" className="text-lg font-semibold">
-          Dymcode
+          Bugping
         </Link>
         <Link href="/app" className="text-sm hover:underline">
           {t('dashboard')}

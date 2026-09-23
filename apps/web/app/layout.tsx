@@ -12,12 +12,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   return {
     metadataBase: new URL(getPublicEnv().appUrl),
-    title: { default: t('title'), template: '%s · Dymcode' },
+    title: { default: t('title'), template: '%s · Bugping' },
     description: t('description'),
     openGraph: {
       title: t('title'),
       description: t('description'),
-      siteName: 'Dymcode',
+      siteName: 'Bugping',
       locale,
       type: 'website',
     },

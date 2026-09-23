@@ -19,7 +19,7 @@ export function sampleMessage(overrides: Partial<FeedbackMessage> = {}): Feedbac
       browser: 'Chrome 129',
       os: 'Windows 10',
     },
-    dashboardUrl: 'https://dymcode.dev/projects/p1/feedback?f=f1',
+    dashboardUrl: 'https://bugping.app/projects/p1/feedback?f=f1',
     screenshot: null,
     ...overrides,
   };

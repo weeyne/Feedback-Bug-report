@@ -31,7 +31,7 @@ function configFor(key: string, req: IncomingMessage): WidgetConfig {
   const q = page.searchParams;
   const locale = q.get('locale');
   return {
-    primaryColor: /^[0-9a-fA-F]{6}$/.test(q.get('color') ?? '') ? `#${q.get('color')}` : '#6366f1',
+    primaryColor: /^[0-9a-fA-F]{6}$/.test(q.get('color') ?? '') ? `#${q.get('color')}` : '#E0321F',
     triggerText: q.get('text') ?? 'Feedback',
     position: q.get('position') === 'bottom-left' ? 'bottom-left' : 'bottom-right',
     showBadge: q.get('badge') !== '0',

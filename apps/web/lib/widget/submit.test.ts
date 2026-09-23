@@ -55,7 +55,7 @@ function request(
   };
   const origin = opts.origin === undefined ? 'https://host.example' : opts.origin;
   if (origin !== null) headers.origin = origin;
-  return new Request('https://dymcode.dev/api/v1/widget/submit', {
+  return new Request('https://bugping.app/api/v1/widget/submit', {
     method: 'POST',
     body: form,
     headers,

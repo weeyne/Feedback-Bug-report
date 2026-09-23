@@ -2,7 +2,7 @@ import { safeEqual } from '../crypto';
 import type { Db } from '../db/types';
 import type { Env } from '../env';
 
-export const EXPIRED_TEXT = 'This link has expired. Create a new one in your Dymcode dashboard.';
+export const EXPIRED_TEXT = 'This link has expired. Create a new one in your Bugping dashboard.';
 export const HELP_TEXT =
   'Hi! I deliver feedback from your Bugping widget. Connect a project in your dashboard: Integrations → Telegram.';
 

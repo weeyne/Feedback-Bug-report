@@ -6,7 +6,7 @@ const HOST_PAGE = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Dymcode E2E host</title>
+    <title>Bugping E2E host</title>
   </head>
   <body style="margin: 0; background: #fff">
     <h1 style="margin: 40px; font: 20px sans-serif">E2E host page</h1>

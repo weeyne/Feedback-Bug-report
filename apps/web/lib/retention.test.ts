@@ -87,12 +87,12 @@ describe('handleRetention', () => {
       };
       const denied = await handleRetention(
         deps,
-        new Request('https://dymcode.dev/api/cron/retention'),
+        new Request('https://bugping.app/api/cron/retention'),
       );
       expect(denied.status).toBe(401);
       const ok = await handleRetention(
         deps,
-        new Request('https://dymcode.dev/api/cron/retention', {
+        new Request('https://bugping.app/api/cron/retention', {
           headers: { authorization: `Bearer ${'s'.repeat(20)}` },
         }),
       );

@@ -7,7 +7,7 @@ const config = {
   position: 'bottom-right',
   showBadge: true,
   customCss: null,
-  badgeUrl: 'https://dymcode.dev/?ref=pk_AbCdEfGh12345678&utm_source=widget',
+  badgeUrl: 'https://bugping.app/?ref=pk_AbCdEfGh12345678&utm_source=widget',
   locale: 'en',
 };
 
@@ -44,12 +44,12 @@ describe('boot', () => {
     const isReady = ready();
     boot(
       window,
-      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     expect(window.Bugping).toBeDefined();
     await isReady;
     expect(fetch).toHaveBeenCalledWith(
-      'https://dymcode.dev/api/v1/widget/config?key=pk_AbCdEfGh12345678',
+      'https://bugping.app/api/v1/widget/config?key=pk_AbCdEfGh12345678',
       { credentials: 'omit' },
     );
     const host = document.querySelector('[data-bugping]')!;
@@ -61,7 +61,7 @@ describe('boot', () => {
     boot(
       window,
       script({
-        src: 'https://dymcode.dev/w/widget.js',
+        src: 'https://bugping.app/w/widget.js',
         'data-project-id': 'pk_AbCdEfGh12345678',
         'data-hide-trigger': '',
       }),
@@ -80,7 +80,7 @@ describe('boot', () => {
     const isReady = ready();
     boot(
       window,
-      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     (window.Bugping as { identify(u: object): void }).identify({ email: 'ann@example.com' });
     await isReady;
@@ -89,7 +89,7 @@ describe('boot', () => {
   });
 
   it('does nothing without a project id', () => {
-    boot(window, script({ src: 'https://dymcode.dev/w/widget.js' }));
+    boot(window, script({ src: 'https://bugping.app/w/widget.js' }));
     expect(window.Bugping).toBeUndefined();
     expect(warn).toHaveBeenCalledOnce();
   });
@@ -99,7 +99,7 @@ describe('boot', () => {
     (window as { Bugping?: unknown }).Bugping = existing;
     boot(
       window,
-      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     expect(window.Bugping).toBe(existing);
     expect(fetch).not.toHaveBeenCalled();
@@ -112,7 +112,7 @@ describe('boot', () => {
     );
     boot(
       window,
-      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     await vi.waitFor(() => expect(warn).toHaveBeenCalled());
     expect(document.querySelector('[data-bugping]')).toBeNull();
@@ -126,7 +126,7 @@ describe('boot', () => {
     const before = console.error;
     boot(
       window,
-      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     expect(console.error).not.toBe(before);
     await vi.waitFor(() => expect(warn).toHaveBeenCalled());
@@ -138,7 +138,7 @@ describe('boot', () => {
     vi.stubGlobal('requestIdleCallback', idle);
     boot(
       window,
-      script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     expect(idle).toHaveBeenCalledWith(expect.any(Function), { timeout: 3000 });
   });

@@ -4,7 +4,7 @@ import type { FeedbackMessage } from './types';
 export const TYPE_STYLE: Record<FeedbackType, { emoji: string; label: string; color: number }> = {
   bug: { emoji: '🐞', label: 'Bug', color: 0xef4444 },
   idea: { emoji: '💡', label: 'Idea', color: 0x22c55e },
-  general: { emoji: '💬', label: 'Other', color: 0x6366f1 },
+  general: { emoji: '💬', label: 'Other', color: 0xe0321f },
 };
 
 const MESSAGE_LIMIT = 3000;

@@ -22,7 +22,7 @@ describe('projects', () => {
       );
       expect(rows).toEqual([
         {
-          primary_color: '#6366f1',
+          primary_color: '#E0321F',
           trigger_text: 'Feedback',
           position: 'bottom-right',
           hide_badge: false,

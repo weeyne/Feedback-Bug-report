@@ -216,7 +216,7 @@ export async function dispatchQuotaNotice(deps: DispatchDeps, projectId: string)
 }
 
 export const TEST_NOTICE_TEXT = (projectName: string) =>
-  `✅ Dymcode test message: notifications for "${projectName}" work.`;
+  `✅ Bugping test message: notifications for "${projectName}" work.`;
 
 /** Dashboard "Send test": one integration, same notifiers and bookkeeping as real deliveries. */
 export async function sendTestNotice(

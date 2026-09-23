@@ -21,7 +21,7 @@ describe('discord notifier', () => {
     expect(body.allowed_mentions).toEqual({ parse: [] });
     expect(body.embeds[0]).toMatchObject({
       title: '🐞 Bug · Acme <Shop>',
-      url: 'https://dymcode.dev/projects/p1/feedback?f=f1',
+      url: 'https://bugping.app/projects/p1/feedback?f=f1',
       color: 0xef4444,
     });
     expect(body.embeds[0].description).toContain('Checkout');

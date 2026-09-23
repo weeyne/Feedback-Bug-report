@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installConsoleBuffer, type ConsoleBuffer } from './console-buffer';
 
-const OWN = 'https://dymcode.dev/w/widget.js';
+const OWN = 'https://bugping.app/w/widget.js';
 
 describe('installConsoleBuffer', () => {
   let buffer: ConsoleBuffer;

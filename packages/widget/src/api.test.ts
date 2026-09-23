@@ -2,14 +2,14 @@ import { SubmitPayloadSchema, type ClientMetadata, type WidgetConfig } from '@bu
 import { describe, expect, it, vi } from 'vitest';
 import { buildPayload, fetchConfig, submitFeedback } from './api';
 
-const ORIGIN = 'https://dymcode.dev';
+const ORIGIN = 'https://bugping.app';
 const config: WidgetConfig = {
   primaryColor: '#6366f1',
   triggerText: 'Feedback',
   position: 'bottom-right',
   showBadge: true,
   customCss: null,
-  badgeUrl: 'https://dymcode.dev/?ref=pk_AbCdEfGh12345678&utm_source=widget',
+  badgeUrl: 'https://bugping.app/?ref=pk_AbCdEfGh12345678&utm_source=widget',
   locale: 'auto',
 };
 const metadata: ClientMetadata = {
@@ -29,7 +29,7 @@ describe('fetchConfig', () => {
     const fetchImpl = vi.fn(async () => json(config));
     await expect(fetchConfig(ORIGIN, 'pk_AbCdEfGh12345678', fetchImpl)).resolves.toEqual(config);
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://dymcode.dev/api/v1/widget/config?key=pk_AbCdEfGh12345678',
+      'https://bugping.app/api/v1/widget/config?key=pk_AbCdEfGh12345678',
       { credentials: 'omit' },
     );
   });
@@ -69,7 +69,7 @@ describe('submitFeedback', () => {
     const shot = new Blob(['img'], { type: 'image/webp' });
     await expect(submitFeedback(ORIGIN, payload, shot, fetchImpl)).resolves.toEqual({ ok: true });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://dymcode.dev/api/v1/widget/submit');
+    expect(url).toBe('https://bugping.app/api/v1/widget/submit');
     expect(init.method).toBe('POST');
     const body = init.body as FormData;
     expect(JSON.parse(String(body.get('payload')))).toEqual(payload);

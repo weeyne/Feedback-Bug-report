@@ -28,8 +28,8 @@ describe('getPublicEnv', () => {
 
   it('succeeds when VERCEL_ENV=production and NEXT_PUBLIC_APP_URL is set', () => {
     process.env.VERCEL_ENV = 'production';
-    process.env.NEXT_PUBLIC_APP_URL = 'https://dymcode.com';
-    expect(getPublicEnv().appUrl).toBe('https://dymcode.com');
+    process.env.NEXT_PUBLIC_APP_URL = 'https://bugping.com';
+    expect(getPublicEnv().appUrl).toBe('https://bugping.com');
   });
 
   it('does not require NEXT_PUBLIC_APP_URL for preview/dev VERCEL_ENV', () => {

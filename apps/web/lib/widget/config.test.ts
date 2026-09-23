@@ -12,7 +12,7 @@ import { handleConfig } from './config';
 const get = (db: TestDb, key: string) =>
   handleConfig(
     { db, env: { NEXT_PUBLIC_APP_URL: 'https://app.example' } },
-    new Request(`https://dymcode.dev/api/v1/widget/config?key=${key}`, {
+    new Request(`https://bugping.app/api/v1/widget/config?key=${key}`, {
       headers: { origin: 'https://host.example' },
     }),
   );

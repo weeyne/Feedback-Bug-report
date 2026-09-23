@@ -1,8 +1,8 @@
-# Dymcode
+# Bugping
 
 Lightweight feedback & bug-report widget that delivers reports straight to Telegram and Discord.
 
-Design: `docs/superpowers/specs/2026-09-21-dymcode-design.md`
+Design specs: `docs/superpowers/specs/`
 
 ## Requirements
 
@@ -48,7 +48,7 @@ pnpm --filter @bugping/widget e2e     # Playwright smoke tests against the built
 Embed:
 
 ```html
-<script async src="https://dymcode.vercel.app/w/widget.js" data-project-id="pk_…"></script>
+<script async src="https://bugping.vercel.app/w/widget.js" data-project-id="pk_…"></script>
 ```
 
 Host page API: `Bugping.open('bug' | 'idea' | 'general')`, `Bugping.identify({ email, id, name })`,

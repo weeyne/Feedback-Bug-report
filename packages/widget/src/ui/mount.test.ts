@@ -20,7 +20,7 @@ const baseConfig: WidgetConfig = {
   position: 'bottom-right',
   showBadge: true,
   customCss: null,
-  badgeUrl: 'https://dymcode.dev/?ref=pk_AbCdEfGh12345678&utm_source=widget',
+  badgeUrl: 'https://bugping.app/?ref=pk_AbCdEfGh12345678&utm_source=widget',
   locale: 'en',
 };
 const metadata: ClientMetadata = {
@@ -143,7 +143,7 @@ describe('mountWidget', () => {
   });
 
   it('renders the badge only for an https badge URL', () => {
-    for (const badgeUrl of ['javascript:alert(1)', 'http://dymcode.dev/', '//dymcode.dev/']) {
+    for (const badgeUrl of ['javascript:alert(1)', 'http://bugping.app/', '//bugping.app/']) {
       const { handle, q } = setup({ config: { badgeUrl } });
       expect(q('.bp-badge')).toBeNull();
       handle.destroy();

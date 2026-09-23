@@ -63,7 +63,7 @@ function setup(
     env: {
       TELEGRAM_BOT_TOKEN: SHARED_TOKEN,
       SECRETS_ENCRYPTION_KEY: KEY,
-      NEXT_PUBLIC_APP_URL: 'https://dymcode.dev',
+      NEXT_PUBLIC_APP_URL: 'https://bugping.app',
     },
     sleep: async () => {},
   };
@@ -113,7 +113,7 @@ describe('dispatchFeedback', () => {
       expect(body.chat_id).toBe('4242');
       expect(body.text).toContain('Broken checkout');
       expect(body.text).toContain(
-        `https://dymcode.dev/app/p/${project.id}/feedback?f=${feedbackId}`,
+        `https://bugping.app/app/p/${project.id}/feedback?f=${feedbackId}`,
       );
       expect(await integration(db, tg)).toEqual({
         enabled: true,

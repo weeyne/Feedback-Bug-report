@@ -12,7 +12,7 @@ async function Nav({ projects, email }: { projects: ShellProject[]; email: strin
   return (
     <nav className="flex h-full flex-col gap-4 p-4">
       <Link href="/app" className="text-lg font-semibold">
-        Dymcode
+        Bugping
       </Link>
       <ProjectNav projects={projects} />
       <ul className="mt-auto flex flex-col gap-1 text-sm">
@@ -64,7 +64,7 @@ export async function AppShell(props: {
               <Nav {...props} />
             </SheetContent>
           </Sheet>
-          <span className="font-semibold">Dymcode</span>
+          <span className="font-semibold">Bugping</span>
         </header>
         <main className="min-w-0 flex-1">{props.children}</main>
       </div>

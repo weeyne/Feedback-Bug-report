@@ -5,11 +5,11 @@ describe('createScreenshotLoader', () => {
   it('imports the module once and returns its capture function', async () => {
     const capture = vi.fn(async () => null);
     const importer = vi.fn(async () => ({ capture }));
-    const load = createScreenshotLoader('https://dymcode.dev/w/screenshot.js?v=1', importer);
+    const load = createScreenshotLoader('https://bugping.app/w/screenshot.js?v=1', importer);
     await expect(load()).resolves.toBe(capture);
     await expect(load()).resolves.toBe(capture);
     expect(importer).toHaveBeenCalledOnce();
-    expect(importer).toHaveBeenCalledWith('https://dymcode.dev/w/screenshot.js?v=1');
+    expect(importer).toHaveBeenCalledWith('https://bugping.app/w/screenshot.js?v=1');
   });
 
   it('resolves null when the import fails or has no capture export', async () => {

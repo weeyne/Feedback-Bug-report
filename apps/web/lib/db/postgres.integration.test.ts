@@ -81,7 +81,7 @@ describe.runIf(process.env.DB_TEST_TARGET === 'supabase')(
           after: () => {},
           notify,
         },
-        new Request('https://dymcode.dev/api/v1/widget/submit', {
+        new Request('https://bugping.app/api/v1/widget/submit', {
           method: 'POST',
           body: form,
           headers: { 'x-forwarded-for': `203.0.113.${Math.floor(Math.random() * 200)}` },

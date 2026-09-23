@@ -1,4 +1,4 @@
-# Deploying Dymcode
+# Deploying Bugping
 
 Production runs on Vercel (the `apps/web` Next.js app) and Supabase Cloud (Postgres, Auth, Storage).
 Never commit secrets: every value below is entered in the Vercel or Supabase dashboard.
@@ -47,7 +47,7 @@ Never commit secrets: every value below is entered in the Vercel or Supabase das
    - `NEXT_PUBLIC_APP_URL`: `https://<domain>` (no trailing slash)
    - `SECRETS_ENCRYPTION_KEY`, `IP_HASH_SALT`, `CRON_SECRET`
    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
-   - `NEXT_PUBLIC_BUGPING_PROJECT_KEY` (optional): the public key of your own Dymcode project, for the landing widget
+   - `NEXT_PUBLIC_BUGPING_PROJECT_KEY` (optional): the public key of your own Bugping project, for the landing widget
    - Do NOT set `BUGPING_TEST_MODE`.
    - **Scope all of the above to Production only.** Preview deployments would otherwise read the production
      database and send magic-link/OAuth redirects to the production domain. Either leave Preview without these
@@ -81,7 +81,7 @@ The script reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` from `apps/w
 ### Sandbox
 
 1. Create a sandbox account at `https://sandbox-vendors.paddle.com` (no identity verification).
-2. Catalog → Products: "Dymcode Pro" with two prices: $9 monthly recurring and $49 one-time. Copy both `pri_…` ids.
+2. Catalog → Products: "Bugping Pro" with two prices: $9 monthly recurring and $49 one-time. Copy both `pri_…` ids.
 3. Developer tools → Authentication: create an API key and a client-side token.
 4. Developer tools → Notifications: a destination `https://<domain>/api/billing/webhook` for `subscription.*`,
    `transaction.completed`, `adjustment.created`, `adjustment.updated`. Copy its secret key.

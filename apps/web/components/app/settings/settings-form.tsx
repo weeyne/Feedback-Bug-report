@@ -43,7 +43,7 @@ export function SettingsForm({
     setForm((f) => ({ ...f, [key]: value }));
   const cssBytes = utf8ByteLength(form.customCss);
   const preview: WidgetConfig = {
-    primaryColor: /^#[0-9a-fA-F]{6}$/.test(form.primaryColor) ? form.primaryColor : '#6366f1',
+    primaryColor: /^#[0-9a-fA-F]{6}$/.test(form.primaryColor) ? form.primaryColor : '#E0321F',
     triggerText: form.triggerText.trim() || 'Feedback',
     position: form.position,
     showBadge: !(pro && form.hideBadge),

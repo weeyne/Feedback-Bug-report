@@ -1,12 +1,11 @@
 // Must stay free of runtime dependencies: the widget bundle imports this file directly.
 
-const DOMAIN = 'dymcode.dev';
+const DOMAIN = 'bugping.app';
 
 export const BRAND = {
-  name: 'Dymcode',
+  name: 'Bugping',
   domain: DOMAIN,
   url: `https://${DOMAIN}`,
-  telegramBot: 'DymcodeBot',
 } as const;
 
 /**

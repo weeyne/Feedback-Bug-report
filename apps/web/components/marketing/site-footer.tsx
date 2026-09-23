@@ -7,7 +7,7 @@ export async function SiteFooter() {
   return (
     <footer className="border-t">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-muted-foreground">
-        <span>© {new Date().getFullYear()} Dymcode</span>
+        <span>© {new Date().getFullYear()} Bugping</span>
         <nav className="flex items-center gap-4">
           <Link href="/privacy" className="hover:underline">
             {t('privacy')}

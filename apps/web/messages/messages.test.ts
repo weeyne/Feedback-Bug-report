@@ -73,7 +73,7 @@ describe('messages', () => {
       'Paste this snippet before the closing </body> tag of your site.',
     );
     expect(tEn('install.identifyHint')).toBe(
-      'Call Dymcode.identify({ email, id, name }) after sign-in.',
+      'Call Bugping.identify({ email, id, name }) after sign-in.',
     );
   });
 });

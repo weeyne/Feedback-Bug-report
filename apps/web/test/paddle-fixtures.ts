@@ -83,7 +83,7 @@ export function adjustmentEvent(input: {
 
 export function signedRequest(event: object, secret: string, nowMs = Date.now()): Request {
   const body = JSON.stringify(event);
-  return new Request('https://dymcode.dev/api/billing/webhook', {
+  return new Request('https://bugping.app/api/billing/webhook', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',

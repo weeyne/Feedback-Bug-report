@@ -16,7 +16,7 @@ function setup(db: TestDb) {
     env: {
       TELEGRAM_WEBHOOK_SECRET: SECRET,
       TELEGRAM_BOT_TOKEN: '111:BOT',
-      TELEGRAM_BOT_USERNAME: 'dymcode_bot',
+      TELEGRAM_BOT_USERNAME: 'bugping_bot',
     },
   };
   return { deps, sent, fetchImpl };
@@ -27,7 +27,7 @@ const update = (
   chat: { id: number; type: string } = { id: 777, type: 'private' },
   secret = SECRET,
 ) =>
-  new Request('https://dymcode.dev/api/telegram/webhook', {
+  new Request('https://bugping.app/api/telegram/webhook', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': secret },
     body: JSON.stringify({ update_id: 1, message: { message_id: 1, text, chat } }),
@@ -86,7 +86,7 @@ describe('handleTelegramWebhook', () => {
       );
       await handleTelegramWebhook(
         deps,
-        update(`/start@Dymcode_Bot ${code}`, { id: -100123, type: 'supergroup' }),
+        update(`/start@Bugping_Bot ${code}`, { id: -100123, type: 'supergroup' }),
       );
       expect(await integrationFor(db, project.id)).toEqual([
         { target: '-100123', enabled: true, last_error: null },
@@ -119,7 +119,7 @@ describe('handleTelegramWebhook', () => {
     withTx(async (db) => {
       const { deps } = setup(db);
       const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const bad = new Request('https://dymcode.dev/api/telegram/webhook', {
+      const bad = new Request('https://bugping.app/api/telegram/webhook', {
         method: 'POST',
         headers: { 'x-telegram-bot-api-secret-token': SECRET },
         body: '{not json',

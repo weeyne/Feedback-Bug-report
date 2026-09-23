@@ -7,7 +7,7 @@ const valid = {
   position: 'bottom-right',
   showBadge: true,
   customCss: null,
-  badgeUrl: 'https://dymcode.dev/?ref=pk_AbCdEfGh12345678&utm_source=widget',
+  badgeUrl: 'https://bugping.app/?ref=pk_AbCdEfGh12345678&utm_source=widget',
   locale: 'auto',
 };
 

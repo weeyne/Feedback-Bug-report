@@ -16,7 +16,7 @@ describe('format', () => {
     expect(full).toContain('Chrome 129 · Windows 10 · 1280×720 (screen 1920×1080 @2x)');
     expect(full).toContain('<code>TypeError: x is undefined</code>');
     expect(full).toContain(
-      '<a href="https://dymcode.dev/projects/p1/feedback?f=f1">Open in dashboard</a>',
+      '<a href="https://bugping.app/projects/p1/feedback?f=f1">Open in dashboard</a>',
     );
     expect(short).toContain('🐞 <b>Bug</b> · Acme &lt;Shop&gt;');
     expect(short).toContain('Open in dashboard');
