@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "copy-widget": "node scripts/copy-widget.mjs",
     "dev": "pnpm --filter @dymcode/widget build && pnpm copy-widget && next dev",

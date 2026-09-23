@@ -20,16 +20,19 @@ Never commit secrets: every value below is entered in the Vercel or Supabase das
    - Settings → General → "Include files outside the Root Directory in the Build Step": enable it. The workspace
      packages (`packages/*`) and `supabase/` (migrations, PGlite bootstrap) live outside `apps/web` and are needed
      by the build and by the workspace's `pnpm` install.
-3. Build command: `cd ../.. && pnpm --filter @dymcode/widget build && pnpm --filter @dymcode/web build`.
-   Install command: leave the default (Vercel detects pnpm from the lockfile).
-   - Settings → General → Node.js Version: **24.x**. The root `package.json` `engines` field is not read when Root
-     Directory is `apps/web`, so this must be set explicitly in the dashboard.
+3. Build command, function region and Node version live in the repo, not the dashboard:
+   - `apps/web/vercel.json` sets `buildCommand` (`cd ../.. && pnpm --filter @dymcode/widget build && pnpm --filter
+     @dymcode/web build`). It must be in `vercel.json`: when Vercel detects Turborepo it replaces a dashboard build
+     command with plain `next build`, which skips the widget and leaves `/w/widget.js` returning 404.
+   - `apps/web/vercel.json` sets `regions: ["lhr1"]` (London), next to the Supabase `eu-west-2` pooler. Each dashboard
+     page makes several DB round trips, so a region mismatch is noticeable latency. Change it if the Supabase
+     project moves.
+   - `apps/web/package.json` sets `engines.node` to `24.x`, which Vercel reads from the Root Directory.
+   - Install command: leave the default (Vercel detects pnpm from the lockfile).
    - The repo pins `packageManager: pnpm@11.20.0` in the root `package.json`, and pnpm 11 reads `allowBuilds` from
      `pnpm-workspace.yaml`. Add the environment variable `ENABLE_EXPERIMENTAL_COREPACK=1` so Vercel installs and
      uses that pnpm version instead of its own default.
-4. Settings → Functions: set the Function Region to the Supabase project's region (the dev project uses the
-   `eu-west-2` / London pooler). Each dashboard page makes several DB round trips, so region mismatch is
-   noticeable latency.
+4. After the first deploy, check that `https://<domain>/w/widget.js` returns JavaScript (not 404).
 5. Environment variables, same names as `apps/web/.env.local`:
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
    - `DATABASE_URL`: the transaction pooler URL (`…pooler.supabase.com:6543/postgres`)
