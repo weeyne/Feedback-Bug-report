@@ -1,4 +1,4 @@
-import type { FeedbackMetadata, FeedbackType } from '@dymcode/shared';
+import type { FeedbackMetadata, FeedbackType } from '@bugping/shared';
 
 export interface Attachment {
   data: Uint8Array;

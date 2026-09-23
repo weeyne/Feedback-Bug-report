@@ -4,7 +4,7 @@ import {
   createUser,
   withTx,
   type TestDb,
-} from '@dymcode/db-tests/harness';
+} from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import { VALID_ENV } from '@/test/fixtures';
 import type { AuthAdmin } from '../auth/admin';

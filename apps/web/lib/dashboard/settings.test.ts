@@ -5,7 +5,7 @@ import {
   grantPro,
   withTx,
   type TestDb,
-} from '@dymcode/db-tests/harness';
+} from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import { VALID_ENV } from '@/test/fixtures';
 import { parseEnv } from '../env';
@@ -22,7 +22,7 @@ const valid = {
   locale: 'ru',
   allowedOrigins: ['shop.example.com/path', 'http://localhost:3000', 'shop.example.com'],
   hideBadge: true,
-  customCss: '.dc-root { color: red; }',
+  customCss: '.bp-root { color: red; }',
 };
 
 function setup(db: TestDb) {
@@ -47,7 +47,7 @@ describe('updateProjectSettings', () => {
         locale: 'ru',
         allowed_origins: ['https://shop.example.com', 'http://localhost:3000'],
         hide_badge: true,
-        custom_css: '.dc-root { color: red; }',
+        custom_css: '.bp-root { color: red; }',
       });
     }));
 

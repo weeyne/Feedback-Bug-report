@@ -1,6 +1,6 @@
 'use client';
 
-import type { WidgetConfig } from '@dymcode/shared';
+import type { WidgetConfig } from '@bugping/shared';
 import { useEffect, useRef } from 'react';
 
 interface PreviewHandle {

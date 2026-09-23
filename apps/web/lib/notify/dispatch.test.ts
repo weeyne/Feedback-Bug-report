@@ -5,7 +5,7 @@ import {
   grantPro,
   withTx,
   type TestDb,
-} from '@dymcode/db-tests/harness';
+} from '@bugping/db-tests/harness';
 import { describe, expect, it, vi } from 'vitest';
 import { encryptSecret } from '../crypto';
 import { createMemoryStorage } from '../storage';

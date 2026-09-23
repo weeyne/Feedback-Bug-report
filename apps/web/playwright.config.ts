@@ -9,13 +9,13 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}` },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `pnpm --filter @dymcode/widget build && node scripts/copy-widget.mjs && pnpm exec next dev --port ${PORT}`,
+    command: `pnpm --filter @bugping/widget build && node scripts/copy-widget.mjs && pnpm exec next dev --port ${PORT}`,
     url: `http://localhost:${PORT}/e2e-host`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
     // Fake values only: test mode never talks to Supabase, Telegram or Discord.
     env: {
-      DYMCODE_TEST_MODE: '1',
+      BUGPING_TEST_MODE: '1',
       NEXT_PUBLIC_SUPABASE_URL: 'http://localhost:54321',
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'e2e-publishable-key-0000000000',
       SUPABASE_SERVICE_ROLE_KEY: 'e2e-service-role-key-000000',
@@ -25,7 +25,7 @@ export default defineConfig({
       IP_HASH_SALT: 'e2e-salt-0123456789abcdef',
       CRON_SECRET: 'e2e-cron-secret-0123456789',
       TELEGRAM_BOT_TOKEN: '123456:E2E_token',
-      TELEGRAM_BOT_USERNAME: 'dymcode_bot',
+      TELEGRAM_BOT_USERNAME: 'bugping_bot',
       TELEGRAM_WEBHOOK_SECRET: 'e2e-webhook-secret-0123',
       // Fake values only: test mode never talks to Paddle, the outbox fetch answers.
       PADDLE_API_KEY: 'pdl_sdbx_apikey_e2e0000000000000000',

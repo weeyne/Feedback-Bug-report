@@ -7,13 +7,13 @@ import { mountWidget } from './ui/mount';
 
 declare global {
   interface Window {
-    Dymcode?: unknown;
+    Bugping?: unknown;
   }
 }
 
 const warn = (message: string) => {
   try {
-    console.warn(`[Dymcode] ${message}`);
+    console.warn(`[Bugping] ${message}`);
   } catch {
     // Console may be unavailable; nothing else to do.
   }
@@ -22,7 +22,7 @@ const warn = (message: string) => {
 /** Starts the widget for `script` (the embed tag). Safe to call twice; never throws. */
 export function boot(win: Window & typeof globalThis, script: HTMLScriptElement | null): void {
   try {
-    if (win.Dymcode || !script) return;
+    if (win.Bugping || !script) return;
     const projectKey = script.dataset.projectId;
     if (!projectKey) return warn('missing data-project-id on the script tag');
 
@@ -30,7 +30,7 @@ export function boot(win: Window & typeof globalThis, script: HTMLScriptElement 
     const apiOrigin = new URL(scriptUrl).origin;
     const buffer = installConsoleBuffer(win, scriptUrl);
     const state: ApiState = { handle: null, user: undefined };
-    win.Dymcode = createPublicApi(state, warn);
+    win.Bugping = createPublicApi(state, warn);
     const loadCapture = createScreenshotLoader(
       new URL(`screenshot.js?v=${encodeURIComponent(__WIDGET_VERSION__)}`, scriptUrl).href,
     );
@@ -52,7 +52,7 @@ export function boot(win: Window & typeof globalThis, script: HTMLScriptElement 
         },
       });
       if (state.user) state.handle.identify(state.user);
-      win.dispatchEvent(new Event('dymcode:ready'));
+      win.dispatchEvent(new Event('bugping:ready'));
     };
 
     const run = () => void start().catch(() => warn('failed to start'));

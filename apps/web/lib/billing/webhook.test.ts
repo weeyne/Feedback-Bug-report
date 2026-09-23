@@ -1,4 +1,4 @@
-import { createUser, withTx, type TestDb } from '@dymcode/db-tests/harness';
+import { createUser, withTx, type TestDb } from '@bugping/db-tests/harness';
 import { describe, expect, it, vi } from 'vitest';
 import {
   adjustmentEvent,

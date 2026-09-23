@@ -1,4 +1,4 @@
-import type { WidgetLocale } from '@dymcode/shared';
+import type { WidgetLocale } from '@bugping/shared';
 import { z } from 'zod';
 import { ENTITLEMENTS } from '../billing/plans';
 import type { Db, Row } from '../db/types';

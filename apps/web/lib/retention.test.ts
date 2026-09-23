@@ -4,7 +4,7 @@ import {
   grantPro,
   withTx,
   type TestDb,
-} from '@dymcode/db-tests/harness';
+} from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import { createMemoryStorage } from './storage';
 import { handleRetention, runRetention, type RetentionDeps } from './retention';

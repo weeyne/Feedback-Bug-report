@@ -4,8 +4,8 @@ import {
   grantPro,
   withTx,
   type TestDb,
-} from '@dymcode/db-tests/harness';
-import { SCREENSHOT_MAX_BYTES } from '@dymcode/shared';
+} from '@bugping/db-tests/harness';
+import { SCREENSHOT_MAX_BYTES } from '@bugping/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '../db/types';
 import { createMemoryStorage } from '../storage';

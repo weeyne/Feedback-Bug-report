@@ -1,5 +1,5 @@
-import type { ConsoleError } from '@dymcode/shared';
-import { CONSOLE_ERRORS_MAX, CONSOLE_ERROR_MESSAGE_MAX_LENGTH } from '@dymcode/shared/constants';
+import type { ConsoleError } from '@bugping/shared';
+import { CONSOLE_ERRORS_MAX, CONSOLE_ERROR_MESSAGE_MAX_LENGTH } from '@bugping/shared/constants';
 
 export interface ConsoleBuffer {
   entries(): ConsoleError[];

@@ -10,7 +10,7 @@ import {
   buildBadgeUrl,
   type WidgetConfig,
   type WidgetLocale,
-} from '@dymcode/shared';
+} from '@bugping/shared';
 import type { Plugin } from 'vite';
 
 export interface MockSubmission {
@@ -129,7 +129,7 @@ export function mockApi(): Plugin {
   }
 
   return {
-    name: 'dymcode-mock-api',
+    name: 'bugping-mock-api',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         handle(req, res).then(

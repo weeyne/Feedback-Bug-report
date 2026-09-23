@@ -20,7 +20,7 @@ export function h<K extends keyof HTMLElementTagNameMap>(
         try {
           listener.call(el, event);
         } catch (error) {
-          console.error('[Dymcode]', error);
+          console.error('[Bugping]', error);
         }
       });
     } else {

@@ -1,5 +1,5 @@
 {
-  "name": "dymcode",
+  "name": "bugping",
   "private": true,
   "packageManager": "pnpm@11.20.0",
   "engines": {
@@ -13,7 +13,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:test": "pnpm --filter @dymcode/db-tests test"
+    "db:test": "pnpm --filter @bugping/db-tests test"
   },
   "devDependencies": {
     "prettier": "^3.9.8",

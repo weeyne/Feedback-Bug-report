@@ -1,11 +1,11 @@
-import type { ClientMetadata, SubmitPayload, WidgetConfig } from '@dymcode/shared';
-import { BRAND } from '@dymcode/shared/brand';
+import type { ClientMetadata, SubmitPayload, WidgetConfig } from '@bugping/shared';
+import { BRAND } from '@bugping/shared/brand';
 import {
   EMAIL_MAX_LENGTH,
   FEEDBACK_TYPES,
   MESSAGE_MAX_LENGTH,
   type FeedbackType,
-} from '@dymcode/shared/constants';
+} from '@bugping/shared/constants';
 import { buildPayload, type SubmitResult } from '../api';
 import type { Messages } from '../i18n';
 import type { CaptureFn } from '../screenshot-loader';
@@ -86,7 +86,7 @@ export function createPanel(options: {
       'button',
       {
         type: 'button',
-        class: 'dc-type',
+        class: 'bp-type',
         'data-type': ft,
         'aria-pressed': 'false',
         onclick: () => selectType(ft),
@@ -95,79 +95,79 @@ export function createPanel(options: {
     ),
   );
   const message = h('textarea', {
-    class: 'dc-input dc-message',
+    class: 'bp-input bp-message',
     rows: 4,
     maxlength: MESSAGE_MAX_LENGTH,
   });
-  const messageError = h('p', { class: 'dc-field-error dc-message-error', role: 'alert' });
+  const messageError = h('p', { class: 'bp-field-error bp-message-error', role: 'alert' });
   const email = h('input', {
-    class: 'dc-input dc-email',
+    class: 'bp-input bp-email',
     type: 'email',
     maxlength: EMAIL_MAX_LENGTH,
     placeholder: t.emailPlaceholder,
     autocomplete: 'email',
     'aria-label': t.emailLabel,
   });
-  const emailError = h('p', { class: 'dc-field-error dc-email-error', role: 'alert' });
+  const emailError = h('p', { class: 'bp-field-error bp-email-error', role: 'alert' });
   const honeypot = h('input', {
-    class: 'dc-hp',
+    class: 'bp-hp',
     name: 'website',
     tabindex: -1,
     autocomplete: 'off',
     'aria-hidden': 'true',
   });
-  const shotToggle = h('input', { type: 'checkbox', class: 'dc-shot-toggle', checked: true });
-  const thumb = h('span', { class: 'dc-thumb', 'data-state': 'loading' });
+  const shotToggle = h('input', { type: 'checkbox', class: 'bp-shot-toggle', checked: true });
+  const thumb = h('span', { class: 'bp-thumb', 'data-state': 'loading' });
   const shotText = h('span', {}, t.screenshot);
-  const status = h('p', { class: 'dc-status', role: 'status' });
+  const status = h('p', { class: 'bp-status', role: 'status' });
   const retry = h(
     'button',
-    { type: 'button', class: 'dc-retry', hidden: true, onclick: () => void send() },
+    { type: 'button', class: 'bp-retry', hidden: true, onclick: () => void send() },
     t.retry,
   );
   const sendButton = h(
     'button',
-    { type: 'button', class: 'dc-send', onclick: () => void send() },
+    { type: 'button', class: 'bp-send', onclick: () => void send() },
     t.send,
   );
   const form = h(
     'form',
     {
-      class: 'dc-form',
+      class: 'bp-form',
       novalidate: true,
       onsubmit: (e: Event) => {
         e.preventDefault();
         void send();
       },
     },
-    h('div', { class: 'dc-types', role: 'group' }, ...typeButtons),
+    h('div', { class: 'bp-types', role: 'group' }, ...typeButtons),
     message,
     messageError,
     email,
     emailError,
     honeypot,
-    h('label', { class: 'dc-shot' }, shotToggle, thumb, shotText),
+    h('label', { class: 'bp-shot' }, shotToggle, thumb, shotText),
     status,
     retry,
     sendButton,
   );
-  const thanks = h('p', { class: 'dc-thanks', role: 'status', hidden: true }, t.thanks);
+  const thanks = h('p', { class: 'bp-thanks', role: 'status', hidden: true }, t.thanks);
   // Only an https link: a config value must never become a javascript: or other-scheme URL.
   const badge =
     config.showBadge && config.badgeUrl.startsWith('https://')
       ? h(
           'a',
-          { class: 'dc-badge', href: config.badgeUrl, target: '_blank', rel: 'noopener' },
+          { class: 'bp-badge', href: config.badgeUrl, target: '_blank', rel: 'noopener' },
           `${t.poweredBy} ${BRAND.name}`,
         )
       : null;
   const element = h(
     'div',
     {
-      class: 'dc-panel',
+      class: 'bp-panel',
       role: 'dialog',
       'aria-modal': 'false',
-      'aria-labelledby': 'dc-title',
+      'aria-labelledby': 'bp-title',
       hidden: true,
       // Composed key events would retarget to the host and trigger its shortcuts; keep them here.
       onkeydown: onKeydown,
@@ -176,11 +176,11 @@ export function createPanel(options: {
     },
     h(
       'div',
-      { class: 'dc-head' },
-      h('h2', { class: 'dc-title', id: 'dc-title' }, t.title),
+      { class: 'bp-head' },
+      h('h2', { class: 'bp-title', id: 'bp-title' }, t.title),
       h(
         'button',
-        { type: 'button', class: 'dc-close', 'aria-label': t.close, onclick: () => close() },
+        { type: 'button', class: 'bp-close', 'aria-label': t.close, onclick: () => close() },
         '×',
       ),
     ),

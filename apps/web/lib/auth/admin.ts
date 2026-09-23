@@ -7,7 +7,7 @@ export interface AuthAdmin {
 }
 
 export function getAuthAdmin(deps: Pick<AppDeps, 'db' | 'env'>): AuthAdmin {
-  if (deps.env.DYMCODE_TEST_MODE === '1') {
+  if (deps.env.BUGPING_TEST_MODE === '1') {
     return {
       deleteUser: async (userId) => {
         await deps.db.query('delete from auth.users where id = $1', [userId]);

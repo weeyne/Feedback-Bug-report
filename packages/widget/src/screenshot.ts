@@ -1,4 +1,4 @@
-import { SCREENSHOT_MAX_BYTES } from '@dymcode/shared/constants';
+import { SCREENSHOT_MAX_BYTES } from '@bugping/shared/constants';
 import { domToCanvas } from 'modern-screenshot';
 
 const MAX_WIDTH = 1600;

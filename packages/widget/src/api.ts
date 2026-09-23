@@ -1,10 +1,10 @@
-import type { ClientMetadata, SubmitPayload, WidgetConfig } from '@dymcode/shared';
+import type { ClientMetadata, SubmitPayload, WidgetConfig } from '@bugping/shared';
 import {
   HEX_COLOR_PATTERN,
   WIDGET_LOCALES,
   WIDGET_POSITIONS,
   type FeedbackType,
-} from '@dymcode/shared/constants';
+} from '@bugping/shared/constants';
 
 export type SubmitResult =
   { ok: true } | { ok: false; reason: 'rate_limited' | 'invalid' | 'server' | 'network' };
@@ -66,7 +66,7 @@ export async function submitFeedback(
     if (response.ok) return { ok: true };
     if (response.status === 429) return { ok: false, reason: 'rate_limited' };
     if (response.status < 500) {
-      console.warn('[Dymcode] submission rejected:', await response.text().catch(() => ''));
+      console.warn('[Bugping] submission rejected:', await response.text().catch(() => ''));
       return { ok: false, reason: 'invalid' };
     }
     return { ok: false, reason: 'server' };

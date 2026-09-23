@@ -42,13 +42,13 @@ export default async function InstallPage({ params }: { params: Promise<{ projec
         <h2 className="font-medium">{t('customTitle')}</h2>
         <p className="text-sm text-muted-foreground">{t('customHint')}</p>
         <Block
-          code={`<script async src="${src}" data-project-id="${project.public_key}" data-hide-trigger></script>\n<button onclick="Dymcode.open('bug')">Report a bug</button>`}
+          code={`<script async src="${src}" data-project-id="${project.public_key}" data-hide-trigger></script>\n<button onclick="Bugping.open('bug')">Report a bug</button>`}
         />
       </section>
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">{t('identifyTitle')}</h2>
         <p className="text-sm text-muted-foreground">{t('identifyHint')}</p>
-        <Block code={`Dymcode.identify({ email: user.email, id: user.id, name: user.name });`} />
+        <Block code={`Bugping.identify({ email: user.email, id: user.id, name: user.name });`} />
       </section>
     </div>
   );

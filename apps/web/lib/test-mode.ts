@@ -24,8 +24,8 @@ export interface TestModeDeps extends AppDeps {
 }
 
 export function assertTestModeAllowed(env: Env, nodeEnv: string | undefined): void {
-  if (env.DYMCODE_TEST_MODE === '1' && nodeEnv === 'production') {
-    throw new Error('DYMCODE_TEST_MODE must never be enabled in production');
+  if (env.BUGPING_TEST_MODE === '1' && nodeEnv === 'production') {
+    throw new Error('BUGPING_TEST_MODE must never be enabled in production');
   }
 }
 

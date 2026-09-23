@@ -1,4 +1,4 @@
-import { createProject, createUser, withTx, type TestDb } from '@dymcode/db-tests/harness';
+import { createProject, createUser, withTx, type TestDb } from '@bugping/db-tests/harness';
 import { describe, expect, it, vi } from 'vitest';
 import { EXPIRED_TEXT, HELP_TEXT, handleTelegramWebhook, type WebhookDeps } from './webhook';
 

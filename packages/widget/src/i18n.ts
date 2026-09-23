@@ -1,4 +1,4 @@
-import type { FeedbackType, WidgetLocale } from '@dymcode/shared/constants';
+import type { FeedbackType, WidgetLocale } from '@bugping/shared/constants';
 
 export type Locale = Exclude<WidgetLocale, 'auto'>;
 

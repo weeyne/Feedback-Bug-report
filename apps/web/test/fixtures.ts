@@ -9,7 +9,7 @@ export const VALID_ENV = {
   IP_HASH_SALT: '0123456789abcdef0123456789abcdef',
   CRON_SECRET: 'fedcba9876543210fedcba9876543210',
   TELEGRAM_BOT_TOKEN: '123456:ABC-def_ghi',
-  TELEGRAM_BOT_USERNAME: 'dymcode_bot',
+  TELEGRAM_BOT_USERNAME: 'bugping_bot',
   TELEGRAM_WEBHOOK_SECRET: 'webhook-secret-0123456789',
 };
 

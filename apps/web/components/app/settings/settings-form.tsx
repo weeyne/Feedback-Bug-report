@@ -1,6 +1,6 @@
 'use client';
 
-import { CUSTOM_CSS_MAX_BYTES, buildBadgeUrl, type WidgetConfig } from '@dymcode/shared';
+import { CUSTOM_CSS_MAX_BYTES, buildBadgeUrl, type WidgetConfig } from '@bugping/shared';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';

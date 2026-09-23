@@ -7,18 +7,18 @@ afterEach(() => {
 
 describe('GET /e2e-host', () => {
   it('is not served outside test mode', async () => {
-    vi.stubEnv('DYMCODE_TEST_MODE', '');
+    vi.stubEnv('BUGPING_TEST_MODE', '');
     expect((await GET()).status).toBe(404);
   });
 
   it('is not served in production even with test mode set', async () => {
-    vi.stubEnv('DYMCODE_TEST_MODE', '1');
+    vi.stubEnv('BUGPING_TEST_MODE', '1');
     vi.stubEnv('NODE_ENV', 'production');
     expect((await GET()).status).toBe(404);
   });
 
   it('serves the widget host page in test mode', async () => {
-    vi.stubEnv('DYMCODE_TEST_MODE', '1');
+    vi.stubEnv('BUGPING_TEST_MODE', '1');
     vi.stubEnv('NODE_ENV', 'development');
     const res = await GET();
     expect(res.status).toBe(200);

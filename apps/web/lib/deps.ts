@@ -21,16 +21,16 @@ export interface AppDeps {
 // same pattern used for database-client singletons that must survive Next.js dev reloads.
 declare global {
   // eslint-disable-next-line no-var -- `var` is required for global augmentation
-  var __dymcodeDeps: Promise<AppDeps> | undefined;
+  var __bugpingDeps: Promise<AppDeps> | undefined;
 }
 
 export function getDeps(): Promise<AppDeps> {
-  return (globalThis.__dymcodeDeps ??= buildDeps());
+  return (globalThis.__bugpingDeps ??= buildDeps());
 }
 
 async function buildDeps(): Promise<AppDeps> {
   const env = getEnv();
-  if (env.DYMCODE_TEST_MODE === '1') {
+  if (env.BUGPING_TEST_MODE === '1') {
     const { assertTestModeAllowed, createTestModeDeps } = await import('./test-mode');
     assertTestModeAllowed(env, process.env.NODE_ENV);
     return createTestModeDeps(env);

@@ -4,7 +4,7 @@ import { parseEnv } from './env';
 
 describe('parseEnv', () => {
   it('accepts a complete environment', () => {
-    expect(parseEnv(VALID_ENV).TELEGRAM_BOT_USERNAME).toBe('dymcode_bot');
+    expect(parseEnv(VALID_ENV).TELEGRAM_BOT_USERNAME).toBe('bugping_bot');
   });
 
   it('lists invalid variable names without leaking values', () => {
@@ -15,19 +15,19 @@ describe('parseEnv', () => {
   });
 
   it('accepts an optional test-mode flag', () => {
-    expect(parseEnv({ ...VALID_ENV, DYMCODE_TEST_MODE: '1' }).DYMCODE_TEST_MODE).toBe('1');
-    expect(() => parseEnv({ ...VALID_ENV, DYMCODE_TEST_MODE: 'yes' })).toThrow(/DYMCODE_TEST_MODE/);
+    expect(parseEnv({ ...VALID_ENV, BUGPING_TEST_MODE: '1' }).BUGPING_TEST_MODE).toBe('1');
+    expect(() => parseEnv({ ...VALID_ENV, BUGPING_TEST_MODE: 'yes' })).toThrow(/BUGPING_TEST_MODE/);
   });
 
   it('requires the publishable key and accepts an optional own project key', () => {
     const { NEXT_PUBLIC_SUPABASE_ANON_KEY: _, ...withoutAnon } = VALID_ENV;
     expect(() => parseEnv(withoutAnon)).toThrow(/NEXT_PUBLIC_SUPABASE_ANON_KEY/);
     expect(
-      parseEnv({ ...VALID_ENV, NEXT_PUBLIC_DYMCODE_PROJECT_KEY: 'pk_AbCdEfGh12345678' })
-        .NEXT_PUBLIC_DYMCODE_PROJECT_KEY,
+      parseEnv({ ...VALID_ENV, NEXT_PUBLIC_BUGPING_PROJECT_KEY: 'pk_AbCdEfGh12345678' })
+        .NEXT_PUBLIC_BUGPING_PROJECT_KEY,
     ).toBe('pk_AbCdEfGh12345678');
-    expect(() => parseEnv({ ...VALID_ENV, NEXT_PUBLIC_DYMCODE_PROJECT_KEY: 'nope' })).toThrow(
-      /NEXT_PUBLIC_DYMCODE_PROJECT_KEY/,
+    expect(() => parseEnv({ ...VALID_ENV, NEXT_PUBLIC_BUGPING_PROJECT_KEY: 'nope' })).toThrow(
+      /NEXT_PUBLIC_BUGPING_PROJECT_KEY/,
     );
   });
 

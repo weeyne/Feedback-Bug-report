@@ -26,7 +26,7 @@ importers:
       '@base-ui/react':
         specifier: ^1.8.0
         version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@dymcode/shared':
+      '@bugping/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@paddle/paddle-js':
@@ -78,10 +78,10 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
-      '@dymcode/db-tests':
+      '@bugping/db-tests':
         specifier: workspace:*
         version: link:../../supabase/tests
-      '@dymcode/widget':
+      '@bugping/widget':
         specifier: workspace:*
         version: link:../../packages/widget
       '@electric-sql/pglite':
@@ -134,7 +134,7 @@ importers:
         specifier: ^4.7.0
         version: 4.7.0
     devDependencies:
-      '@dymcode/shared':
+      '@bugping/shared':
         specifier: workspace:*
         version: link:../shared
       '@playwright/test':
@@ -164,7 +164,7 @@ importers:
 
   supabase/tests:
     devDependencies:
-      '@dymcode/shared':
+      '@bugping/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@electric-sql/pglite':

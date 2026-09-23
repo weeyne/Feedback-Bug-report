@@ -17,7 +17,7 @@ export default defineConfig({
     target: 'es2019',
     lib: {
       entry: 'src/entry.ts',
-      name: 'DymcodeWidget',
+      name: 'BugpingWidget',
       formats: ['iife'],
       fileName: () => 'widget.js',
     },

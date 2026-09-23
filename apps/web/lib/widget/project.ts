@@ -1,4 +1,4 @@
-import { PUBLIC_KEY_PATTERN, type WidgetLocale, type WidgetPosition } from '@dymcode/shared';
+import { PUBLIC_KEY_PATTERN, type WidgetLocale, type WidgetPosition } from '@bugping/shared';
 import type { Db, Row } from '../db/types';
 
 export interface ProjectRow extends Row {

@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 async function testDeps(): Promise<TestModeDeps | null> {
-  if (getEnv().DYMCODE_TEST_MODE !== '1') return null;
+  if (getEnv().BUGPING_TEST_MODE !== '1') return null;
   return (await getDeps()) as TestModeDeps;
 }
 

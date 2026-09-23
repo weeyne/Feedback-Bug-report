@@ -1,4 +1,4 @@
-import { createUser, withTx, type TestDb } from '@dymcode/db-tests/harness';
+import { createUser, withTx, type TestDb } from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import { PADDLE_ENV, VALID_ENV } from '@/test/fixtures';
 import type { DashDeps } from '../dashboard/result';

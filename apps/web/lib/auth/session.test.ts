@@ -33,7 +33,7 @@ describe('getSessionUser', () => {
 
   it('trusts the e2e cookie in test mode outside production', async () => {
     vi.stubEnv('NODE_ENV', 'test');
-    vi.mocked(getEnv).mockReturnValue({ DYMCODE_TEST_MODE: '1' } as ReturnType<typeof getEnv>);
+    vi.mocked(getEnv).mockReturnValue({ BUGPING_TEST_MODE: '1' } as ReturnType<typeof getEnv>);
     const raw = JSON.stringify({ id: '8c0e2f36-3c5e-4f63-9d5b-0a4d1b1f6a10', email: 'a@b.co' });
     vi.mocked(cookies).mockResolvedValue({
       get: () => ({ name: 'e2e_user', value: raw }),
@@ -46,9 +46,9 @@ describe('getSessionUser', () => {
     expect(createSupabaseServerClient).not.toHaveBeenCalled();
   });
 
-  it('ignores the e2e cookie in production even when DYMCODE_TEST_MODE=1', async () => {
+  it('ignores the e2e cookie in production even when BUGPING_TEST_MODE=1', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.mocked(getEnv).mockReturnValue({ DYMCODE_TEST_MODE: '1' } as ReturnType<typeof getEnv>);
+    vi.mocked(getEnv).mockReturnValue({ BUGPING_TEST_MODE: '1' } as ReturnType<typeof getEnv>);
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getClaims: async () => ({ data: null }) },
     } as unknown as Awaited<ReturnType<typeof createSupabaseServerClient>>);

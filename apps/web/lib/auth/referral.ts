@@ -1,4 +1,4 @@
-import { PUBLIC_KEY_PATTERN } from '@dymcode/shared';
+import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import type { Db } from '../db/types';
 
 /**

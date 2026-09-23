@@ -1,5 +1,5 @@
 // Registers the shared bot webhook. Usage:
-//   pnpm --filter @dymcode/web telegram:set-webhook https://your-domain/api/telegram/webhook
+//   pnpm --filter @bugping/web telegram:set-webhook https://your-domain/api/telegram/webhook
 // Reads TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET from the environment or apps/web/.env.local.
 // Never prints secrets.
 import { existsSync, readFileSync } from 'node:fs';
@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 const url = process.argv[2];
 if (!url || !url.startsWith('https://')) {
   console.error(
-    'Usage: pnpm --filter @dymcode/web telegram:set-webhook https://<domain>/api/telegram/webhook',
+    'Usage: pnpm --filter @bugping/web telegram:set-webhook https://<domain>/api/telegram/webhook',
   );
   process.exit(1);
 }

@@ -1,4 +1,4 @@
-import { SubmitPayloadSchema, type ClientMetadata, type WidgetConfig } from '@dymcode/shared';
+import { SubmitPayloadSchema, type ClientMetadata, type WidgetConfig } from '@bugping/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { buildPayload, fetchConfig, submitFeedback } from './api';
 

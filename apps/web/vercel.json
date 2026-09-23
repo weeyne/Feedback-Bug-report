@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd ../.. && pnpm --filter @dymcode/widget build && pnpm --filter @dymcode/web build",
+  "buildCommand": "cd ../.. && pnpm --filter @bugping/widget build && pnpm --filter @bugping/web build",
   "regions": ["lhr1"],
   "crons": [{ "path": "/api/cron/retention", "schedule": "0 3 * * *" }]
 }

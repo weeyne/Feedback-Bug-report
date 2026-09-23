@@ -1,8 +1,8 @@
-import { FEEDBACK_TYPES, type FeedbackType } from '@dymcode/shared/constants';
+import { FEEDBACK_TYPES, type FeedbackType } from '@bugping/shared/constants';
 import type { IdentifiedUser } from './context/metadata';
 import type { WidgetHandle } from './ui/mount';
 
-export interface DymcodeApi {
+export interface BugpingApi {
   open(type?: FeedbackType): void;
   identify(user: IdentifiedUser): void;
 }
@@ -20,8 +20,8 @@ function isIdentifiedUser(value: unknown): value is IdentifiedUser {
   );
 }
 
-/** `window.Dymcode`. Every method swallows errors: host pages must never see ours. */
-export function createPublicApi(state: ApiState, warn: (message: string) => void): DymcodeApi {
+/** `window.Bugping`. Every method swallows errors: host pages must never see ours. */
+export function createPublicApi(state: ApiState, warn: (message: string) => void): BugpingApi {
   return {
     open(type) {
       try {

@@ -6,7 +6,7 @@ const dest = new URL('../public/w/', import.meta.url);
 
 if (!existsSync(new URL('widget.js', src))) {
   console.error(
-    'packages/widget/dist/widget.js not found. Run: pnpm --filter @dymcode/widget build',
+    'packages/widget/dist/widget.js not found. Run: pnpm --filter @bugping/widget build',
   );
   process.exit(1);
 }

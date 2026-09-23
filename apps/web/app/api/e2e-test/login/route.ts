@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 /** E2E only: signs in as (and creates if needed) the user with the given email. */
 export async function POST(request: Request) {
-  if (getEnv().DYMCODE_TEST_MODE !== '1') return json({ error: 'not found' }, 404);
+  if (getEnv().BUGPING_TEST_MODE !== '1') return json({ error: 'not found' }, 404);
   const { email } = (await request.json()) as { email: string };
   const { db } = await getDeps();
   let [user] = await db.query<{ id: string }>('select id from auth.users where email = $1', [

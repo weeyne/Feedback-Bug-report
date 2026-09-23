@@ -1,6 +1,6 @@
-import type { ClientMetadata, ConsoleError } from '@dymcode/shared';
+import type { ClientMetadata, ConsoleError } from '@bugping/shared';
 
-/** What the host page passed to `Dymcode.identify()`. */
+/** What the host page passed to `Bugping.identify()`. */
 export interface IdentifiedUser {
   email?: string;
   id?: string;

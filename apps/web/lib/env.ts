@@ -1,4 +1,4 @@
-import { PUBLIC_KEY_PATTERN } from '@dymcode/shared';
+import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { z } from 'zod';
 
 /** Vercel sometimes stores an unset variable as an empty string; treat that as unset. */
@@ -9,7 +9,7 @@ function optionalWhenEmpty<T extends z.ZodTypeAny>(schema: T) {
 const EnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
-  NEXT_PUBLIC_DYMCODE_PROJECT_KEY: z.string().regex(PUBLIC_KEY_PATTERN).optional(),
+  NEXT_PUBLIC_BUGPING_PROJECT_KEY: z.string().regex(PUBLIC_KEY_PATTERN).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//),
   NEXT_PUBLIC_APP_URL: z.url(),
@@ -21,7 +21,7 @@ const EnvSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/),
   TELEGRAM_BOT_USERNAME: z.string().regex(/^\w{5,32}$/),
   TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/),
-  DYMCODE_TEST_MODE: z.enum(['0', '1']).optional(),
+  BUGPING_TEST_MODE: z.enum(['0', '1']).optional(),
   PADDLE_API_KEY: optionalWhenEmpty(z.string().min(20)),
   PADDLE_WEBHOOK_SECRET: optionalWhenEmpty(z.string().min(16)),
   PADDLE_PRICE_MONTHLY: optionalWhenEmpty(z.string().regex(/^pri_\w+$/)),

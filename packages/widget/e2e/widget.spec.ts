@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('trigger keeps its own styles despite hostile host CSS', async ({ page }) => {
   await page.goto('/dev/built.html');
-  const trigger = page.locator('[data-dymcode] .dc-trigger');
+  const trigger = page.locator('[data-bugping] .bp-trigger');
   await expect(trigger).toHaveText('Feedback');
   const style = await trigger.evaluate((el) => {
     const cs = getComputedStyle(el);
@@ -13,8 +13,8 @@ test('trigger keeps its own styles despite hostile host CSS', async ({ page }) =
 
 test('submits feedback with a screenshot to the API', async ({ page }) => {
   await page.goto('/dev/built.html');
-  await page.locator('.dc-trigger').click();
-  await expect(page.locator('.dc-thumb')).toHaveAttribute('data-state', 'ready', {
+  await page.locator('.bp-trigger').click();
+  await expect(page.locator('.bp-thumb')).toHaveAttribute('data-state', 'ready', {
     timeout: 15_000,
   });
   const probe = await page.locator('#mask-probe').evaluate((el) => {
@@ -22,10 +22,10 @@ test('submits feedback with a screenshot to the API', async ({ page }) => {
     return { x: r.x, y: r.y, w: r.width, h: r.height, viewport: window.innerWidth };
   });
   expect(probe.w).toBeGreaterThan(20);
-  await page.locator('.dc-message').fill('The pricing button does nothing');
+  await page.locator('.bp-message').fill('The pricing button does nothing');
   await page.waitForTimeout(2100); // the bot guard drops submissions faster than 2s
-  await page.locator('.dc-send').click();
-  await expect(page.locator('.dc-thanks')).toBeVisible();
+  await page.locator('.bp-send').click();
+  await expect(page.locator('.bp-thanks')).toBeVisible();
 
   const last = await (await page.request.get('/__mock/last-submission')).json();
   expect(last.status).toBe(201);
@@ -62,21 +62,21 @@ test('submits feedback with a screenshot to the API', async ({ page }) => {
   expect(darkShare).toBeGreaterThanOrEqual(0.95);
 });
 
-test('hidden trigger can be opened through window.Dymcode', async ({ page }) => {
+test('hidden trigger can be opened through window.Bugping', async ({ page }) => {
   await page.goto('/dev/built-hidden.html');
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
-        if (document.querySelector('[data-dymcode]')) resolve();
-        else window.addEventListener('dymcode:ready', () => resolve(), { once: true });
+        if (document.querySelector('[data-bugping]')) resolve();
+        else window.addEventListener('bugping:ready', () => resolve(), { once: true });
       }),
   );
-  await expect(page.locator('.dc-trigger')).toHaveCount(0);
+  await expect(page.locator('.bp-trigger')).toHaveCount(0);
   await page.evaluate(() =>
-    (window as unknown as { Dymcode: { open(t: string): void } }).Dymcode.open('idea'),
+    (window as unknown as { Bugping: { open(t: string): void } }).Bugping.open('idea'),
   );
-  await expect(page.locator('.dc-panel')).toBeVisible();
-  await expect(page.locator('.dc-type[data-type="idea"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.bp-panel')).toBeVisible();
+  await expect(page.locator('.bp-type[data-type="idea"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
 type Rgb = [number, number, number];
@@ -89,14 +89,14 @@ async function submitAndSample(
   page: import('@playwright/test').Page,
   points: Array<[number, number]>,
 ) {
-  await page.locator('.dc-trigger').click();
-  await expect(page.locator('.dc-thumb')).toHaveAttribute('data-state', 'ready', {
+  await page.locator('.bp-trigger').click();
+  await expect(page.locator('.bp-thumb')).toHaveAttribute('data-state', 'ready', {
     timeout: 15_000,
   });
-  await page.locator('.dc-message').fill('Capture check');
+  await page.locator('.bp-message').fill('Capture check');
   await page.waitForTimeout(2100);
-  await page.locator('.dc-send').click();
-  await expect(page.locator('.dc-thanks')).toBeVisible();
+  await page.locator('.bp-send').click();
+  await expect(page.locator('.bp-thanks')).toBeVisible();
   // points are fractions of the image size; pixels are composited over #123456 so transparency shows.
   return page.evaluate(async (pts) => {
     const res = await fetch('/__mock/last-screenshot');
@@ -131,7 +131,7 @@ test('captures exactly the viewport of a scrolled page, including fixed elements
   page,
 }) => {
   await page.goto('/dev/scrolled.html');
-  await expect(page.locator('[data-dymcode] .dc-trigger')).toBeVisible();
+  await expect(page.locator('[data-bugping] .bp-trigger')).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 2000));
   const viewport = page.viewportSize()!;
   const shot = await submitAndSample(page, [
@@ -148,7 +148,7 @@ test('captures exactly the viewport of a scrolled page, including fixed elements
 
 test('fills a white background when the page has none', async ({ page }) => {
   await page.goto('/dev/transparent.html');
-  await expect(page.locator('[data-dymcode] .dc-trigger')).toBeVisible();
+  await expect(page.locator('[data-bugping] .bp-trigger')).toBeVisible();
   const shot = await submitAndSample(page, [[0.3, 0.8]]);
   expect(near(shot.pixels[0]!, [255, 255, 255])).toBe(true);
 });

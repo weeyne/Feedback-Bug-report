@@ -37,14 +37,14 @@ test('onboarding: create a project, receive the first feedback, resolve it', asy
 
   const host = await context.newPage();
   await host.goto(`/e2e-host?key=${key}`);
-  await host.locator('[data-dymcode] .dc-trigger').click();
-  await expect(host.locator('.dc-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
+  await host.locator('[data-bugping] .bp-trigger').click();
+  await expect(host.locator('.bp-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
     timeout: 15_000,
   });
-  await host.locator('.dc-message').fill('E2E: the cart button does nothing');
+  await host.locator('.bp-message').fill('E2E: the cart button does nothing');
   await host.waitForTimeout(2100); // bot guard
-  await host.locator('.dc-send').click();
-  await expect(host.locator('.dc-thanks')).toBeVisible();
+  await host.locator('.bp-send').click();
+  await expect(host.locator('.bp-thanks')).toBeVisible();
   await host.close();
 
   await expect(page.getByTestId('install-received')).toBeVisible({ timeout: 15_000 });
@@ -68,15 +68,15 @@ test('settings: color and locale update the preview and the public config', asyn
   const { key, projectId } = await createProject(page, 'E2E Settings');
   await page.goto(`/app/p/${projectId}/settings`);
   const preview = page.getByTestId('widget-preview');
-  await expect(preview.locator('[data-dymcode]')).toBeAttached({ timeout: 15_000 });
+  await expect(preview.locator('[data-bugping]')).toBeAttached({ timeout: 15_000 });
 
   await page.getByTestId('settings-color-hex').fill('#ff0055');
   await page.getByTestId('settings-locale').selectOption('ru');
   await expect
     .poll(() =>
-      preview.locator('[data-dymcode]').evaluate((host) => {
-        const root = host.shadowRoot?.querySelector<HTMLElement>('.dc-root');
-        return `${root?.style.getPropertyValue('--dc-accent')}|${root?.getAttribute('lang')}`;
+      preview.locator('[data-bugping]').evaluate((host) => {
+        const root = host.shadowRoot?.querySelector<HTMLElement>('.bp-root');
+        return `${root?.style.getPropertyValue('--bp-accent')}|${root?.getAttribute('lang')}`;
       }),
     )
     .toBe('#ff0055|ru');

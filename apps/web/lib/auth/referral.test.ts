@@ -1,4 +1,4 @@
-import { createProject, createUser, withTx, type TestDb } from '@dymcode/db-tests/harness';
+import { createProject, createUser, withTx, type TestDb } from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import { attributeReferral } from './referral';
 

@@ -5,7 +5,7 @@ import {
   WIDGET_LOCALES,
   WIDGET_POSITIONS,
   type WidgetLocale,
-} from '@dymcode/shared';
+} from '@bugping/shared';
 import { z } from 'zod';
 import { withUser } from '../db/with-user';
 import { utf8ByteLength } from './bytes';

@@ -1,4 +1,4 @@
-import type { FeedbackMetadata, FeedbackType } from '@dymcode/shared';
+import type { FeedbackMetadata, FeedbackType } from '@bugping/shared';
 import { z } from 'zod';
 import { ENTITLEMENTS } from '../billing/plans';
 import type { Row } from '../db/types';

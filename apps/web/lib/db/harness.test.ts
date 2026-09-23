@@ -1,4 +1,4 @@
-import { withTx } from '@dymcode/db-tests/harness';
+import { withTx } from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import type { Db } from './types';
 

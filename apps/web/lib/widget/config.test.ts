@@ -4,8 +4,8 @@ import {
   grantPro,
   withTx,
   type TestDb,
-} from '@dymcode/db-tests/harness';
-import { WidgetConfigSchema } from '@dymcode/shared';
+} from '@bugping/db-tests/harness';
+import { WidgetConfigSchema } from '@bugping/shared';
 import { describe, expect, it } from 'vitest';
 import { handleConfig } from './config';
 
@@ -22,7 +22,7 @@ async function projectWithSettings(db: TestDb, pro: boolean) {
   if (pro) await grantPro(db, owner);
   const project = await createProject(db, owner, 'Acme');
   await db.query(
-    `update public.projects set hide_badge = true, custom_css = '.dc-trigger{border-radius:0}',
+    `update public.projects set hide_badge = true, custom_css = '.bp-trigger{border-radius:0}',
        locale = 'uk', primary_color = '#ff0066', trigger_text = 'Help' where id = $1`,
     [project.id],
   );
@@ -59,7 +59,7 @@ describe('handleConfig', () => {
       const project = await projectWithSettings(db, true);
       const body = await (await get(db, project.public_key)).json();
       expect(body.showBadge).toBe(false);
-      expect(body.customCss).toBe('.dc-trigger{border-radius:0}');
+      expect(body.customCss).toBe('.bp-trigger{border-radius:0}');
     }));
 
   it('sends cache and CORS headers', () =>

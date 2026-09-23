@@ -16,13 +16,13 @@ const state = async (page: Page): Promise<State> =>
 
 async function submitFromWidget(page: Page, key: string, message: string) {
   await page.goto(`/e2e-host?key=${key}`);
-  await page.locator('[data-dymcode] .dc-trigger').click();
-  await expect(page.locator('.dc-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
+  await page.locator('[data-bugping] .bp-trigger').click();
+  await expect(page.locator('.bp-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
     timeout: 15_000,
   });
-  await page.locator('.dc-message').fill(message);
+  await page.locator('.bp-message').fill(message);
   await page.waitForTimeout(2100); // bot guard
-  await page.locator('.dc-send').click();
+  await page.locator('.bp-send').click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -31,7 +31,7 @@ test.beforeEach(async ({ page }) => {
 
 test('a widget submission reaches Telegram and Discord with the screenshot', async ({ page }) => {
   await submitFromWidget(page, 'pk_E2eE2eE2eE2e1234', 'E2E: checkout is broken');
-  await expect(page.locator('.dc-thanks')).toBeVisible();
+  await expect(page.locator('.bp-thanks')).toBeVisible();
   await expect.poll(async () => (await state(page)).outbox.length, { timeout: 15_000 }).toBe(2);
   const { outbox, feedback } = await state(page);
 
@@ -59,7 +59,7 @@ test('the 21st Free submission is hidden and triggers one quota notice per chann
 }) => {
   await page.request.post('/api/e2e-test/usage', { data: { count: 20 } });
   await submitFromWidget(page, 'pk_E2eE2eE2eE2e1234', 'E2E: over the limit');
-  await expect(page.locator('.dc-thanks')).toBeVisible();
+  await expect(page.locator('.bp-thanks')).toBeVisible();
   await expect.poll(async () => (await state(page)).outbox.length, { timeout: 15_000 }).toBe(2);
   const { outbox, feedback } = await state(page);
   for (const entry of outbox) {
@@ -71,7 +71,7 @@ test('the 21st Free submission is hidden and triggers one quota notice per chann
 
 test('a disallowed origin is rejected and nothing is sent', async ({ page }) => {
   await submitFromWidget(page, 'pk_E2eE2eE2eOrig567', 'E2E: wrong origin');
-  await expect(page.locator('.dc-status')).toHaveText("Couldn't send. Try again later.");
+  await expect(page.locator('.bp-status')).toHaveText("Couldn't send. Try again later.");
   await page.waitForTimeout(1000);
   const { outbox, feedback } = await state(page);
   expect(outbox).toEqual([]);

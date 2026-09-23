@@ -1,5 +1,5 @@
 {
-  "name": "@dymcode/web",
+  "name": "@bugping/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "copy-widget": "node scripts/copy-widget.mjs",
-    "dev": "pnpm --filter @dymcode/widget build && pnpm copy-widget && next dev",
+    "dev": "pnpm --filter @bugping/widget build && pnpm copy-widget && next dev",
     "build": "pnpm copy-widget && next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
-    "@dymcode/shared": "workspace:*",
+    "@bugping/shared": "workspace:*",
     "@paddle/paddle-js": "^1.6.5",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
@@ -37,8 +37,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@dymcode/db-tests": "workspace:*",
-    "@dymcode/widget": "workspace:*",
+    "@bugping/db-tests": "workspace:*",
+    "@bugping/widget": "workspace:*",
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",

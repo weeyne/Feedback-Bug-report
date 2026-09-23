@@ -1,4 +1,4 @@
-import { createProject, createUser, withTx } from '@dymcode/db-tests/harness';
+import { createProject, createUser, withTx } from '@bugping/db-tests/harness';
 import { describe, expect, it } from 'vitest';
 import { withUser } from './with-user';
 

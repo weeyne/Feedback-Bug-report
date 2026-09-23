@@ -1,4 +1,4 @@
-import { PUBLIC_KEY_PATTERN } from '@dymcode/shared';
+import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -11,7 +11,7 @@ interface AuthResult {
 }
 
 async function currentUser(request: NextRequest, response: NextResponse): Promise<AuthResult> {
-  if (process.env.DYMCODE_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
+  if (process.env.BUGPING_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
     try {
       const userId = JSON.parse(request.cookies.get('e2e_user')?.value ?? 'null')?.id ?? null;
       return { userId, response };

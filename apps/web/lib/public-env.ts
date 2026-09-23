@@ -1,4 +1,4 @@
-import { PUBLIC_KEY_PATTERN } from '@dymcode/shared';
+import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { z } from 'zod';
 
 const PublicEnvSchema = z.object({
@@ -7,7 +7,7 @@ const PublicEnvSchema = z.object({
     .optional()
     .transform((value) => (value ? value.replace(/\/+$/, '') : 'http://localhost:3000'))
     .pipe(z.url()),
-  dymcodeProjectKey: z
+  bugpingProjectKey: z
     .string()
     .optional()
     .transform((value) => (value ? value : undefined))
@@ -16,7 +16,7 @@ const PublicEnvSchema = z.object({
 
 export interface PublicEnv {
   appUrl: string;
-  dymcodeProjectKey?: string;
+  bugpingProjectKey?: string;
 }
 
 /**
@@ -33,7 +33,7 @@ export function getPublicEnv(): PublicEnv {
   }
   const result = PublicEnvSchema.safeParse({
     appUrl: process.env.NEXT_PUBLIC_APP_URL,
-    dymcodeProjectKey: process.env.NEXT_PUBLIC_DYMCODE_PROJECT_KEY,
+    bugpingProjectKey: process.env.NEXT_PUBLIC_BUGPING_PROJECT_KEY,
   });
   if (!result.success) {
     const names = [...new Set(result.error.issues.map((issue) => issue.path.join('.')))];

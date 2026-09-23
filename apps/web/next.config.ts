@@ -4,7 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const config: NextConfig = {
-  transpilePackages: ['@dymcode/shared'],
+  transpilePackages: ['@bugping/shared'],
   serverExternalPackages: ['@electric-sql/pglite'],
   // `pnpm typecheck` (tsc) is the type gate; Next's built-in checker may not support TS 7.
   typescript: { ignoreBuildErrors: true },

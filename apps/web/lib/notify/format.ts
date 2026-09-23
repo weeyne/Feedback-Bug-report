@@ -1,4 +1,4 @@
-import type { FeedbackType } from '@dymcode/shared';
+import type { FeedbackType } from '@bugping/shared';
 import type { FeedbackMessage } from './types';
 
 export const TYPE_STYLE: Record<FeedbackType, { emoji: string; label: string; color: number }> = {

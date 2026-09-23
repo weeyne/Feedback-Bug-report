@@ -1,4 +1,4 @@
-import { buildBadgeUrl, type WidgetConfig } from '@dymcode/shared';
+import { buildBadgeUrl, type WidgetConfig } from '@bugping/shared';
 import type { Db } from '../db/types';
 import type { Env } from '../env';
 import { corsHeaders, json } from '../http';

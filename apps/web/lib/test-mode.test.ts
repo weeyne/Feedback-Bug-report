@@ -5,13 +5,13 @@ import { assertTestModeAllowed, createTestModeDeps, E2E_PROJECT_KEY } from './te
 
 describe('test mode', () => {
   it('refuses to run in production', () => {
-    const env = parseEnv({ ...VALID_ENV, DYMCODE_TEST_MODE: '1' });
+    const env = parseEnv({ ...VALID_ENV, BUGPING_TEST_MODE: '1' });
     expect(() => assertTestModeAllowed(env, 'production')).toThrow(/production/);
     expect(() => assertTestModeAllowed(env, 'development')).not.toThrow();
   });
 
   it('boots an in-memory database with seeded projects and records outbound calls', async () => {
-    const deps = await createTestModeDeps(parseEnv({ ...VALID_ENV, DYMCODE_TEST_MODE: '1' }));
+    const deps = await createTestModeDeps(parseEnv({ ...VALID_ENV, BUGPING_TEST_MODE: '1' }));
     const [project] = await deps.db.query<{ name: string }>(
       'select name from public.projects where public_key = $1',
       [E2E_PROJECT_KEY],

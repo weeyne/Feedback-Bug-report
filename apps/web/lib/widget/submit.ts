@@ -5,7 +5,7 @@ import {
   SCREENSHOT_MIME_TYPES,
   SubmitPayloadSchema,
   type FeedbackMetadata,
-} from '@dymcode/shared';
+} from '@bugping/shared';
 import { UAParser } from 'ua-parser-js';
 import { ENTITLEMENTS } from '../billing/plans';
 import type { Db } from '../db/types';

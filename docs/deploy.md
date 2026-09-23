@@ -29,8 +29,8 @@ Never commit secrets: every value below is entered in the Vercel or Supabase das
      packages (`packages/*`) and `supabase/` (migrations, PGlite bootstrap) live outside `apps/web` and are needed
      by the build and by the workspace's `pnpm` install.
 3. Build command, function region and Node version live in the repo, not the dashboard:
-   - `apps/web/vercel.json` sets `buildCommand` (`cd ../.. && pnpm --filter @dymcode/widget build && pnpm --filter
-     @dymcode/web build`). It must be in `vercel.json`: when Vercel detects Turborepo it replaces a dashboard build
+   - `apps/web/vercel.json` sets `buildCommand` (`cd ../.. && pnpm --filter @bugping/widget build && pnpm --filter
+     @bugping/web build`). It must be in `vercel.json`: when Vercel detects Turborepo it replaces a dashboard build
      command with plain `next build`, which skips the widget and leaves `/w/widget.js` returning 404.
    - `apps/web/vercel.json` sets `regions: ["lhr1"]` (London), next to the Supabase `eu-west-2` pooler. Each dashboard
      page makes several DB round trips, so a region mismatch is noticeable latency. Change it if the Supabase
@@ -47,8 +47,8 @@ Never commit secrets: every value below is entered in the Vercel or Supabase das
    - `NEXT_PUBLIC_APP_URL`: `https://<domain>` (no trailing slash)
    - `SECRETS_ENCRYPTION_KEY`, `IP_HASH_SALT`, `CRON_SECRET`
    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
-   - `NEXT_PUBLIC_DYMCODE_PROJECT_KEY` (optional): the public key of your own Dymcode project, for the landing widget
-   - Do NOT set `DYMCODE_TEST_MODE`.
+   - `NEXT_PUBLIC_BUGPING_PROJECT_KEY` (optional): the public key of your own Dymcode project, for the landing widget
+   - Do NOT set `BUGPING_TEST_MODE`.
    - **Scope all of the above to Production only.** Preview deployments would otherwise read the production
      database and send magic-link/OAuth redirects to the production domain. Either leave Preview without these
      variables (previews then fail to boot, which is acceptable for now) or point a Preview-scoped copy at a
@@ -71,7 +71,7 @@ Production, as above.
 After the first successful deploy:
 
 ```bash
-pnpm --filter @dymcode/web telegram:set-webhook https://<domain>/api/telegram/webhook
+pnpm --filter @bugping/web telegram:set-webhook https://<domain>/api/telegram/webhook
 ```
 
 The script reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` from `apps/web/.env.local`.
@@ -117,6 +117,6 @@ Notifications → the events log of the destination.
 - [ ] Sign in with GitHub; sign out; sign in with a magic link. Open the magic link in the **same browser** that
       requested it — Supabase Auth uses PKCE, so the code verifier only exists in that browser's storage.
 - [ ] Create a project, copy the snippet, connect Telegram (private chat) and Discord.
-- [ ] Submit feedback from the landing widget (set `NEXT_PUBLIC_DYMCODE_PROJECT_KEY` to that project and redeploy)
+- [ ] Submit feedback from the landing widget (set `NEXT_PUBLIC_BUGPING_PROJECT_KEY` to that project and redeploy)
       or from any page with the snippet: the report arrives in Telegram with a screenshot and appears in the feed.
 - [ ] Vercel → Settings → Cron Jobs lists `/api/cron/retention`.

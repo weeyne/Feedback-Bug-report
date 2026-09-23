@@ -39,10 +39,10 @@ Supabase provides. CI runs the same tests against a real Supabase stack.
 loaded screenshot module (`dist/screenshot.js`).
 
 ```bash
-pnpm --filter @dymcode/widget dev     # dev page with a mock API at http://localhost:5173/dev/index.html
-pnpm --filter @dymcode/widget build   # dist/widget.js + dist/screenshot.js
-pnpm --filter @dymcode/widget size    # enforce the size budget
-pnpm --filter @dymcode/widget e2e     # Playwright smoke tests against the built bundle
+pnpm --filter @bugping/widget dev     # dev page with a mock API at http://localhost:5173/dev/index.html
+pnpm --filter @bugping/widget build   # dist/widget.js + dist/screenshot.js
+pnpm --filter @bugping/widget size    # enforce the size budget
+pnpm --filter @bugping/widget e2e     # Playwright smoke tests against the built bundle
 ```
 
 Embed:
@@ -51,17 +51,17 @@ Embed:
 <script async src="https://dymcode.vercel.app/w/widget.js" data-project-id="pk_…"></script>
 ```
 
-Host page API: `Dymcode.open('bug' | 'idea' | 'general')`, `Dymcode.identify({ email, id, name })`,
-and the `dymcode:ready` window event. Add `data-hide-trigger` to hide the floating button.
+Host page API: `Bugping.open('bug' | 'idea' | 'general')`, `Bugping.identify({ email, id, name })`,
+and the `bugping:ready` window event. Add `data-hide-trigger` to hide the floating button.
 
 ## Web app and API (`apps/web`)
 
 Next.js app serving the public widget API, notifications, the Telegram webhook and the retention cron.
 
 ```bash
-pnpm --filter @dymcode/web dev     # builds the widget, copies it to public/w/, starts next dev (needs apps/web/.env.local)
-pnpm --filter @dymcode/web test    # unit + DB tests on PGlite (no Docker, no .env.local needed)
-pnpm --filter @dymcode/web e2e     # widget → API → notification E2E in test mode (fake env, in-memory DB)
+pnpm --filter @bugping/web dev     # builds the widget, copies it to public/w/, starts next dev (needs apps/web/.env.local)
+pnpm --filter @bugping/web test    # unit + DB tests on PGlite (no Docker, no .env.local needed)
+pnpm --filter @bugping/web e2e     # widget → API → notification E2E in test mode (fake env, in-memory DB)
 ```
 
 Endpoints: `GET /api/v1/widget/config`, `POST /api/v1/widget/submit`, `POST /api/telegram/webhook`,
@@ -72,7 +72,7 @@ minute per project.
 After deploying, register the shared bot webhook:
 
 ```bash
-pnpm --filter @dymcode/web telegram:set-webhook https://<your-domain>/api/telegram/webhook
+pnpm --filter @bugping/web telegram:set-webhook https://<your-domain>/api/telegram/webhook
 ```
 
 ## Dashboard

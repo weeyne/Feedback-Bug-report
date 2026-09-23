@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** E2E only: sets this month's submission count for the seeded owner. */
 export async function POST(request: Request) {
-  if (getEnv().DYMCODE_TEST_MODE !== '1') return json({ error: 'not found' }, 404);
+  if (getEnv().BUGPING_TEST_MODE !== '1') return json({ error: 'not found' }, 404);
   const deps = (await getDeps()) as TestModeDeps;
   const { count } = (await request.json()) as { count: number };
   await deps.db.query(

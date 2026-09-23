@@ -1,4 +1,4 @@
-import { ClientMetadataSchema } from '@dymcode/shared';
+import { ClientMetadataSchema } from '@bugping/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { collectMetadata, redactUrl } from './metadata';
 

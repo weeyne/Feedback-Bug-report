@@ -1,4 +1,4 @@
-import { PUBLIC_KEY_PATTERN } from '@dymcode/shared/constants';
+import { PUBLIC_KEY_PATTERN } from '@bugping/shared/constants';
 import { describe, expect, it } from 'vitest';
 import { withTx } from './db';
 import { createFeedback, createProject, createUser } from './fixtures';

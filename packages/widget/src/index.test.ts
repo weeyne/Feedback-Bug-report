@@ -19,7 +19,7 @@ function script(attrs: Record<string, string>) {
 
 const ready = () =>
   new Promise<void>((resolve) =>
-    window.addEventListener('dymcode:ready', () => resolve(), { once: true }),
+    window.addEventListener('bugping:ready', () => resolve(), { once: true }),
   );
 
 describe('boot', () => {
@@ -34,8 +34,8 @@ describe('boot', () => {
   });
 
   afterEach(() => {
-    delete (window as { Dymcode?: unknown }).Dymcode;
-    document.querySelectorAll('[data-dymcode]').forEach((el) => el.remove());
+    delete (window as { Bugping?: unknown }).Bugping;
+    document.querySelectorAll('[data-bugping]').forEach((el) => el.remove());
     vi.unstubAllGlobals();
     warn.mockRestore();
   });
@@ -46,17 +46,17 @@ describe('boot', () => {
       window,
       script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
-    expect(window.Dymcode).toBeDefined();
+    expect(window.Bugping).toBeDefined();
     await isReady;
     expect(fetch).toHaveBeenCalledWith(
       'https://dymcode.dev/api/v1/widget/config?key=pk_AbCdEfGh12345678',
       { credentials: 'omit' },
     );
-    const host = document.querySelector('[data-dymcode]')!;
-    expect(host.shadowRoot!.querySelector('.dc-trigger')).not.toBeNull();
+    const host = document.querySelector('[data-bugping]')!;
+    expect(host.shadowRoot!.querySelector('.bp-trigger')).not.toBeNull();
   });
 
-  it('respects data-hide-trigger and opens through window.Dymcode', async () => {
+  it('respects data-hide-trigger and opens through window.Bugping', async () => {
     const isReady = ready();
     boot(
       window,
@@ -67,11 +67,11 @@ describe('boot', () => {
       }),
     );
     await isReady;
-    const root = document.querySelector('[data-dymcode]')!.shadowRoot!;
-    expect(root.querySelector('.dc-trigger')).toBeNull();
-    (window.Dymcode as { open(type: string): void }).open('idea');
-    expect(root.querySelector<HTMLElement>('.dc-panel')!.hidden).toBe(false);
-    expect(root.querySelector('.dc-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe(
+    const root = document.querySelector('[data-bugping]')!.shadowRoot!;
+    expect(root.querySelector('.bp-trigger')).toBeNull();
+    (window.Bugping as { open(type: string): void }).open('idea');
+    expect(root.querySelector<HTMLElement>('.bp-panel')!.hidden).toBe(false);
+    expect(root.querySelector('.bp-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe(
       'true',
     );
   });
@@ -82,26 +82,26 @@ describe('boot', () => {
       window,
       script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
-    (window.Dymcode as { identify(u: object): void }).identify({ email: 'ann@example.com' });
+    (window.Bugping as { identify(u: object): void }).identify({ email: 'ann@example.com' });
     await isReady;
-    const root = document.querySelector('[data-dymcode]')!.shadowRoot!;
-    expect(root.querySelector<HTMLInputElement>('.dc-email')!.value).toBe('ann@example.com');
+    const root = document.querySelector('[data-bugping]')!.shadowRoot!;
+    expect(root.querySelector<HTMLInputElement>('.bp-email')!.value).toBe('ann@example.com');
   });
 
   it('does nothing without a project id', () => {
     boot(window, script({ src: 'https://dymcode.dev/w/widget.js' }));
-    expect(window.Dymcode).toBeUndefined();
+    expect(window.Bugping).toBeUndefined();
     expect(warn).toHaveBeenCalledOnce();
   });
 
   it('ignores a second include', () => {
     const existing = { open() {}, identify() {} };
-    (window as { Dymcode?: unknown }).Dymcode = existing;
+    (window as { Bugping?: unknown }).Bugping = existing;
     boot(
       window,
       script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
-    expect(window.Dymcode).toBe(existing);
+    expect(window.Bugping).toBe(existing);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -115,7 +115,7 @@ describe('boot', () => {
       script({ src: 'https://dymcode.dev/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
     );
     await vi.waitFor(() => expect(warn).toHaveBeenCalled());
-    expect(document.querySelector('[data-dymcode]')).toBeNull();
+    expect(document.querySelector('[data-bugping]')).toBeNull();
   });
 
   it('releases the console buffer when the config cannot load', async () => {
