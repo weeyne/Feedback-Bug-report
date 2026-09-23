@@ -34,6 +34,8 @@
     "faq3a": "Yes: hide ours with data-hide-trigger and call Dymcode.open().",
     "privacy": "Privacy",
     "terms": "Terms",
+    "refund": "Refunds",
+    "choosePlan": "Choose plan",
     "dashboard": "Dashboard"
   },
   "legal": {
@@ -45,11 +47,17 @@
     "privacy4": "IP addresses are never stored; only a salted hash is used inside short-lived rate-limit keys.",
     "privacy5": "Reports are delivered to the Telegram or Discord destinations the project owner configures.",
     "privacy6": "Account owners can delete projects or their whole account at any time; this removes all related data.",
+    "privacy7": "Payments are processed by Paddle.com; we do not see or store card details.",
     "termsTitle": "Terms of Service",
     "terms1": "Dymcode is provided as is. Do not use it to collect data you are not allowed to collect.",
     "terms2": "You are responsible for informing your site’s visitors about the widget in your own privacy policy.",
     "terms3": "Free plan limits may change with notice. Paid plans renew monthly until cancelled; Lifetime is a one-time payment.",
-    "terms4": "We may suspend accounts that abuse the service or its delivery channels."
+    "terms4": "We may suspend accounts that abuse the service or its delivery channels.",
+    "terms5": "Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.",
+    "refundTitle": "Refund Policy",
+    "refund1": "You can get a full refund within 14 days of the first payment of a subscription or of a Lifetime purchase.",
+    "refund2": "After that, a monthly subscription can be cancelled at any time and stays active until the end of the paid period.",
+    "refund3": "To request a refund, reply to your Paddle receipt email or contact us. Refunds are processed by Paddle, our Merchant of Record."
   },
   "common": {
     "save": "Save",
