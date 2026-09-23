@@ -5,10 +5,9 @@ const TIMEOUT_MS = 10_000;
 // Cancelling twice is not an error for us. Per developer.paddle.com/errors, the code for
 // "this subscription is already canceled" is `subscription_is_canceled_action_invalid`
 // (the brief's draft `subscription_is_canceled` does not exist in the Paddle API).
-const ALREADY_CANCELLED = new Set([
-  'subscription_is_canceled_action_invalid',
-  'subscription_locked_pending_changes',
-]);
+// `subscription_locked_pending_changes` means something ELSE — another scheduled change
+// is blocking this one — the subscription is NOT cancelled, so that code must still throw.
+const ALREADY_CANCELLED = new Set(['subscription_is_canceled_action_invalid']);
 
 export class PaddleError extends Error {
   constructor(

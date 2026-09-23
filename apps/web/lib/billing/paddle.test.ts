@@ -46,7 +46,7 @@ describe('Paddle client', () => {
     expect(calls[0]!.body).not.toHaveProperty('customer_id');
   });
 
-  it('cancels a subscription and treats an already-cancelled one as success', async () => {
+  it('cancels a subscription', async () => {
     const ok = fake(() => Response.json({ data: { id: 'sub_1' } }));
     await ok.client.cancelSubscription('sub_1', 'next_billing_period');
     expect(ok.calls[0]).toMatchObject({
@@ -54,15 +54,9 @@ describe('Paddle client', () => {
       method: 'POST',
       body: { effective_from: 'next_billing_period' },
     });
-    const already = fake(() =>
-      Response.json(
-        { error: { code: 'subscription_locked_pending_changes', detail: 'x' } },
-        { status: 400 },
-      ),
-    );
-    await expect(
-      already.client.cancelSubscription('sub_1', 'immediately'),
-    ).resolves.toBeUndefined();
+  });
+
+  it('treats an already-cancelled subscription as success', async () => {
     // Real Paddle code (developer.paddle.com/errors) for an already-canceled subscription;
     // the brief's draft `subscription_is_canceled` is not an actual Paddle error code.
     const canceled = fake(() =>
@@ -74,6 +68,21 @@ describe('Paddle client', () => {
     await expect(
       canceled.client.cancelSubscription('sub_1', 'immediately'),
     ).resolves.toBeUndefined();
+  });
+
+  it('rejects when another scheduled change blocks the cancellation', async () => {
+    // subscription_locked_pending_changes means a DIFFERENT scheduled change is blocking
+    // this request — the subscription is NOT cancelled, so this must surface as a failure,
+    // not be swallowed like the already-cancelled case above.
+    const locked = fake(() =>
+      Response.json(
+        { error: { code: 'subscription_locked_pending_changes', detail: 'x' } },
+        { status: 400 },
+      ),
+    );
+    const error = await locked.client.cancelSubscription('sub_1', 'immediately').catch((e) => e);
+    expect(error).toBeInstanceOf(PaddleError);
+    expect(error).toMatchObject({ status: 400, code: 'subscription_locked_pending_changes' });
   });
 
   it('returns the portal overview URL', async () => {
