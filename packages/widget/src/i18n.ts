@@ -1,4 +1,5 @@
 import type { FeedbackType, WidgetLocale } from '@bugping/shared/constants';
+import type { AnnotateMessages } from './annotate/types';
 
 export type Locale = Exclude<WidgetLocale, 'auto'>;
 
@@ -22,6 +23,27 @@ export interface Messages {
   close: string;
   /** Prefix before the product name in the badge. */
   poweredBy: string;
+  homeTitle: string;
+  homeSubtitle: string;
+  cards: Record<FeedbackType, string>;
+  cardHints: Record<FeedbackType, string>;
+  back: string;
+  shot: {
+    label: string;
+    capture: string;
+    file: string;
+    pasteHint: string;
+    annotate: string;
+    replace: string;
+    remove: string;
+    capturing: string;
+    captureFailed: string;
+    editorUnavailable: string;
+    notImage: string;
+    tooLarge: string;
+    decode: string;
+  };
+  annotate: AnnotateMessages;
 }
 
 export const MESSAGES: Record<Locale, Messages> = {
@@ -29,7 +51,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     title: 'Send feedback',
     types: { bug: 'Bug', idea: 'Idea', general: 'Other' },
     placeholders: {
-      bug: 'What happened?',
+      bug: 'What happened? What did you expect?',
       idea: "What's your idea?",
       general: "What's on your mind?",
     },
@@ -48,12 +70,49 @@ export const MESSAGES: Record<Locale, Messages> = {
     retry: 'Retry',
     close: 'Close',
     poweredBy: 'Powered by',
+    homeTitle: 'Hi 👋',
+    homeSubtitle: 'Found a problem or have an idea? Tell us.',
+    cards: {
+      bug: 'Report a bug',
+      idea: 'Suggest an idea',
+      general: 'Ask a question',
+    },
+    cardHints: {
+      bug: 'Something is broken',
+      idea: 'How to make it better',
+      general: "We'll reply by email",
+    },
+    back: 'Back',
+    shot: {
+      label: 'Screenshot',
+      capture: 'Capture this page',
+      file: 'Your file',
+      pasteHint: 'or paste (Ctrl+V) / drop an image here',
+      annotate: 'Annotate',
+      replace: 'Replace',
+      remove: 'Remove',
+      capturing: 'Capturing the page…',
+      captureFailed: "Couldn't capture the page",
+      editorUnavailable: 'Editor unavailable',
+      notImage: "That file isn't an image",
+      tooLarge: 'The image is too large',
+      decode: "Couldn't open the image",
+    },
+    annotate: {
+      rect: 'Rectangle',
+      pen: 'Pen',
+      hide: 'Hide',
+      undo: 'Undo',
+      done: 'Done',
+      cancel: 'Cancel',
+      canvas: 'Screenshot drawing area',
+    },
   },
   ru: {
     title: 'Отправить отзыв',
     types: { bug: 'Баг', idea: 'Идея', general: 'Другое' },
     placeholders: {
-      bug: 'Что случилось?',
+      bug: 'Что случилось? Что вы ожидали увидеть?',
       idea: 'Какая у вас идея?',
       general: 'Что вы хотите сказать?',
     },
@@ -72,12 +131,49 @@ export const MESSAGES: Record<Locale, Messages> = {
     retry: 'Повторить',
     close: 'Закрыть',
     poweredBy: 'Работает на',
+    homeTitle: 'Привет 👋',
+    homeSubtitle: 'Нашли проблему или есть идея? Расскажите нам.',
+    cards: {
+      bug: 'Сообщить о баге',
+      idea: 'Предложить идею',
+      general: 'Задать вопрос',
+    },
+    cardHints: {
+      bug: 'Что-то сломалось',
+      idea: 'Как сделать лучше',
+      general: 'Ответим на email',
+    },
+    back: 'Назад',
+    shot: {
+      label: 'Скриншот',
+      capture: 'Снять страницу',
+      file: 'Свой файл',
+      pasteHint: 'или вставьте (Ctrl+V) / перетащите картинку сюда',
+      annotate: 'Пометить',
+      replace: 'Заменить',
+      remove: 'Убрать',
+      capturing: 'Снимаем страницу…',
+      captureFailed: 'Не удалось снять страницу',
+      editorUnavailable: 'Редактор недоступен',
+      notImage: 'Этот файл не картинка',
+      tooLarge: 'Картинка слишком большая',
+      decode: 'Не удалось открыть картинку',
+    },
+    annotate: {
+      rect: 'Рамка',
+      pen: 'Карандаш',
+      hide: 'Скрыть',
+      undo: 'Отменить',
+      done: 'Готово',
+      cancel: 'Отмена',
+      canvas: 'Область рисования на скриншоте',
+    },
   },
   uk: {
     title: 'Надіслати відгук',
     types: { bug: 'Баг', idea: 'Ідея', general: 'Інше' },
     placeholders: {
-      bug: 'Що сталося?',
+      bug: 'Що сталося? Що ви очікували побачити?',
       idea: 'Яка у вас ідея?',
       general: 'Що ви хочете сказати?',
     },
@@ -96,12 +192,49 @@ export const MESSAGES: Record<Locale, Messages> = {
     retry: 'Повторити',
     close: 'Закрити',
     poweredBy: 'Працює на',
+    homeTitle: 'Привіт 👋',
+    homeSubtitle: 'Знайшли проблему чи маєте ідею? Розкажіть нам.',
+    cards: {
+      bug: 'Повідомити про баг',
+      idea: 'Запропонувати ідею',
+      general: 'Поставити запитання',
+    },
+    cardHints: {
+      bug: 'Щось зламалося',
+      idea: 'Як зробити краще',
+      general: 'Відповімо на email',
+    },
+    back: 'Назад',
+    shot: {
+      label: 'Скриншот',
+      capture: 'Зняти сторінку',
+      file: 'Свій файл',
+      pasteHint: 'або вставте (Ctrl+V) / перетягніть зображення сюди',
+      annotate: 'Позначити',
+      replace: 'Замінити',
+      remove: 'Прибрати',
+      capturing: 'Знімаємо сторінку…',
+      captureFailed: 'Не вдалося зняти сторінку',
+      editorUnavailable: 'Редактор недоступний',
+      notImage: 'Цей файл не зображення',
+      tooLarge: 'Зображення завелике',
+      decode: 'Не вдалося відкрити зображення',
+    },
+    annotate: {
+      rect: 'Рамка',
+      pen: 'Олівець',
+      hide: 'Приховати',
+      undo: 'Скасувати',
+      done: 'Готово',
+      cancel: 'Скасувати',
+      canvas: 'Область малювання на скриншоті',
+    },
   },
   es: {
     title: 'Enviar comentarios',
     types: { bug: 'Error', idea: 'Idea', general: 'Otro' },
     placeholders: {
-      bug: '¿Qué ha pasado?',
+      bug: '¿Qué pasó? ¿Qué esperabas?',
       idea: '¿Cuál es tu idea?',
       general: '¿Qué quieres contarnos?',
     },
@@ -120,6 +253,43 @@ export const MESSAGES: Record<Locale, Messages> = {
     retry: 'Reintentar',
     close: 'Cerrar',
     poweredBy: 'Con tecnología de',
+    homeTitle: 'Hola 👋',
+    homeSubtitle: '¿Encontraste un problema o tienes una idea? Cuéntanos.',
+    cards: {
+      bug: 'Informar de un error',
+      idea: 'Sugerir una idea',
+      general: 'Hacer una pregunta',
+    },
+    cardHints: {
+      bug: 'Algo no funciona',
+      idea: 'Cómo mejorarlo',
+      general: 'Te responderemos por email',
+    },
+    back: 'Atrás',
+    shot: {
+      label: 'Captura',
+      capture: 'Capturar la página',
+      file: 'Tu archivo',
+      pasteHint: 'o pega (Ctrl+V) / suelta una imagen aquí',
+      annotate: 'Anotar',
+      replace: 'Reemplazar',
+      remove: 'Quitar',
+      capturing: 'Capturando la página…',
+      captureFailed: 'No se pudo capturar la página',
+      editorUnavailable: 'Editor no disponible',
+      notImage: 'Ese archivo no es una imagen',
+      tooLarge: 'La imagen es demasiado grande',
+      decode: 'No se pudo abrir la imagen',
+    },
+    annotate: {
+      rect: 'Rectángulo',
+      pen: 'Lápiz',
+      hide: 'Ocultar',
+      undo: 'Deshacer',
+      done: 'Listo',
+      cancel: 'Cancelar',
+      canvas: 'Área de dibujo de la captura',
+    },
   },
 };
 

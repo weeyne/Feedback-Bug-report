@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FEEDBACK_TYPES } from '@bugping/shared/constants';
 import { MESSAGES, resolveLocale } from './i18n';
 
 describe('resolveLocale', () => {
@@ -37,6 +38,16 @@ describe('MESSAGES', () => {
       const flat = flatten(messages);
       expect(Object.keys(flat).sort()).toEqual(reference);
       for (const value of Object.values(flat)) expect(value.trim()).not.toBe('');
+    }
+  });
+
+  it('has a card, a hint and a placeholder for every feedback type', () => {
+    for (const messages of Object.values(MESSAGES)) {
+      for (const type of FEEDBACK_TYPES) {
+        expect(messages.cards[type]).toBeTruthy();
+        expect(messages.cardHints[type]).toBeTruthy();
+        expect(messages.placeholders[type]).toBeTruthy();
+      }
     }
   });
 });
