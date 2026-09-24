@@ -17,6 +17,7 @@ import {
   getFeedback,
   hiddenFeedbackCount,
   listFeedback,
+  newCountsByProject,
   screenshotUrl,
   setFeedbackStatus,
   statusCounts,
@@ -209,6 +210,34 @@ describe('feedback use cases', () => {
         resolved: 0,
         archived: 0,
       });
+    }));
+
+  it('counts new feedback per project in one query, excluding over-quota rows for free owners', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const a = await createProject(db, owner);
+      const b = await createProject(db, owner);
+      const empty = await createProject(db, owner);
+      await createFeedback(db, a.id, { message: 'a1' });
+      await createFeedback(db, a.id, { message: 'a2' });
+      await createFeedback(db, a.id, { message: 'a hidden', overQuota: true });
+      const resolvedId = await createFeedback(db, a.id, { message: 'a resolved' });
+      await db.query(`update public.feedback set status = 'resolved' where id = $1`, [resolvedId]);
+      await createFeedback(db, b.id, { message: 'b1' });
+      const other = await createUser(db);
+      const foreign = await createProject(db, other);
+      await createFeedback(db, foreign.id, { message: 'foreign' });
+
+      const counts = await newCountsByProject(deps, owner);
+      expect(counts).toEqual({ [a.id]: 2, [b.id]: 1 });
+      expect(counts[empty.id]).toBeUndefined();
+      // Matches the per-project statusCounts badge it replaces.
+      expect(counts[a.id]).toBe((await statusCounts(deps, owner, a.id)).new);
+
+      await grantPro(db, owner);
+      expect(await newCountsByProject(deps, owner)).toEqual({ [a.id]: 3, [b.id]: 1 });
+      expect(await newCountsByProject(deps, await createUser(db))).toEqual({});
     }));
 
   it('returns page, browser and email meta fields', () =>

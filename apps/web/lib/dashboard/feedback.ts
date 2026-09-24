@@ -169,6 +169,22 @@ export async function statusCounts(
   return counts;
 }
 
+/** `new` counts for every project the user can see, in one query. RLS scopes rows to the
+ * user's own projects and hides over-quota rows from Free owners, exactly like `statusCounts`.
+ * Projects without new feedback are absent from the result. */
+export async function newCountsByProject(
+  deps: DashDeps,
+  userId: string,
+): Promise<Record<string, number>> {
+  const rows = await withUser(deps.db, userId, (tx) =>
+    tx.query<{ project_id: string; n: number }>(
+      `select project_id, count(*)::int as n from public.feedback
+       where status = 'new' group by project_id`,
+    ),
+  );
+  return Object.fromEntries(rows.map((r) => [r.project_id, r.n]));
+}
+
 export async function hiddenFeedbackCount(
   deps: DashDeps,
   userId: string,
