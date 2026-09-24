@@ -20,7 +20,8 @@ export interface MountOptions {
   languages?: readonly string[];
   /**
    * True when the small-screen layout applies; evaluated at open time.
-   * Defaults to `matchMedia('(max-width: 640px)')` (false where matchMedia is missing).
+   * Defaults to `matchMedia('(max-width: 640px)')` (false where matchMedia is missing); always
+   * false in preview.
    */
   compact?: () => boolean;
 }
@@ -92,7 +93,8 @@ export function mountWidget(
   root.style.setProperty('--bp-accent-2', tint(accent, 0.25));
   root.style.setProperty('--bp-on-accent', onAccent(accent));
 
-  const isCompact = options.compact ?? defaultCompact;
+  // The dashboard preview lives in a small box: never the viewport-fixed dial or bottom sheet.
+  const isCompact = options.preview ? () => false : (options.compact ?? defaultCompact);
   let dial: Dial | null = null;
 
   /**

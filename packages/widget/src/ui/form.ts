@@ -18,11 +18,18 @@ const EMAIL_ERROR_ID = 'bp-email-error';
 export interface FormScreen extends Screen {
   element: HTMLFormElement;
   type(): FeedbackType;
-  /** Shows the form for `type`: new title/placeholder, fresh screenshot block, timer restarted. */
+  /** A new form session (the panel opened from hidden): restarts the bot-guard timer. */
+  begin(): void;
+  /**
+   * Shows the form for `type`: new title/placeholder and a fresh screenshot block — unless the
+   * visitor went Back and picked the same type again, which keeps the block as it was.
+   */
   start(type: FeedbackType, canGoBack?: boolean): void;
-  /** Clears what the visitor entered (after a successful send). */
+  /** Clears what the visitor entered (after a successful send) and starts a new session. */
   reset(): void;
   handlePaste(event: ClipboardEvent): void;
+  /** A file dropped on the panel while the form shows. */
+  handleDrop(event: DragEvent): void;
   /** Prefills (or clears, with '') the identified email unless the visitor typed their own. */
   setEmail(email: string): void;
   destroy(): void;
@@ -52,9 +59,12 @@ export function createForm(options: {
 }): FormScreen {
   const { t, deps } = options;
   let type: FeedbackType = 'bug';
+  /** Start of the form session, for the server's minimum-fill-time bot guard. */
   let openedAt = 0;
   let identifiedEmail = '';
   let sending = false;
+  /** The visitor left this form with Back: picking the same type again resumes it. */
+  let wentBack = false;
 
   const shotDeps: ShotBlockDeps | null = deps
     ? { loadCapture: safeLoader(deps.loadCapture), loadAnnotate: safeLoader(deps.loadAnnotate) }
@@ -70,7 +80,10 @@ export function createForm(options: {
       class: 'bp-icon-btn bp-back',
       'aria-label': t.back,
       title: t.back,
-      onclick: () => options.onBack(),
+      onclick: () => {
+        wentBack = true;
+        options.onBack();
+      },
     },
     backIcon(),
   );
@@ -118,9 +131,6 @@ export function createForm(options: {
     t.send,
   );
 
-  const hasFiles = (event: Event) =>
-    Array.from((event as DragEvent).dataTransfer?.types ?? []).includes('Files');
-
   const element = h(
     'form',
     {
@@ -130,18 +140,6 @@ export function createForm(options: {
       onsubmit: (e: Event) => {
         e.preventDefault();
         void send();
-      },
-      // Allow dropping files (not text) onto the form; preview never accepts a drop.
-      ondragover: (e: Event) => {
-        if (deps && hasFiles(e)) e.preventDefault();
-      },
-      ondrop: (e: Event) => {
-        if (!deps || !hasFiles(e)) return;
-        // Always claim a file drop so the browser never navigates away to the dropped file.
-        e.preventDefault();
-        if (shotBlock.handleDrop(e as DragEvent)) return;
-        const file = (e as DragEvent).dataTransfer?.files?.[0];
-        if (file) void shotBlock.addImage(file); // not an image: the block explains why
       },
     },
     h(
@@ -197,6 +195,8 @@ export function createForm(options: {
     // A send in flight owns this form (its type, timer and screenshot): navigating back to a
     // form meanwhile returns to that send instead of starting a new one underneath it.
     if (sending) return;
+    const resume = wentBack && next === type;
+    wentBack = false;
     type = next;
     emoji.textContent = TYPE_EMOJI[next];
     titleText.textContent = t.cards[next];
@@ -204,8 +204,14 @@ export function createForm(options: {
     message.setAttribute('aria-label', t.placeholders[next]);
     back.hidden = !canGoBack;
     clearMessages();
+    // openedAt is per form session (begin/reset), not per type: switching type via Back must not
+    // restart the clock, or a quick send after switching would trip the server's bot guard.
+    if (!resume) shotBlock.reset(next === 'bug');
+  }
+
+  function begin() {
     openedAt = safeNow();
-    shotBlock.reset(next === 'bug');
+    wentBack = false;
   }
 
   function reset() {
@@ -213,6 +219,14 @@ export function createForm(options: {
     email.value = identifiedEmail;
     honeypot.value = '';
     clearMessages();
+    begin();
+  }
+
+  function handleDrop(event: DragEvent) {
+    if (!deps) return;
+    if (shotBlock.handleDrop(event)) return;
+    const file = event.dataTransfer?.files?.[0];
+    if (file) void shotBlock.addImage(file); // not an image: the block explains why
   }
 
   function setBusy(busy: boolean) {
@@ -279,8 +293,10 @@ export function createForm(options: {
     titleId: TITLE_ID,
     focus: () => message.focus(),
     type: () => type,
+    begin,
     start,
     reset,
+    handleDrop,
     handlePaste: (event) => void shotBlock.handlePaste(event),
     setEmail(value: string) {
       // Replace only what identify() put there before; never text the visitor typed.

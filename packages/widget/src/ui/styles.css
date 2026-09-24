@@ -186,6 +186,7 @@
   transform-origin: bottom left;
 }
 [data-preview] .bp-trigger,
+[data-preview] .bp-dial,
 [data-preview] .bp-panel {
   position: absolute;
 }
@@ -198,6 +199,7 @@
   width: 100%;
   max-width: 100%;
   max-height: 90vh;
+  padding-bottom: env(safe-area-inset-bottom);
   border-radius: 16px 16px 0 0;
   animation: bp-sheet-up 0.22s ease-out;
   transition: transform 0.2s ease;
@@ -529,6 +531,16 @@
 .bp-shot-actions button:disabled {
   cursor: default;
   opacity: 0.6;
+}
+/* The editor is loading or open: Annotate and the thumbnail ignore clicks until it settles. */
+.bp-shot-actions button[aria-disabled='true'],
+.bp-thumb[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+/* Focus lands on the block itself only as a fallback when a re-render removed the focused control. */
+.bp-shot:focus {
+  outline: none;
 }
 .bp-shot[data-state='empty'] .bp-shot-actions button,
 .bp-shot-annotate {

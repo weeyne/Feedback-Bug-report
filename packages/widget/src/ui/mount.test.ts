@@ -385,6 +385,79 @@ describe('screenshot', () => {
     expect(drop.defaultPrevented).toBe(true);
     await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
   });
+
+  function fileDrag(type: 'dragover' | 'drop', files: File[]) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['Files'], files, dropEffect: 'none' },
+    });
+    return event;
+  }
+
+  it('claims file drags anywhere on the panel; only the form screen takes the file', async () => {
+    const { q, handle, openForm } = setup();
+    const file = new File(['d'], 'd.png', { type: 'image/png' });
+
+    handle.open();
+    const overHome = fileDrag('dragover', [file]);
+    q('.bp-home')!.dispatchEvent(overHome);
+    expect(overHome.defaultPrevented).toBe(true);
+    const dropHome = fileDrag('drop', [file]);
+    q('.bp-foot')!.dispatchEvent(dropHome);
+    expect(dropHome.defaultPrevented).toBe(true);
+    handle.close();
+
+    openForm('idea');
+    for (const target of ['.bp-foot', '.bp-sheet-handle']) {
+      const over = fileDrag('dragover', [file]);
+      q(target)!.dispatchEvent(over);
+      expect(over.defaultPrevented).toBe(true);
+    }
+    const drop = fileDrag('drop', [file]);
+    q('.bp-foot')!.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
+  });
+
+  it('leaves text drags alone', () => {
+    const { q, openForm } = setup();
+    openForm('idea');
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', { value: { types: ['text/plain'], files: [] } });
+    q('.bp-message')!.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(false);
+  });
+
+  it('Back to the same card keeps the screenshot; another card starts fresh', async () => {
+    const loadCapture = vi.fn(async () => async () => shot);
+    const { q, openForm } = setup({ deps: { loadCapture } });
+    openForm('bug');
+    await vi.waitFor(() => expect(q('.bp-shot')!.dataset.state).toBe('ready'));
+    q('.bp-back')!.click();
+    q('.bp-card[data-type="bug"]')!.click();
+    expect(q('.bp-shot')!.dataset.state).toBe('ready');
+    expect(loadCapture).toHaveBeenCalledOnce();
+
+    q('.bp-back')!.click();
+    q('.bp-card[data-type="idea"]')!.click();
+    expect(q('.bp-shot')!.dataset.state).toBe('empty');
+  });
+
+  it('removing the screenshot keeps focus in the panel, so Escape still closes it', async () => {
+    const { q, root, panel, openForm } = setup();
+    openForm('bug');
+    await vi.waitFor(() => expect(q('.bp-shot')!.dataset.state).toBe('ready'));
+    q('.bp-shot-remove')!.focus();
+    q('.bp-shot-remove')!.click();
+    const active = root.activeElement;
+    expect(active).not.toBeNull();
+    expect(q('.bp-shot')!.contains(active)).toBe(true);
+    expect(active).toBe(q('.bp-shot-capture'));
+    active!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }),
+    );
+    expect(panel().hidden).toBe(true);
+  });
 });
 
 describe('keyboard', () => {
@@ -486,6 +559,43 @@ describe('form', () => {
       metadata,
     });
     expect(blob).toBe(shot);
+  });
+
+  it('switching type via Back keeps the session clock for the bot guard', async () => {
+    const { q, message, openForm, submit, tick } = setup();
+    openForm('bug');
+    tick(30000);
+    q('.bp-back')!.click();
+    q('.bp-card[data-type="idea"]')!.click();
+    message().value = 'Quick idea';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    const [payload] = submit.mock.calls[0]!;
+    expect(payload.type).toBe('idea');
+    expect(payload.elapsedMs).toBeGreaterThanOrEqual(30000);
+  });
+
+  it('restarts the clock when the panel opens again or after a successful send', async () => {
+    const { q, message, openForm, submit, tick, escape, handle } = setup();
+    openForm('bug');
+    tick(30000);
+    escape();
+    tick(1000);
+    openForm('bug');
+    tick(3000);
+    message().value = 'first';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0]![0].elapsedMs).toBe(3000);
+
+    await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
+    tick(500);
+    handle.open('idea'); // re-opened while thanks shows: a new session
+    tick(2500);
+    message().value = 'second';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    expect(submit.mock.calls[1]![0].elapsedMs).toBe(2500);
   });
 
   it('sends the chosen type', async () => {
@@ -658,6 +768,23 @@ describe('preview and lifecycle', () => {
     expect(loadCapture).not.toHaveBeenCalled();
     expect(loadAnnotate).not.toHaveBeenCalled();
     expect(q('.bp-root')!.hasAttribute('data-preview')).toBe(true);
+  });
+
+  it('preview never uses the compact dial or sheet and ignores dropped files', () => {
+    const { q, handle } = setup({ preview: true, compact: true });
+    expect(q('.bp-root')!.getAttribute('data-compact')).toBe('false');
+    q('.bp-trigger')!.click();
+    expect(q('.bp-panel')!.hidden).toBe(false);
+    expect(q('.bp-panel')!.classList.contains('bp-sheet')).toBe(false);
+    expect(q('.bp-dial')!.classList.contains('bp-dial-open')).toBe(false);
+    handle.open('general');
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { types: ['Files'], files: [new File(['d'], 'd.png', { type: 'image/png' })] },
+    });
+    q('.bp-message')!.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+    expect(q('.bp-shot-error')!.textContent).toBe('');
   });
 
   it('ignores a stale capture result from a closed-and-reopened panel', async () => {

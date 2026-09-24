@@ -109,6 +109,19 @@ export function createPanel(options: {
       onpaste: (e: Event) => {
         if (screen === 'form' && !element.hidden) form.handlePaste(e as ClipboardEvent);
       },
+      // File drags anywhere over the panel (footer, sheet handle, home screen) are always claimed,
+      // so a drop can never navigate the host page away to the dropped file; only the form uses it.
+      ondragover: (e: Event) => {
+        const transfer = (e as DragEvent).dataTransfer;
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        if (transfer) transfer.dropEffect = acceptsDrop() ? 'copy' : 'none';
+      },
+      ondrop: (e: Event) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        if (acceptsDrop()) form.handleDrop(e as DragEvent);
+      },
       // Bottom-sheet dismissal: a downward drag starting on the handle or a screen's header.
       onpointerdown: onSheetPointerDown,
       onpointermove: onSheetPointerMove,
@@ -121,6 +134,15 @@ export function createPanel(options: {
     thanks.element,
     footer,
   );
+
+  function hasFiles(event: Event): boolean {
+    return Array.from((event as DragEvent).dataTransfer?.types ?? []).includes('Files');
+  }
+
+  /** Preview never accepts a drop (the form ignores it without deps). */
+  function acceptsDrop(): boolean {
+    return screen === 'form' && !element.hidden && options.deps !== null;
+  }
 
   function isSheet() {
     return element.classList.contains('bp-sheet');
@@ -192,7 +214,10 @@ export function createPanel(options: {
     element.classList.toggle('bp-sheet', options.compact());
     thanks.cancel();
     const wasHidden = element.hidden;
-    if (wasHidden) previouslyFocused = activeElementDeep();
+    if (wasHidden) {
+      previouslyFocused = activeElementDeep();
+      form.begin();
+    }
     // Re-opened while "thanks" still shows: start a clean session instead of staying stuck on it.
     if (screen === 'thanks') form.reset();
     element.hidden = false;
