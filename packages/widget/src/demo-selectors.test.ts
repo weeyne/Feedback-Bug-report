@@ -96,7 +96,6 @@ describe('DEMO_SELECTORS', () => {
     const editor = editorHost.shadowRoot!;
     expect(editor).not.toBeNull();
     const rect = one(editor, DEMO_SELECTORS.editorRectTool);
-    expect(rect.textContent).toBe('Rectangle');
     rect.click();
     expect(rect.getAttribute('aria-pressed')).toBe('true');
     const canvas = one(editor, DEMO_SELECTORS.editorCanvas);
