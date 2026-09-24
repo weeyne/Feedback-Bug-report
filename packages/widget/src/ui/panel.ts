@@ -1,55 +1,41 @@
 import type { ClientMetadata, SubmitPayload, WidgetConfig } from '@bugping/shared';
 import { BRAND } from '@bugping/shared/brand';
-import {
-  EMAIL_MAX_LENGTH,
-  FEEDBACK_TYPES,
-  MESSAGE_MAX_LENGTH,
-  type FeedbackType,
-} from '@bugping/shared/constants';
-import { buildPayload, type SubmitResult } from '../api';
+import type { FeedbackType } from '@bugping/shared/constants';
+import type { AnnotateFn } from '../annotate/types';
+import type { SubmitResult } from '../api';
 import type { Messages } from '../i18n';
 import type { CaptureFn } from '../screenshot-loader';
+import { createForm } from './form';
 import { h } from './h';
-
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const THANKS_CLOSE_MS = 2000;
-/** Send never waits longer than this for a pending screenshot; it goes out without one instead. */
-const CAPTURE_WAIT_MS = 8000;
+import { createHome, type Screen } from './home';
+import { createThanks } from './thanks';
 
 export interface PanelDeps {
   projectKey: string;
   submit(payload: SubmitPayload, screenshot: Blob | null): Promise<SubmitResult>;
   loadCapture(): Promise<CaptureFn | null>;
+  loadAnnotate(): Promise<AnnotateFn | null>;
   collectMetadata(): ClientMetadata;
   /** Monotonic milliseconds, e.g. `performance.now()`. */
   now(): number;
 }
 
+export type PanelScreen = 'home' | 'form' | 'thanks';
+
 export interface Panel {
   element: HTMLElement;
-  open(type: FeedbackType): void;
+  /** No type: the home screen. A type: that type's form. */
+  open(type?: FeedbackType): void;
   close(): void;
   isOpen(): boolean;
   /** Prefills (or clears, with '') the identified email unless the visitor typed their own. */
   setEmail(email: string): void;
-  /** Revokes the current screenshot preview URL and cancels the pending auto-close timer. */
+  /** Revokes screenshot preview URLs and cancels the pending auto-close timer. */
   destroy(): void;
 }
 
-type ShotState = 'loading' | 'ready' | 'unavailable';
-
-/** Resolves true if `promise` settles within `ms`, false otherwise. Never rejects. */
-function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const cap = new Promise<boolean>((resolve) => {
-    timer = setTimeout(() => resolve(false), ms);
-  });
-  const done = promise.then(
-    () => true,
-    () => true,
-  );
-  return Promise.race([done, cap]).finally(() => clearTimeout(timer));
-}
+/** Direction of a screen change, for the slide-in animation. */
+type Direction = 'none' | 'forward' | 'back';
 
 /** The actually-focused element, descending into this document's own open shadow trees. */
 function activeElementDeep(): HTMLElement | null {
@@ -67,308 +53,117 @@ export function createPanel(options: {
   deps: PanelDeps | null;
   /** Excluded from screenshots. */
   host: Element;
-  onClose(previouslyFocused: HTMLElement | null): void;
+  /** The launcher, when shown: its `aria-expanded` follows the panel and it gets focus on close. */
+  launcher: HTMLElement | null;
+  /** True when the small-screen layout applies; evaluated at open time. */
+  compact(): boolean;
 }): Panel {
-  const { config, t, deps } = options;
-  let type: FeedbackType = 'bug';
-  let openedAt = 0;
-  let shot: Blob | null = null;
-  let shotUrl: string | null = null;
-  let capturing: Promise<void> = Promise.resolve();
-  let captureGeneration = 0;
-  let identifiedEmail = '';
-  let sending = false;
-  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  const { config, t, launcher } = options;
+  let screen: PanelScreen = 'home';
   let previouslyFocused: HTMLElement | null = null;
 
-  const typeButtons = FEEDBACK_TYPES.map((ft) =>
-    h(
-      'button',
-      {
-        type: 'button',
-        class: 'bp-type',
-        'data-type': ft,
-        'aria-pressed': 'false',
-        onclick: () => selectType(ft),
-      },
-      t.types[ft],
-    ),
-  );
-  const message = h('textarea', {
-    class: 'bp-input bp-message',
-    rows: 4,
-    maxlength: MESSAGE_MAX_LENGTH,
+  const home = createHome({ t, onPick: (type) => showForm(type, 'forward'), onClose: close });
+  const form = createForm({
+    t,
+    deps: options.deps,
+    host: options.host,
+    onBack: () => showScreen('home', 'back'),
+    onClose: close,
+    onSent,
   });
-  const messageError = h('p', { class: 'bp-field-error bp-message-error', role: 'alert' });
-  const email = h('input', {
-    class: 'bp-input bp-email',
-    type: 'email',
-    maxlength: EMAIL_MAX_LENGTH,
-    placeholder: t.emailPlaceholder,
-    autocomplete: 'email',
-    'aria-label': t.emailLabel,
-  });
-  const emailError = h('p', { class: 'bp-field-error bp-email-error', role: 'alert' });
-  const honeypot = h('input', {
-    class: 'bp-hp',
-    name: 'website',
-    tabindex: -1,
-    autocomplete: 'off',
-    'aria-hidden': 'true',
-  });
-  const shotToggle = h('input', { type: 'checkbox', class: 'bp-shot-toggle', checked: true });
-  const thumb = h('span', { class: 'bp-thumb', 'data-state': 'loading' });
-  const shotText = h('span', {}, t.screenshot);
-  const status = h('p', { class: 'bp-status', role: 'status' });
-  const retry = h(
-    'button',
-    { type: 'button', class: 'bp-retry', hidden: true, onclick: () => void send() },
-    t.retry,
-  );
-  const sendButton = h(
-    'button',
-    { type: 'button', class: 'bp-send', onclick: () => void send() },
-    t.send,
-  );
-  const form = h(
-    'form',
-    {
-      class: 'bp-form',
-      novalidate: true,
-      onsubmit: (e: Event) => {
-        e.preventDefault();
-        void send();
-      },
-    },
-    h('div', { class: 'bp-types', role: 'group' }, ...typeButtons),
-    message,
-    messageError,
-    email,
-    emailError,
-    honeypot,
-    h('label', { class: 'bp-shot' }, shotToggle, thumb, shotText),
-    status,
-    retry,
-    sendButton,
-  );
-  const thanks = h('p', { class: 'bp-thanks', role: 'status', hidden: true }, t.thanks);
+  const thanks = createThanks({ t, onDone: close });
+  const screens: Record<PanelScreen, Screen> = { home, form, thanks };
+
   // Only an https link: a config value must never become a javascript: or other-scheme URL.
-  const badge =
+  const footer =
     config.showBadge && config.badgeUrl.startsWith('https://')
       ? h(
-          'a',
-          { class: 'bp-badge', href: config.badgeUrl, target: '_blank', rel: 'noopener' },
-          `${t.poweredBy} ${BRAND.name}`,
+          'div',
+          { class: 'bp-foot' },
+          h(
+            'a',
+            { class: 'bp-badge', href: config.badgeUrl, target: '_blank', rel: 'noopener' },
+            `${t.poweredBy} ${BRAND.name}`,
+          ),
         )
       : null;
+
   const element = h(
     'div',
     {
       class: 'bp-panel',
       role: 'dialog',
       'aria-modal': 'false',
-      'aria-labelledby': 'bp-title',
       hidden: true,
       // Composed key events would retarget to the host and trigger its shortcuts; keep them here.
       onkeydown: onKeydown,
       onkeypress: stopPropagation,
       onkeyup: stopPropagation,
+      onpaste: (e: Event) => {
+        if (screen === 'form' && !element.hidden) form.handlePaste(e as ClipboardEvent);
+      },
     },
-    h(
-      'div',
-      { class: 'bp-head' },
-      h('h2', { class: 'bp-title', id: 'bp-title' }, t.title),
-      h(
-        'button',
-        { type: 'button', class: 'bp-close', 'aria-label': t.close, onclick: () => close() },
-        '×',
-      ),
-    ),
-    form,
-    thanks,
-    badge,
+    home.element,
+    form.element,
+    thanks.element,
+    footer,
   );
 
-  function selectType(next: FeedbackType) {
-    type = next;
-    for (const button of typeButtons) {
-      button.setAttribute('aria-pressed', String(button.dataset.type === next));
-    }
-    message.placeholder = t.placeholders[next];
-    message.setAttribute('aria-label', t.placeholders[next]);
+  function showScreen(next: PanelScreen, direction: Direction, focus = true) {
+    screen = next;
+    element.dataset.screen = next;
+    element.dataset.direction = direction;
+    for (const [name, s] of Object.entries(screens)) s.element.hidden = name !== next;
+    if (footer) footer.hidden = next === 'thanks';
+    element.setAttribute('aria-labelledby', screens[next].titleId);
+    if (focus) screens[next].focus();
   }
 
-  function setShot(state: ShotState, blob: Blob | null = null) {
-    shot = blob;
-    thumb.dataset.state = state;
-    thumb.replaceChildren();
-    if (shotUrl) {
-      try {
-        URL.revokeObjectURL(shotUrl);
-      } catch {
-        // best-effort cleanup only
-      }
-    }
-    shotUrl = null;
-    const unavailable = state === 'unavailable';
-    shotToggle.disabled = unavailable;
-    if (unavailable) shotToggle.checked = false;
-    shotText.textContent = unavailable ? t.screenshotUnavailable : t.screenshot;
-    if (blob) {
-      try {
-        if (typeof URL.createObjectURL === 'function') {
-          shotUrl = URL.createObjectURL(blob);
-          thumb.append(h('img', { src: shotUrl, alt: '' }));
-        }
-      } catch {
-        // no inline preview available; the toggle above still reflects a usable screenshot
-      }
-    }
+  function showForm(type: FeedbackType, direction: Direction) {
+    form.start(type);
+    showScreen('form', direction);
   }
 
-  /** One capture per open: a generation counter drops results from a capture that is no longer current. */
-  function startCapture() {
-    shotToggle.checked = true;
-    const generation = ++captureGeneration;
-    if (!deps) {
-      setShot('ready');
-      return;
-    }
-    setShot('loading');
-    let request: Promise<CaptureFn | null>;
-    try {
-      request = deps.loadCapture();
-    } catch {
-      request = Promise.resolve(null);
-    }
-    capturing = request
-      .then((captureFn) => (captureFn ? captureFn(options.host) : null))
-      .then(
-        (blob) => {
-          if (generation === captureGeneration) setShot(blob ? 'ready' : 'unavailable', blob);
-        },
-        () => {
-          if (generation === captureGeneration) setShot('unavailable');
-        },
-      );
+  function setExpanded(expanded: boolean) {
+    launcher?.setAttribute('aria-expanded', String(expanded));
   }
 
-  function showForm() {
-    form.hidden = false;
-    thanks.hidden = true;
-  }
-
-  function reset() {
-    message.value = '';
-    email.value = identifiedEmail;
-    honeypot.value = '';
-    messageError.textContent = '';
-    emailError.textContent = '';
-    status.textContent = '';
-    retry.hidden = true;
-    showForm();
-  }
-
-  /** Monotonic milliseconds; never throws even if `deps.now()` does. */
-  function safeNow(): number {
-    if (!deps) return 0;
-    try {
-      return deps.now();
-    } catch {
-      return 0;
+  function open(type?: FeedbackType) {
+    thanks.cancel();
+    const wasHidden = element.hidden;
+    if (wasHidden) previouslyFocused = activeElementDeep();
+    // Re-opened while "thanks" still shows: start a clean session instead of staying stuck on it.
+    if (screen === 'thanks') form.reset();
+    element.hidden = false;
+    setExpanded(true);
+    if (!type) {
+      showScreen('home', 'none');
+    } else if (!wasHidden && screen === 'form' && form.type() === type) {
+      form.focus();
+    } else {
+      showForm(type, 'none');
     }
-  }
-
-  function open(next: FeedbackType) {
-    clearTimeout(closeTimer);
-    previouslyFocused = activeElementDeep();
-    selectType(next);
-    if (element.hidden) {
-      element.hidden = false;
-      showForm();
-      openedAt = safeNow();
-      startCapture();
-    } else if (!thanks.hidden) {
-      // Re-opened while the "thanks" state was still showing: start a clean session instead of
-      // leaving the panel stuck on the previous submission.
-      reset();
-      openedAt = safeNow();
-      startCapture();
-    }
-    message.focus();
   }
 
   function close() {
     if (element.hidden) return;
-    clearTimeout(closeTimer);
+    thanks.cancel();
     element.hidden = true;
-    if (!thanks.hidden) reset();
-    options.onClose(previouslyFocused);
+    setExpanded(false);
+    if (screen === 'thanks') form.reset();
+    if (launcher) launcher.focus();
+    else if (previouslyFocused?.isConnected) previouslyFocused.focus();
   }
 
-  function setBusy(busy: boolean) {
-    sendButton.disabled = busy;
-    retry.disabled = busy;
-    sendButton.textContent = busy ? t.sending : t.send;
-    if (busy) sendButton.setAttribute('aria-busy', 'true');
-    else sendButton.removeAttribute('aria-busy');
-  }
-
-  function showError(reason: Exclude<SubmitResult, { ok: true }>['reason']) {
-    status.textContent =
-      reason === 'rate_limited'
-        ? t.errorRateLimited
-        : reason === 'network'
-          ? t.errorNetwork
-          : t.errorInvalid;
-    retry.hidden = reason === 'rate_limited' || reason === 'invalid';
-  }
-
-  async function send() {
-    if (!deps || sending) return;
-    const text = message.value.trim();
-    const mail = email.value.trim();
-    messageError.textContent = text ? '' : t.errorRequired;
-    emailError.textContent = mail && !EMAIL_SHAPE.test(mail) ? t.errorEmail : '';
-    if (!text) return message.focus();
-    if (emailError.textContent) return email.focus();
-
-    sending = true;
-    setBusy(true);
-    status.textContent = '';
-    retry.hidden = true;
-    try {
-      let withShot = shotToggle.checked;
-      if (withShot) withShot = await settlesWithin(capturing, CAPTURE_WAIT_MS);
-      const payload = buildPayload({
-        projectKey: deps.projectKey,
-        type,
-        message: text,
-        email: mail,
-        metadata: deps.collectMetadata(),
-        elapsedMs: safeNow() - openedAt,
-        website: honeypot.value,
-      });
-      const result = await deps.submit(payload, withShot && shotToggle.checked ? shot : null);
-      if (result.ok) {
-        if (element.hidden) {
-          // The panel was closed while this send was in flight: settle quietly instead of
-          // popping "thanks" back open, and leave the form clean for the next open().
-          reset();
-        } else {
-          form.hidden = true;
-          thanks.hidden = false;
-          closeTimer = setTimeout(close, THANKS_CLOSE_MS);
-        }
-      } else {
-        showError(result.reason);
-      }
-    } catch {
-      showError('network');
-    } finally {
-      sending = false;
-      setBusy(false);
+  function onSent() {
+    if (element.hidden) {
+      // Closed while the send was in flight: settle quietly instead of popping "thanks" back
+      // open, and leave the form clean for the next open().
+      form.reset();
+      return;
     }
+    showScreen('thanks', 'forward');
+    thanks.start();
   }
 
   function stopPropagation(event: Event) {
@@ -390,7 +185,11 @@ export function createPanel(options: {
     );
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (!first || !last) return;
+    if (!first || !last) {
+      // Nothing to move to (the thanks screen): keep focus inside the dialog.
+      event.preventDefault();
+      return;
+    }
     const active = (element.getRootNode() as ShadowRoot | Document).activeElement;
     if ((event as KeyboardEvent).shiftKey && active === first) {
       event.preventDefault();
@@ -401,30 +200,17 @@ export function createPanel(options: {
     }
   }
 
-  function destroy() {
-    clearTimeout(closeTimer);
-    if (shotUrl) {
-      try {
-        URL.revokeObjectURL(shotUrl);
-      } catch {
-        // best-effort cleanup only
-      }
-      shotUrl = null;
-    }
-  }
-
-  selectType('bug');
+  showScreen('home', 'none', false);
 
   return {
     element,
     open,
     close,
     isOpen: () => !element.hidden,
-    setEmail(value: string) {
-      // Replace only what identify() put there before; never text the visitor typed.
-      if (!email.value || email.value === identifiedEmail) email.value = value;
-      identifiedEmail = value;
+    setEmail: (value) => form.setEmail(value),
+    destroy() {
+      thanks.cancel();
+      form.destroy();
     },
-    destroy,
   };
 }

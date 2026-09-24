@@ -26,10 +26,12 @@ export function createPublicApi(state: ApiState, warn: (message: string) => void
     open(type) {
       try {
         if (!state.handle) return warn('widget is not ready yet');
-        const valid = (FEEDBACK_TYPES as readonly unknown[]).includes(type)
-          ? (type as FeedbackType)
-          : 'bug';
-        state.handle.open(valid);
+        // An invalid type counts as none: the choice screen rather than a guess.
+        if ((FEEDBACK_TYPES as readonly unknown[]).includes(type)) {
+          state.handle.open(type as FeedbackType);
+        } else {
+          state.handle.open();
+        }
       } catch {
         // Never propagate into the host page.
       }

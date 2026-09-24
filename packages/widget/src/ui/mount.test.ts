@@ -2,9 +2,16 @@ import type { ClientMetadata, WidgetConfig } from '@bugping/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SubmitResult } from '../api';
 import type { CaptureFn } from '../screenshot-loader';
+import { tint } from './color';
 import { mountWidget, type WidgetHandle } from './mount';
 import type { PanelDeps } from './panel';
 import baseCss from './styles.css?inline';
+
+// happy-dom has no canvas/createImageBitmap: own images pass through preparation unchanged.
+vi.mock('../image/prepare', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image/prepare')>()),
+  prepareImage: async (blob: Blob) => blob,
+}));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -13,6 +20,8 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 const baseConfig: WidgetConfig = {
   primaryColor: '#6366f1',
@@ -58,6 +67,7 @@ function setup(
     projectKey: 'pk_AbCdEfGh12345678',
     submit,
     loadCapture: async () => async () => shot,
+    loadAnnotate: async () => null,
     collectMetadata: () => metadata,
     now: () => clock,
     ...options.deps,
@@ -70,19 +80,55 @@ function setup(
       languages: ['en-US'],
       hideTrigger: options.hideTrigger,
       preview: options.preview,
+      compact: () => false,
     },
   );
   const root = handle.host.shadowRoot!;
   const q = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector);
-  return { handle, root, q, submit, deps, tick: (ms: number) => (clock += ms) };
+  const panel = () => q('.bp-panel')!;
+  const escape = () =>
+    panel().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const message = () => q<HTMLTextAreaElement>('.bp-message')!;
+  /** Launcher → home → card: the visitor's path to a form. */
+  const openForm = (type: 'bug' | 'idea' | 'general' = 'bug') => {
+    q('.bp-trigger')!.click();
+    q(`.bp-card[data-type="${type}"]`)!.click();
+  };
+  const labelOf = (el: Element) =>
+    root.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? null;
+  return {
+    handle,
+    root,
+    q,
+    panel,
+    escape,
+    message,
+    openForm,
+    labelOf,
+    submit,
+    deps,
+    tick: (ms: number) => (clock += ms),
+  };
+}
+
+function pasteEvent(items: object[]) {
+  const event = new Event('paste', { bubbles: true, cancelable: true, composed: true });
+  Object.defineProperty(event, 'clipboardData', { value: { items } });
+  return event;
 }
 
 describe('mountWidget', () => {
-  it('renders an isolated host with the trigger text as literal text', () => {
+  it('renders an isolated host; the launcher is labelled with the trigger text', () => {
     const { handle, q } = setup({ config: { triggerText: '<img src=x onerror=alert(1)>' } });
     expect(handle.host.hasAttribute('data-bugping')).toBe(true);
     expect(handle.host.shadowRoot).not.toBeNull();
-    expect(q('.bp-trigger')!.textContent).toBe('<img src=x onerror=alert(1)>');
+    const trigger = q('.bp-trigger')!;
+    expect(trigger.getAttribute('aria-label')).toBe('<img src=x onerror=alert(1)>');
+    expect(trigger.getAttribute('title')).toBe('<img src=x onerror=alert(1)>');
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(trigger.textContent).toBe('');
+    expect(trigger.querySelectorAll('svg')).toHaveLength(2);
     expect(q('img')).toBeNull();
   });
 
@@ -117,27 +163,47 @@ describe('mountWidget', () => {
     expect(root.adoptedStyleSheets).toHaveLength(1);
   });
 
-  it('applies the accent color, position and locale', () => {
+  it('exposes the accent, its tint and a readable on-accent color, position and locale', () => {
     const { q } = setup({
-      config: { primaryColor: '#ff0000', position: 'bottom-left', locale: 'ru' },
+      config: { primaryColor: '#FACC15', position: 'bottom-left', locale: 'ru' },
     });
     const root = q('.bp-root')!;
-    expect(root.style.getPropertyValue('--bp-accent')).toBe('#ff0000');
+    expect(root.style.getPropertyValue('--bp-accent')).toBe('#FACC15');
+    expect(root.style.getPropertyValue('--bp-accent-2')).toBe(tint('#FACC15', 0.25));
+    expect(root.style.getPropertyValue('--bp-on-accent')).toBe('#1a1414');
     expect(root.dataset.position).toBe('bottom-left');
-    expect(q('.bp-title')!.textContent).toBe('Отправить отзыв');
+    expect(root.getAttribute('lang')).toBe('ru');
+    expect(q('.bp-home h2')!.textContent).toBe('Привет 👋');
   });
 
-  it('hides the trigger with hideTrigger', () => {
+  it('uses white on a dark accent and falls back for an invalid color', () => {
+    const dark = setup({ config: { primaryColor: '#1E3A8A' } });
+    expect(dark.q('.bp-root')!.style.getPropertyValue('--bp-on-accent')).toBe('#ffffff');
+    dark.handle.destroy();
+    const invalid = setup({ config: { primaryColor: 'red' } });
+    expect(invalid.q('.bp-root')!.style.getPropertyValue('--bp-accent')).toBe('#E0321F');
+  });
+
+  it('hides the launcher with hideTrigger', () => {
     const { q } = setup({ hideTrigger: true });
     expect(q('.bp-trigger')).toBeNull();
   });
 
-  it('shows the badge unless disabled', () => {
+  it('shows the badge in the footer on home and form, not on thanks, unless disabled', async () => {
     const shown = setup();
     const badge = shown.q<HTMLAnchorElement>('.bp-badge')!;
     expect(badge.href).toBe(baseConfig.badgeUrl);
     expect(badge.rel).toBe('noopener');
     expect(badge.target).toBe('_blank');
+    const visible = () => !badge.closest('[hidden]');
+    shown.handle.open();
+    expect(visible()).toBe(true);
+    shown.handle.open('bug');
+    expect(visible()).toBe(true);
+    shown.message().value = 'x';
+    shown.q('.bp-send')!.click();
+    await vi.waitFor(() => expect(shown.q('.bp-thanks')!.hidden).toBe(false));
+    expect(visible()).toBe(false);
     shown.handle.destroy();
     expect(setup({ config: { showBadge: false } }).q('.bp-badge')).toBeNull();
   });
@@ -165,48 +231,180 @@ describe('mountWidget', () => {
   });
 
   it('reports open state through isOpen()', () => {
-    const { handle, q } = setup();
+    const { handle, escape } = setup();
     expect(handle.isOpen()).toBe(false);
     handle.open();
     expect(handle.isOpen()).toBe(true);
-    q('.bp-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    escape();
     expect(handle.isOpen()).toBe(false);
   });
 });
 
-describe('panel', () => {
-  it('opens from the trigger with focus in the message field', () => {
-    const { q, root } = setup();
-    q('.bp-trigger')!.click();
-    expect(q('.bp-panel')!.hidden).toBe(false);
-    expect(root.activeElement).toBe(q('.bp-message'));
+describe('screens', () => {
+  it('launcher opens home, focuses the first card; a card opens its form', () => {
+    const { q, root, panel, message, labelOf } = setup();
+    const trigger = q('.bp-trigger')!;
+    trigger.click();
+    expect(panel().hidden).toBe(false);
+    expect(panel().getAttribute('role')).toBe('dialog');
+    expect(panel().getAttribute('aria-modal')).toBe('false');
+    expect(panel().dataset.screen).toBe('home');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(q('.bp-home')!.hidden).toBe(false);
+    expect(q('.bp-form')!.hidden).toBe(true);
+    expect(labelOf(panel())).toBe('Hi 👋');
+    const cards = Array.from(root.querySelectorAll<HTMLElement>('.bp-card'));
+    expect(cards.map((c) => c.dataset.type)).toEqual(['bug', 'idea', 'general']);
+    expect(cards[0]!.textContent).toContain('Report a bug');
+    expect(cards[0]!.textContent).toContain('Something is broken');
+    expect(root.activeElement).toBe(cards[0]);
+
+    q('.bp-card[data-type="idea"]')!.click();
+    expect(panel().dataset.screen).toBe('form');
+    expect(q('.bp-home')!.hidden).toBe(true);
+    expect(q('.bp-form')!.hidden).toBe(false);
+    expect(message().placeholder).toBe("What's your idea?");
+    expect(labelOf(panel())).toContain('Suggest an idea');
+    expect(root.activeElement).toBe(message());
+
+    trigger.click();
+    expect(panel().hidden).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('open(type) preselects the type and its placeholder', () => {
-    const { handle, q } = setup();
+  it('back returns home; open(type) opens a form directly; open() opens home', () => {
+    const { handle, q, root, panel, message, escape } = setup();
     handle.open('idea');
-    expect(q('.bp-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe('true');
-    expect(q('.bp-type[data-type="bug"]')!.getAttribute('aria-pressed')).toBe('false');
-    expect(q<HTMLTextAreaElement>('.bp-message')!.placeholder).toBe("What's your idea?");
+    expect(panel().dataset.screen).toBe('form');
+    expect(message().placeholder).toBe("What's your idea?");
+    expect(q('.bp-back')!.hidden).toBe(false);
+    expect(q('.bp-back')!.getAttribute('aria-label')).toBe('Back');
+
+    q('.bp-back')!.click();
+    expect(panel().dataset.screen).toBe('home');
+    expect(root.activeElement).toBe(q('.bp-card[data-type="bug"]'));
+
+    escape();
+    handle.open();
+    expect(panel().hidden).toBe(false);
+    expect(panel().dataset.screen).toBe('home');
+    handle.open('general');
+    expect(panel().dataset.screen).toBe('form');
+    expect(message().placeholder).toBe("What's on your mind?");
   });
 
-  it('Escape closes and returns focus to the trigger', () => {
-    const { q, root } = setup();
+  it('re-opening while thanks shows resets to the requested screen', async () => {
+    const { handle, q, panel, message } = setup();
+    handle.open('bug');
+    message().value = 'first';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
+    expect(panel().dataset.screen).toBe('thanks');
+
+    handle.open('idea');
+    expect(panel().hidden).toBe(false);
+    expect(panel().dataset.screen).toBe('form');
+    expect(q('.bp-thanks')!.hidden).toBe(true);
+    expect(message().value).toBe('');
+    expect(message().placeholder).toBe("What's your idea?");
+
+    message().value = 'second';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
+    handle.open();
+    expect(panel().dataset.screen).toBe('home');
+    expect(q('.bp-thanks')!.hidden).toBe(true);
+  });
+});
+
+describe('screenshot', () => {
+  it('the bug form captures automatically', async () => {
+    const loadCapture = vi.fn(async () => async () => shot);
+    const { q, openForm } = setup({ deps: { loadCapture } });
+    openForm('bug');
+    expect(q('.bp-shot')!.dataset.state).toBe('capturing');
+    await flush();
+    expect(q('.bp-shot')!.dataset.state).toBe('ready');
+    expect(q('.bp-thumb')!.dataset.state).toBe('ready');
+    expect(loadCapture).toHaveBeenCalledOnce();
+  });
+
+  it('the idea form waits for the capture button', async () => {
+    const loadCapture = vi.fn(async () => async () => shot);
+    const { q, openForm } = setup({ deps: { loadCapture } });
+    openForm('idea');
+    await flush();
+    expect(loadCapture).not.toHaveBeenCalled();
+    expect(q('.bp-shot')!.dataset.state).toBe('empty');
+    q('.bp-shot-capture')!.click();
+    await flush();
+    expect(loadCapture).toHaveBeenCalledOnce();
+    expect(q('.bp-thumb')!.dataset.state).toBe('ready');
+  });
+
+  it('pasting an image while the form is open adds it', async () => {
+    const { q, panel, message, openForm, submit, handle } = setup();
+    const file = new File(['p'], 'p.png', { type: 'image/png' });
+    const item = { kind: 'file', type: 'image/png', getAsFile: () => file };
+
+    handle.open();
+    const onHome = pasteEvent([item]);
+    panel().dispatchEvent(onHome);
+    expect(onHome.defaultPrevented).toBe(false);
+    handle.close();
+
+    openForm('idea');
+    expect(q('.bp-shot')!.dataset.state).toBe('empty');
+    const text = pasteEvent([{ kind: 'string', type: 'text/plain' }]);
+    message().dispatchEvent(text);
+    expect(text.defaultPrevented).toBe(false);
+    const image = pasteEvent([item]);
+    message().dispatchEvent(image);
+    expect(image.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
+
+    message().value = 'pasted';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0]![1]).toBe(file);
+  });
+
+  it('dropping an image on the form adds it', async () => {
+    const { q, openForm } = setup();
+    openForm('general');
+    const file = new File(['d'], 'd.png', { type: 'image/png' });
+    const transfer = { types: ['Files'], files: [file] };
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', { value: transfer });
+    q('.bp-form')!.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: transfer });
+    q('.bp-message')!.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
+  });
+});
+
+describe('keyboard', () => {
+  it('Escape closes and returns focus to the launcher', () => {
+    const { q, root, panel, escape } = setup();
     q('.bp-trigger')!.click();
-    q('.bp-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(q('.bp-panel')!.hidden).toBe(true);
+    escape();
+    expect(panel().hidden).toBe(true);
     expect(root.activeElement).toBe(q('.bp-trigger'));
+    expect(q('.bp-trigger')!.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('keeps key events typed in the panel away from host shortcuts', () => {
-    const { handle, q } = setup();
-    handle.open();
+    const { handle, message } = setup();
+    handle.open('bug');
     const hostListener = vi.fn();
     const types = ['keydown', 'keypress', 'keyup'] as const;
     for (const type of types) document.addEventListener(type, hostListener);
     try {
       for (const type of types) {
-        q('.bp-message')!.dispatchEvent(
+        message().dispatchEvent(
           new KeyboardEvent(type, { key: 'k', bubbles: true, composed: true }),
         );
       }
@@ -216,40 +414,64 @@ describe('panel', () => {
     }
   });
 
-  it('Tab from the last control still wraps to the first after the propagation guard', () => {
+  it('Tab wraps inside the panel after the propagation guard', () => {
     const { handle, q, root } = setup();
-    handle.open();
+    handle.open('bug');
     const badge = q<HTMLAnchorElement>('.bp-badge')!;
     badge.focus();
     badge.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, composed: true }),
     );
-    expect(root.activeElement).toBe(q('.bp-close'));
+    expect(root.activeElement).toBe(q('.bp-back'));
+    q('.bp-back')!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, composed: true }),
+    );
+    expect(root.activeElement).toBe(badge);
   });
 
-  it('requires a message', async () => {
-    const { handle, q, submit } = setup();
+  it('returns focus to the previously focused element with hideTrigger', () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    const { handle, panel, escape } = setup({ hideTrigger: true });
     handle.open();
+    escape();
+    expect(panel().hidden).toBe(true);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+});
+
+describe('form', () => {
+  it('requires a message and links the error', () => {
+    const { handle, q, message, submit } = setup();
+    handle.open('bug');
     q('.bp-send')!.click();
-    expect(q('.bp-message-error')!.textContent).toBe('Write a message first.');
+    const error = q('.bp-message-error')!;
+    expect(error.textContent).toBe('Write a message first.');
+    expect(error.id).not.toBe('');
+    expect(message().getAttribute('aria-describedby')).toBe(error.id);
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it('validates the email shape', async () => {
-    const { handle, q, submit } = setup();
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'Broken';
+  it('validates the email shape and links the error', () => {
+    const { handle, q, message, submit } = setup();
+    handle.open('bug');
+    message().value = 'Broken';
     q<HTMLInputElement>('.bp-email')!.value = 'nope';
     q('.bp-send')!.click();
-    expect(q('.bp-email-error')!.textContent).toBe('Check the email address.');
+    const error = q('.bp-email-error')!;
+    expect(error.textContent).toBe('Check the email address.');
+    expect(error.id).not.toBe('');
+    expect(q('.bp-email')!.getAttribute('aria-describedby')).toBe(error.id);
     expect(submit).not.toHaveBeenCalled();
   });
 
   it('submits the payload with the screenshot and elapsed time', async () => {
-    const { handle, q, submit, tick } = setup();
-    handle.open('bug');
+    const { q, message, openForm, submit, tick } = setup();
+    openForm('bug');
     await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
-    q<HTMLTextAreaElement>('.bp-message')!.value = '  Checkout fails  ';
+    message().value = '  Checkout fails  ';
     tick(4200);
     q('.bp-send')!.click();
     await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
@@ -265,12 +487,23 @@ describe('panel', () => {
     expect(blob).toBe(shot);
   });
 
-  it('sends without a screenshot when the toggle is off', async () => {
-    const { handle, q, submit } = setup();
-    handle.open();
+  it('sends the chosen type', async () => {
+    const { q, message, openForm, submit } = setup();
+    openForm('general');
+    message().value = 'Question';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0]![0]).toMatchObject({ type: 'general' });
+    expect(submit.mock.calls[0]![1]).toBeNull();
+  });
+
+  it('sends without a screenshot after removing it', async () => {
+    const { handle, q, message, submit } = setup();
+    handle.open('bug');
     await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
-    q<HTMLInputElement>('.bp-shot-toggle')!.checked = false;
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'x';
+    q('.bp-shot-remove')!.click();
+    expect(q('.bp-shot')!.dataset.state).toBe('empty');
+    message().value = 'x';
     q('.bp-send')!.click();
     await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
     expect(submit.mock.calls[0]![1]).toBeNull();
@@ -278,11 +511,11 @@ describe('panel', () => {
 
   it('sends without a screenshot when capture has not finished after 8s', async () => {
     vi.useFakeTimers();
-    const { handle, q, submit } = setup({
+    const { handle, q, message, submit } = setup({
       deps: { loadCapture: async () => () => new Promise<Blob | null>(() => {}) },
     });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'Capture hangs';
+    handle.open('bug');
+    message().value = 'Capture hangs';
     q('.bp-send')!.click();
     await vi.advanceTimersByTimeAsync(7999);
     expect(submit).not.toHaveBeenCalled();
@@ -292,43 +525,34 @@ describe('panel', () => {
     expect(submit.mock.calls[0]![1]).toBeNull();
   });
 
-  it('marks the screenshot unavailable when capture is not possible', async () => {
-    const { handle, q, submit } = setup({ deps: { loadCapture: async () => null } });
-    handle.open();
-    await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('unavailable'));
-    const toggle = q<HTMLInputElement>('.bp-shot-toggle')!;
-    expect(toggle.disabled).toBe(true);
-    expect(toggle.checked).toBe(false);
-    expect(q('.bp-shot')!.textContent).toContain('Screenshot unavailable');
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'x';
-    q('.bp-send')!.click();
-    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
-    expect(submit.mock.calls[0]![1]).toBeNull();
-  });
-
-  it('shows thanks, then closes and resets after 2s', async () => {
-    const { handle, q } = setup();
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'Great app';
+  it('shows thanks with a check, then closes and resets after 2s', async () => {
+    const { handle, q, root, panel, message, labelOf } = setup();
+    handle.open('bug');
+    message().value = 'Great app';
     vi.useFakeTimers();
     q('.bp-send')!.click();
     await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
+    const thanks = q('.bp-thanks')!;
+    expect(thanks.getAttribute('role')).toBe('status');
+    expect(thanks.querySelector('svg path')).not.toBeNull();
+    expect(labelOf(panel())).toBe('Thanks! Your feedback was sent.');
+    expect(root.activeElement).toBe(thanks);
     vi.advanceTimersByTime(2000);
-    expect(q('.bp-panel')!.hidden).toBe(true);
-    expect(q<HTMLTextAreaElement>('.bp-message')!.value).toBe('');
+    expect(panel().hidden).toBe(true);
+    expect(message().value).toBe('');
   });
 
   it('keeps the text and explains rate limiting', async () => {
-    const { handle, q } = setup({
+    const { handle, q, message } = setup({
       deps: { submit: async () => ({ ok: false, reason: 'rate_limited' }) },
     });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'Again';
+    handle.open('bug');
+    message().value = 'Again';
     q('.bp-send')!.click();
     await vi.waitFor(() =>
       expect(q('.bp-status')!.textContent).toBe('Too many submissions. Try again later.'),
     );
-    expect(q<HTMLTextAreaElement>('.bp-message')!.value).toBe('Again');
+    expect(message().value).toBe('Again');
     expect(q('.bp-retry')!.hidden).toBe(true);
   });
 
@@ -337,9 +561,9 @@ describe('panel', () => {
       .fn<() => Promise<SubmitResult>>()
       .mockResolvedValueOnce({ ok: false, reason: 'network' })
       .mockResolvedValueOnce({ ok: true });
-    const { handle, q } = setup({ deps: { submit } });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'Flaky';
+    const { handle, q, message } = setup({ deps: { submit } });
+    handle.open('bug');
+    message().value = 'Flaky';
     q('.bp-send')!.click();
     await vi.waitFor(() => expect(q('.bp-retry')!.hidden).toBe(false));
     expect(q('.bp-status')!.textContent).toBe("Couldn't send. Check your connection.");
@@ -348,7 +572,40 @@ describe('panel', () => {
     expect(submit).toHaveBeenCalledTimes(2);
   });
 
-  it('identify pre-fills the email without overwriting typed input', () => {
+  it('offers retry after a server error', async () => {
+    const submit = vi
+      .fn<() => Promise<SubmitResult>>()
+      .mockResolvedValueOnce({ ok: false, reason: 'server' })
+      .mockResolvedValueOnce({ ok: true });
+    const { handle, q, message } = setup({ deps: { submit } });
+    handle.open('bug');
+    message().value = 'Server down';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(q('.bp-retry')!.hidden).toBe(false));
+    expect(q('.bp-status')!.textContent).toBe("Couldn't send. Try again later.");
+    expect(message().value).toBe('Server down');
+    q('.bp-retry')!.click();
+    await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
+    expect(submit).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a busy state on the send button while sending', async () => {
+    const pending = deferred<SubmitResult>();
+    const submit = vi.fn<() => Promise<SubmitResult>>().mockReturnValue(pending.promise);
+    const { handle, q, message } = setup({ deps: { submit } });
+    handle.open('bug');
+    message().value = 'busy check';
+    q('.bp-send')!.click();
+    await vi.waitFor(() => expect(q('.bp-send')!.getAttribute('aria-busy')).toBe('true'));
+    expect(q<HTMLButtonElement>('.bp-send')!.disabled).toBe(true);
+    expect(q('.bp-send')!.textContent).toBe('Sending…');
+    pending.resolve({ ok: true });
+    await vi.waitFor(() => expect(q('.bp-send')!.hasAttribute('aria-busy')).toBe(false));
+  });
+});
+
+describe('identify', () => {
+  it('pre-fills the email without overwriting typed input', () => {
     const { handle, q } = setup();
     handle.identify({ email: 'ann@example.com' });
     expect(q<HTMLInputElement>('.bp-email')!.value).toBe('ann@example.com');
@@ -357,52 +614,48 @@ describe('panel', () => {
     expect(q<HTMLInputElement>('.bp-email')!.value).toBe('typed@example.com');
   });
 
-  it('offers retry after a server error', async () => {
-    const submit = vi
-      .fn<() => Promise<SubmitResult>>()
-      .mockResolvedValueOnce({ ok: false, reason: 'server' })
-      .mockResolvedValueOnce({ ok: true });
-    const { handle, q } = setup({ deps: { submit } });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'Server down';
-    q('.bp-send')!.click();
-    await vi.waitFor(() => expect(q('.bp-retry')!.hidden).toBe(false));
-    expect(q('.bp-status')!.textContent).toBe("Couldn't send. Try again later.");
-    expect(q<HTMLTextAreaElement>('.bp-message')!.value).toBe('Server down');
-    q('.bp-retry')!.click();
-    await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
-    expect(submit).toHaveBeenCalledTimes(2);
-  });
-
-  it('identify replaces a previously identified email', () => {
+  it('replaces a previously identified email', () => {
     const { handle, q } = setup();
     handle.identify({ email: 'a@example.com' });
     handle.identify({ email: 'b@example.com' });
     expect(q<HTMLInputElement>('.bp-email')!.value).toBe('b@example.com');
   });
 
-  it('identify without an email clears the prefilled one', () => {
+  it('without an email clears the prefilled one', () => {
     const { handle, q } = setup();
     handle.identify({ email: 'a@example.com' });
     handle.identify({});
     expect(q<HTMLInputElement>('.bp-email')!.value).toBe('');
   });
 
-  it('identify never clears text the visitor typed', () => {
+  it('never clears text the visitor typed', () => {
     const { handle, q } = setup();
     handle.identify({ email: 'a@example.com' });
     q<HTMLInputElement>('.bp-email')!.value = 'typed@example.com';
     handle.identify({});
     expect(q<HTMLInputElement>('.bp-email')!.value).toBe('typed@example.com');
   });
+});
 
-  it('never submits in preview mode', async () => {
-    const { handle, q, submit } = setup({ preview: true });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'x';
+describe('preview and lifecycle', () => {
+  it('never submits and never loads chunks in preview mode', async () => {
+    const loadCapture = vi.fn(async () => async () => shot);
+    const loadAnnotate = vi.fn(async () => null);
+    const { handle, q, message, submit } = setup({
+      preview: true,
+      deps: { loadCapture, loadAnnotate },
+    });
+    handle.open('bug');
+    await flush();
+    expect(q('.bp-shot')!.dataset.state).toBe('ready');
+    expect(q<HTMLButtonElement>('.bp-shot-annotate')!.disabled).toBe(true);
+    q('.bp-thumb')!.click();
+    message().value = 'x';
     q('.bp-send')!.click();
-    await Promise.resolve();
+    await flush();
     expect(submit).not.toHaveBeenCalled();
+    expect(loadCapture).not.toHaveBeenCalled();
+    expect(loadAnnotate).not.toHaveBeenCalled();
     expect(q('.bp-root')!.hasAttribute('data-preview')).toBe(true);
   });
 
@@ -415,20 +668,20 @@ describe('panel', () => {
       .mockReturnValueOnce(second.promise);
     const shotA = new Blob(['a'], { type: 'image/webp' });
     const shotB = new Blob(['b'], { type: 'image/webp' });
-    const { handle, q, submit } = setup({ deps: { loadCapture } });
+    const { handle, q, message, escape, submit } = setup({ deps: { loadCapture } });
 
     handle.open('bug');
-    q('.bp-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    escape();
     handle.open('bug');
 
     second.resolve(async () => shotB);
     await vi.waitFor(() => expect(q('.bp-thumb')!.dataset.state).toBe('ready'));
 
     first.resolve(async () => shotA);
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
 
     expect(q('.bp-thumb')!.dataset.state).toBe('ready');
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'x';
+    message().value = 'x';
     q('.bp-send')!.click();
     await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
     expect(submit.mock.calls[0]![1]).toBe(shotB);
@@ -437,59 +690,20 @@ describe('panel', () => {
   it('resets instead of showing thanks when closed while a send is in flight', async () => {
     const pending = deferred<SubmitResult>();
     const submit = vi.fn<() => Promise<SubmitResult>>().mockReturnValue(pending.promise);
-    const { handle, q } = setup({ deps: { submit } });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'in flight';
+    const { handle, q, panel, message, escape } = setup({ deps: { submit } });
+    handle.open('bug');
+    message().value = 'in flight';
     q('.bp-send')!.click();
-    q('.bp-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(q('.bp-panel')!.hidden).toBe(true);
+    escape();
+    expect(panel().hidden).toBe(true);
 
     pending.resolve({ ok: true });
-    await vi.waitFor(() => expect(q<HTMLTextAreaElement>('.bp-message')!.value).toBe(''));
-    expect(q('.bp-panel')!.hidden).toBe(true);
+    await vi.waitFor(() => expect(message().value).toBe(''));
+    expect(panel().hidden).toBe(true);
 
-    handle.open();
-    expect(q<HTMLTextAreaElement>('.bp-message')!.value).toBe('');
+    handle.open('bug');
+    expect(message().value).toBe('');
     expect(q('.bp-thanks')!.hidden).toBe(true);
     expect(q('.bp-form')!.hidden).toBe(false);
-  });
-
-  it('shows a busy spinner on the send button while sending', async () => {
-    const pending = deferred<SubmitResult>();
-    const submit = vi.fn<() => Promise<SubmitResult>>().mockReturnValue(pending.promise);
-    const { handle, q } = setup({ deps: { submit } });
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'busy check';
-    q('.bp-send')!.click();
-    await vi.waitFor(() => expect(q('.bp-send')!.getAttribute('aria-busy')).toBe('true'));
-    pending.resolve({ ok: true });
-    await vi.waitFor(() => expect(q('.bp-send')!.hasAttribute('aria-busy')).toBe(false));
-  });
-
-  it('open() while thanks is showing resets and shows the form again', async () => {
-    const { handle, q } = setup();
-    handle.open();
-    q<HTMLTextAreaElement>('.bp-message')!.value = 'first';
-    q('.bp-send')!.click();
-    await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
-
-    handle.open('idea');
-    expect(q('.bp-panel')!.hidden).toBe(false);
-    expect(q('.bp-thanks')!.hidden).toBe(true);
-    expect(q('.bp-form')!.hidden).toBe(false);
-    expect(q<HTMLTextAreaElement>('.bp-message')!.value).toBe('');
-    expect(q('.bp-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('returns focus to the previously focused element when hideTrigger is set', () => {
-    const outside = document.createElement('button');
-    document.body.append(outside);
-    outside.focus();
-    const { handle, q } = setup({ hideTrigger: true });
-    handle.open();
-    q('.bp-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(q('.bp-panel')!.hidden).toBe(true);
-    expect(document.activeElement).toBe(outside);
-    outside.remove();
   });
 });

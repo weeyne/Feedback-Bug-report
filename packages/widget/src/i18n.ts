@@ -4,13 +4,9 @@ import type { AnnotateMessages } from './annotate/types';
 export type Locale = Exclude<WidgetLocale, 'auto'>;
 
 export interface Messages {
-  title: string;
-  types: Record<FeedbackType, string>;
   placeholders: Record<FeedbackType, string>;
   emailLabel: string;
   emailPlaceholder: string;
-  screenshot: string;
-  screenshotUnavailable: string;
   send: string;
   sending: string;
   thanks: string;
@@ -48,8 +44,6 @@ export interface Messages {
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
-    title: 'Send feedback',
-    types: { bug: 'Bug', idea: 'Idea', general: 'Other' },
     placeholders: {
       bug: 'What happened? What did you expect?',
       idea: "What's your idea?",
@@ -57,8 +51,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     emailLabel: 'Email (optional)',
     emailPlaceholder: 'you@example.com',
-    screenshot: 'Attach screenshot',
-    screenshotUnavailable: 'Screenshot unavailable',
     send: 'Send',
     sending: 'Sending…',
     thanks: 'Thanks! Your feedback was sent.',
@@ -109,8 +101,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
   },
   ru: {
-    title: 'Отправить отзыв',
-    types: { bug: 'Баг', idea: 'Идея', general: 'Другое' },
     placeholders: {
       bug: 'Что случилось? Что вы ожидали увидеть?',
       idea: 'Какая у вас идея?',
@@ -118,8 +108,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     emailLabel: 'Email (необязательно)',
     emailPlaceholder: 'you@example.com',
-    screenshot: 'Приложить скриншот',
-    screenshotUnavailable: 'Скриншот недоступен',
     send: 'Отправить',
     sending: 'Отправка…',
     thanks: 'Спасибо! Отзыв отправлен.',
@@ -170,8 +158,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
   },
   uk: {
-    title: 'Надіслати відгук',
-    types: { bug: 'Баг', idea: 'Ідея', general: 'Інше' },
     placeholders: {
       bug: 'Що сталося? Що ви очікували побачити?',
       idea: 'Яка у вас ідея?',
@@ -179,8 +165,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     emailLabel: 'Email (необовʼязково)',
     emailPlaceholder: 'you@example.com',
-    screenshot: 'Додати скриншот',
-    screenshotUnavailable: 'Скриншот недоступний',
     send: 'Надіслати',
     sending: 'Надсилання…',
     thanks: 'Дякуємо! Відгук надіслано.',
@@ -231,8 +215,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
   },
   es: {
-    title: 'Enviar comentarios',
-    types: { bug: 'Error', idea: 'Idea', general: 'Otro' },
     placeholders: {
       bug: '¿Qué pasó? ¿Qué esperabas?',
       idea: '¿Cuál es tu idea?',
@@ -240,8 +222,6 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     emailLabel: 'Email (opcional)',
     emailPlaceholder: 'tu@ejemplo.com',
-    screenshot: 'Adjuntar captura',
-    screenshotUnavailable: 'Captura no disponible',
     send: 'Enviar',
     sending: 'Enviando…',
     thanks: '¡Gracias! Comentario enviado.',

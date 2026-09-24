@@ -19,13 +19,13 @@ describe('createPublicApi', () => {
     expect(warn).toHaveBeenCalledOnce();
   });
 
-  it('opens with a valid type and falls back to bug', () => {
+  it('opens a valid type directly; an invalid or missing type opens the home screen', () => {
     const handle = fakeHandle();
     const api = createPublicApi({ handle, user: undefined }, vi.fn());
     api.open('idea');
     api.open('nonsense' as never);
     api.open();
-    expect(handle.open.mock.calls).toEqual([['idea'], ['bug'], ['bug']]);
+    expect(handle.open.mock.calls).toEqual([['idea'], [], []]);
   });
 
   it('stores the identified user and forwards the email', () => {

@@ -2,10 +2,11 @@ import type { WidgetConfig } from '@bugping/shared';
 import { HEX_COLOR_PATTERN, type FeedbackType } from '@bugping/shared/constants';
 import type { IdentifiedUser } from '../context/metadata';
 import { MESSAGES, resolveLocale } from '../i18n';
+import { onAccent, tint } from './color';
 import { h } from './h';
+import { createLauncher } from './launcher';
 import { createPanel, type PanelDeps } from './panel';
 import styles from './styles.css?inline';
-import { createTrigger } from './trigger';
 
 export type { PanelDeps } from './panel';
 
@@ -16,6 +17,11 @@ export interface MountOptions {
   deps?: PanelDeps;
   /** Defaults to `navigator.languages`; used when the config locale is `auto`. */
   languages?: readonly string[];
+  /**
+   * True when the small-screen layout applies; evaluated at open time.
+   * Defaults to `matchMedia('(max-width: 640px)')` (false where matchMedia is missing).
+   */
+  compact?: () => boolean;
 }
 
 export interface WidgetHandle {
@@ -28,6 +34,14 @@ export interface WidgetHandle {
 }
 
 const FALLBACK_ACCENT = '#E0321F';
+
+function defaultCompact(): boolean {
+  try {
+    return typeof matchMedia === 'function' && matchMedia('(max-width: 640px)').matches;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Constructable stylesheets are not `<style>` elements, so a strict `style-src` CSP on the host
@@ -70,38 +84,32 @@ export function mountWidget(
     'data-position': config.position,
     'data-preview': options.preview === true,
   });
-  root.style.setProperty(
-    '--bp-accent',
-    HEX_COLOR_PATTERN.test(config.primaryColor) ? config.primaryColor : FALLBACK_ACCENT,
-  );
+  const accent = HEX_COLOR_PATTERN.test(config.primaryColor)
+    ? config.primaryColor
+    : FALLBACK_ACCENT;
+  root.style.setProperty('--bp-accent', accent);
+  root.style.setProperty('--bp-accent-2', tint(accent, 0.25));
+  root.style.setProperty('--bp-on-accent', onAccent(accent));
 
-  let trigger: HTMLButtonElement | null = null;
+  const launcher = options.hideTrigger
+    ? null
+    : createLauncher(config.triggerText, () => (panel.isOpen() ? panel.close() : panel.open()));
   const panel = createPanel({
     config,
     t: MESSAGES[locale],
     deps: options.preview ? null : (options.deps ?? null),
     host,
-    onClose: (previouslyFocused) => {
-      if (trigger) {
-        trigger.focus();
-      } else if (previouslyFocused?.isConnected) {
-        previouslyFocused.focus();
-      }
-    },
+    launcher,
+    compact: options.compact ?? defaultCompact,
   });
-  if (!options.hideTrigger) {
-    trigger = createTrigger(config.triggerText, () =>
-      panel.isOpen() ? panel.close() : panel.open('bug'),
-    );
-    root.append(trigger);
-  }
+  if (launcher) root.append(launcher);
   root.append(panel.element);
   shadow.append(root);
   container.append(host);
 
   return {
     host,
-    open: (type = 'bug') => panel.open(type),
+    open: (type) => panel.open(type),
     close: () => panel.close(),
     isOpen: () => panel.isOpen(),
     identify: (user) => panel.setEmail(user.email ?? ''),

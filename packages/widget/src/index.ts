@@ -1,4 +1,5 @@
 import { fetchConfig, submitFeedback } from './api';
+import { createAnnotateLoader } from './chunk-loader';
 import { installConsoleBuffer } from './context/console-buffer';
 import { collectMetadata } from './context/metadata';
 import { createPublicApi, type ApiState } from './public-api';
@@ -31,9 +32,10 @@ export function boot(win: Window & typeof globalThis, script: HTMLScriptElement 
     const buffer = installConsoleBuffer(win, scriptUrl);
     const state: ApiState = { handle: null, user: undefined };
     win.Bugping = createPublicApi(state, warn);
-    const loadCapture = createScreenshotLoader(
-      new URL(`screenshot.js?v=${encodeURIComponent(__WIDGET_VERSION__)}`, scriptUrl).href,
-    );
+    const chunkUrl = (file: string) =>
+      new URL(`${file}?v=${encodeURIComponent(__WIDGET_VERSION__)}`, scriptUrl).href;
+    const loadCapture = createScreenshotLoader(chunkUrl('screenshot.js'));
+    const loadAnnotate = createAnnotateLoader(chunkUrl('annotate.js'));
 
     const start = async () => {
       const config = await fetchConfig(apiOrigin, projectKey);
@@ -47,6 +49,7 @@ export function boot(win: Window & typeof globalThis, script: HTMLScriptElement 
           projectKey,
           submit: (payload, screenshot) => submitFeedback(apiOrigin, payload, screenshot),
           loadCapture,
+          loadAnnotate,
           collectMetadata: () => collectMetadata(win, buffer.entries(), state.user),
           now: () => win.performance.now(),
         },

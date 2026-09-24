@@ -1,5 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as chunkLoader from './chunk-loader';
 import { boot } from './index';
+import * as mount from './ui/mount';
+
+// Spies that call through, so the real widget still mounts.
+vi.mock('./chunk-loader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./chunk-loader')>();
+  return { ...actual, createAnnotateLoader: vi.fn(actual.createAnnotateLoader) };
+});
+vi.mock('./ui/mount', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ui/mount')>();
+  return { ...actual, mountWidget: vi.fn(actual.mountWidget) };
+});
 
 const config = {
   primaryColor: '#6366f1',
@@ -38,6 +50,8 @@ describe('boot', () => {
     document.querySelectorAll('[data-bugping]').forEach((el) => el.remove());
     vi.unstubAllGlobals();
     warn.mockRestore();
+    vi.mocked(chunkLoader.createAnnotateLoader).mockClear();
+    vi.mocked(mount.mountWidget).mockClear();
   });
 
   it('mounts from the script tag, calls the API on the script origin and fires ready', async () => {
@@ -69,11 +83,30 @@ describe('boot', () => {
     await isReady;
     const root = document.querySelector('[data-bugping]')!.shadowRoot!;
     expect(root.querySelector('.bp-trigger')).toBeNull();
-    (window.Bugping as { open(type: string): void }).open('idea');
-    expect(root.querySelector<HTMLElement>('.bp-panel')!.hidden).toBe(false);
-    expect(root.querySelector('.bp-type[data-type="idea"]')!.getAttribute('aria-pressed')).toBe(
-      'true',
+    (window.Bugping as { open(type?: string): void }).open();
+    const panel = root.querySelector<HTMLElement>('.bp-panel')!;
+    expect(panel.hidden).toBe(false);
+    expect(panel.dataset.screen).toBe('home');
+    (window.Bugping as { open(type?: string): void }).open('idea');
+    expect(panel.dataset.screen).toBe('form');
+    expect(root.querySelector<HTMLTextAreaElement>('.bp-message')!.placeholder).toBe(
+      "What's your idea?",
     );
+  });
+
+  it('wires the annotate loader to the versioned annotate.js next to the script', async () => {
+    const isReady = ready();
+    boot(
+      window,
+      script({ src: 'https://bugping.app/w/widget.js', 'data-project-id': 'pk_AbCdEfGh12345678' }),
+    );
+    await isReady;
+    const createAnnotateLoader = vi.mocked(chunkLoader.createAnnotateLoader);
+    expect(createAnnotateLoader).toHaveBeenCalledOnce();
+    expect(createAnnotateLoader.mock.calls[0]![0]).toBe('https://bugping.app/w/annotate.js?v=test');
+    const loader = createAnnotateLoader.mock.results[0]!.value;
+    const deps = vi.mocked(mount.mountWidget).mock.calls[0]![2]!.deps!;
+    expect(deps.loadAnnotate).toBe(loader);
   });
 
   it('applies an email identified before the widget was ready', async () => {
