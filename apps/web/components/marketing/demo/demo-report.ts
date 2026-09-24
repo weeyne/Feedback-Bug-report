@@ -3,7 +3,13 @@ import type { AppLocale } from '@/i18n/locale';
 import { formatTelegram } from '@/lib/notify/format';
 import type { FeedbackMessage } from '@/lib/notify/types';
 import { getPublicEnv } from '@/lib/public-env';
-import { DEMO_CONSOLE_ERROR, DEMO_PROJECT_KEY, DEMO_PROJECT_NAME, DEMO_TEXT } from './protocol';
+import {
+  DEMO_CONSOLE_ERROR,
+  DEMO_PROJECT_KEY,
+  DEMO_PROJECT_NAME,
+  DEMO_SHOP_URL,
+  DEMO_TEXT,
+} from './protocol';
 
 /** `describeAgent` from `lib/widget/user-agent.ts`, injected so callers can load it lazily. */
 export type DescribeAgent = (userAgent: string) => { browser: string; os: string };
@@ -55,19 +61,16 @@ const FIXTURE_AT = Date.UTC(2026, 8, 24, 14, 32, 0);
 
 /**
  * A realistic scene-1 submission for `locale`, for static frames and the demo dashboard's
- * fallback when no live report is available. A function (not a module-level constant) so that
- * importing this module never reads the environment.
+ * fallback when no live report is available. Its page is the fictional store's checkout
+ * (`DEMO_SHOP_URL`), like the live report's.
  */
-export function fixtureReport(
-  locale: AppLocale,
-  appUrl: string = getPublicEnv().appUrl,
-): SubmitPayload {
+export function fixtureReport(locale: AppLocale): SubmitPayload {
   return {
     projectKey: DEMO_PROJECT_KEY,
     type: 'bug',
     message: DEMO_TEXT[locale],
     metadata: {
-      url: `${appUrl}/demo/shop`,
+      url: DEMO_SHOP_URL,
       referrer: '',
       userAgent: FIXTURE_USER_AGENT,
       language: locale === 'ru' ? 'ru-RU' : 'en-US',

@@ -28,7 +28,7 @@ export async function loadDemoRuntime(appUrl: string): Promise<DemoRuntime> {
     report.demoCaption(report.buildDemoMessage({ payload, dashboardUrl, describe: describeAgent }));
   return {
     caption,
-    fixtureCaption: (locale) => caption(report.fixtureReport(locale, appUrl)),
+    fixtureCaption: (locale) => caption(report.fixtureReport(locale)),
     encode: dashboard.encodeDemoReport,
   };
 }

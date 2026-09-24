@@ -14,6 +14,11 @@ export const DEMO_MESSAGE = {
   screenshot: 'bugping-demo:screenshot',
   /** /demo/dashboard → stage: the dashboard page is ready for the screenshot. */
   dashboardReady: 'bugping-demo:dashboard-ready',
+  /**
+   * stage → /demo/dashboard: scene 3 is now visible. The iframe loads during scene 2, so its entry
+   * animations have already played unseen; the bridge replays them.
+   */
+  dashboardShow: 'bugping-demo:dashboard-show',
 } as const;
 
 export type DemoMessageType = (typeof DEMO_MESSAGE)[keyof typeof DEMO_MESSAGE];
@@ -28,6 +33,18 @@ export interface DemoScreenshotMessage {
 export interface DemoDashboardReadyMessage {
   type: typeof DEMO_MESSAGE.dashboardReady;
 }
+
+/** stage → /demo/dashboard: replay the dashboard's entry animations (scene 3 is shown). */
+export interface DemoDashboardShowMessage {
+  type: typeof DEMO_MESSAGE.dashboardShow;
+}
+
+/**
+ * The fictional store's page, as the report shows it: the demo store really lives at /demo/shop
+ * on the app's own origin, but the story (URL bar, Telegram caption, dashboard) is Nova Shop's
+ * checkout at a third-party address.
+ */
+export const DEMO_SHOP_URL = 'https://shop.example.com/checkout';
 
 /** The message the demo visitor types into the widget, per landing locale. */
 export const DEMO_TEXT: Record<AppLocale, string> = {

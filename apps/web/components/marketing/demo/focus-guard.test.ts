@@ -39,8 +39,11 @@ function setup() {
   const cta = new Node('cta');
   const root = { contains: (node: unknown) => node === iframe };
   const dispose = installFocusGuard(root, host);
-  const fire = (type: 'focusin' | 'focusout', target: unknown) => {
-    for (const listener of docListeners.get(type) ?? []) listener({ target } as unknown as Event);
+  /** `inner` is the real target inside a shadow root; `target` is then its retargeted host. */
+  const fire = (type: 'focusin' | 'focusout', target: unknown, inner?: unknown) => {
+    const event =
+      inner === undefined ? { target } : { target, composedPath: () => [inner, target] };
+    for (const listener of docListeners.get(type) ?? []) listener(event as unknown as Event);
   };
   const windowBlur = () => {
     for (const listener of winListeners) listener();
@@ -65,6 +68,21 @@ describe('installFocusGuard', () => {
     flush();
     expect(cta.focus).toHaveBeenCalledWith({ preventScroll: true });
     expect(host.document.activeElement).toBe(cta);
+  });
+
+  it('restores the real element inside a shadow root, not its retargeted host', () => {
+    const { fire, flush, iframe } = setup();
+    // The landing's widget: the textarea lives in the host's shadow root; the host is a plain div.
+    const shadowHost = new Node('host');
+    shadowHost.focus = vi.fn();
+    const textarea = new Node('textarea');
+    host.document.activeElement = shadowHost;
+    fire('focusout', shadowHost, textarea);
+    host.document.activeElement = iframe;
+    flush();
+    expect(textarea.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(shadowHost.focus).not.toHaveBeenCalled();
+    expect(host.document.activeElement).toBe(textarea);
   });
 
   it('blurs the iframe when nothing on the landing had focus', () => {

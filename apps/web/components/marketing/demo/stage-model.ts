@@ -1,5 +1,5 @@
 import type { DemoScene } from './director';
-import { DEMO_MESSAGE, isDemoMessage } from './protocol';
+import { DEMO_MESSAGE, DEMO_SHOP_URL, isDemoMessage } from './protocol';
 
 /**
  * Pure pieces of the landing demo stage (demo-stage.tsx): canvas geometry, the browser frame's
@@ -35,7 +35,8 @@ export function appHost(appUrl: string): string {
 export function sceneUrl(scene: DemoScene, host: string): string {
   switch (scene) {
     case 'site':
-      return 'shop.example.com/checkout';
+      // The same fictional address the report carries (`withDemoShopUrl`), without the scheme.
+      return DEMO_SHOP_URL.replace(/^https?:\/\//, '');
     case 'telegram':
       return 'Telegram';
     case 'dashboard':
@@ -49,6 +50,12 @@ export function clockTime(date: Date): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/*
+ * The demo iframe URLs carry no `?lang=` / `?theme=`: they are same-origin with the landing, so
+ * they already render in the landing's locale (next-intl reads the same locale cookie on the
+ * server) and theme (next-themes reads the same localStorage key, and its `storage` event
+ * listener follows a theme switch on the landing live).
+ */
 export const SHOP_PATH = '/demo/shop';
 export const SHOP_STATIC_PATH = '/demo/shop?static=1';
 export const DASHBOARD_PATH = '/demo/dashboard';

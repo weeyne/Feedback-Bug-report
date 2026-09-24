@@ -11,7 +11,13 @@ import {
   DEMO_PROJECT_KEY,
   DEMO_TEXT,
 } from './protocol';
-import { createDemoSubmit, postToParent } from './shop-bridge';
+import {
+  createDemoSubmit,
+  disableProgrammaticFocus,
+  isEmbedded,
+  postToParent,
+  withDemoShopUrl,
+} from './shop-bridge';
 
 interface WidgetHandle {
   host: HTMLElement;
@@ -52,7 +58,8 @@ const loadPreview = () =>
 
 /**
  * Mounts the real Bugping widget on the demo store with real capture, annotation, metadata and
- * console buffer; only `submit` is fake (no network: it hands the report to the demo stage).
+ * console buffer; only `submit` is fake (no network: it hands the report to the demo stage), and
+ * the reported page URL is the fictional store's (`withDemoShopUrl`).
  * With `staticFrame` it opens the bug form and fills the demo message (reduced-motion frames).
  */
 export function ShopWidget({
@@ -68,6 +75,10 @@ export function ShopWidget({
     let cancelled = false;
     let handle: WidgetHandle | null = null;
     let buffer: { dispose(): void } | null = null;
+
+    // Inside the landing's demo iframe the widget must never pull keyboard focus out of the
+    // landing (see `disableProgrammaticFocus`); the director drives it with events only.
+    if (isEmbedded(window)) disableProgrammaticFocus(window);
 
     loadPreview()
       .then((mod) => {
@@ -93,7 +104,8 @@ export function ShopWidget({
             submit: createDemoSubmit(window),
             loadCapture: mod.createScreenshotLoader(url('screenshot.js')),
             loadAnnotate: mod.createAnnotateLoader(url('annotate.js')),
-            collectMetadata: () => mod.collectMetadata(window, consoleBuffer.entries()),
+            collectMetadata: () =>
+              withDemoShopUrl(mod.collectMetadata(window, consoleBuffer.entries())),
             now: () => performance.now(),
           },
         });

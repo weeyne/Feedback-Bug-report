@@ -1,7 +1,14 @@
-import type { SubmitPayload } from '@bugping/shared';
+import type { ClientMetadata, SubmitPayload } from '@bugping/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { DEMO_MESSAGE, DEMO_TEXT, isDemoMessage } from './protocol';
-import { createDemoSubmit, postToParent, type BridgeWindow } from './shop-bridge';
+import { DEMO_MESSAGE, DEMO_SHOP_URL, DEMO_TEXT, isDemoMessage } from './protocol';
+import {
+  createDemoSubmit,
+  disableProgrammaticFocus,
+  isEmbedded,
+  postToParent,
+  withDemoShopUrl,
+  type BridgeWindow,
+} from './shop-bridge';
 
 const ORIGIN = 'https://bugping.app';
 
@@ -70,5 +77,40 @@ describe('demo shop bridge', () => {
     ).toBe(false);
     expect(isDemoMessage({ origin: ORIGIN, data }, ORIGIN, DEMO_MESSAGE.ready)).toBe(false);
     expect(isDemoMessage({ origin: ORIGIN, data: null }, ORIGIN, DEMO_MESSAGE.ready)).toBe(false);
+  });
+
+  it('isEmbedded is true only inside a frame', () => {
+    expect(isEmbedded(fakeWindow().win)).toBe(true);
+    expect(isEmbedded(fakeWindow({ embedded: false }).win)).toBe(false);
+    expect(isEmbedded({ parent: null })).toBe(false);
+  });
+
+  it('reports the fictional store URL and keeps the rest of the real metadata', () => {
+    const real: ClientMetadata = {
+      url: 'https://bugping.app/demo/shop',
+      referrer: 'https://bugping.app/',
+      userAgent: 'UA',
+      language: 'en-US',
+      timezone: 'UTC',
+      viewport: { w: 1280, h: 720 },
+      screen: { w: 1512, h: 982, dpr: 2 },
+      consoleErrors: [{ message: 'boom', at: 1 }],
+    };
+    expect(withDemoShopUrl(real)).toEqual({ ...real, url: DEMO_SHOP_URL });
+    expect(DEMO_SHOP_URL).toBe('https://shop.example.com/checkout');
+  });
+
+  it('disableProgrammaticFocus turns focus() into a no-op on HTML and SVG elements', () => {
+    const htmlFocus = vi.fn();
+    const svgFocus = vi.fn();
+    const win = {
+      HTMLElement: { prototype: { focus: htmlFocus } },
+      SVGElement: { prototype: { focus: svgFocus } },
+    };
+    disableProgrammaticFocus(win);
+    win.HTMLElement.prototype.focus();
+    win.SVGElement.prototype.focus();
+    expect(htmlFocus).not.toHaveBeenCalled();
+    expect(svgFocus).not.toHaveBeenCalled();
   });
 });

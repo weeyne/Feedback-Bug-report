@@ -58,6 +58,8 @@ describe('demo report', () => {
       expect(caption).toContain(DEMO_TEXT[locale]);
       expect(caption).toContain('Chrome 140 · macOS 10.15.7 · 1280×720');
       expect(caption).toContain(`<code>${DEMO_CONSOLE_ERROR}</code>`);
+      expect(caption).toContain('shop.example.com/checkout');
+      expect(caption).not.toContain('/demo/shop');
       // Short enough to travel as a photo caption, like the real bot sends it.
       expect(caption.length).toBeLessThanOrEqual(1024);
     }
@@ -66,10 +68,8 @@ describe('demo report', () => {
   it('ships fixtures that pass the real submit schema', () => {
     for (const locale of ['en', 'ru'] as const) {
       expect(SubmitPayloadSchema.safeParse(fixtureReport(locale)).success).toBe(true);
-      expect(fixtureReport(locale).metadata.url).toMatch(/\/demo\/shop$/);
+      // The fictional store's checkout, like the live report (`withDemoShopUrl`).
+      expect(fixtureReport(locale).metadata.url).toBe('https://shop.example.com/checkout');
     }
-    expect(fixtureReport('en', 'https://shop.test').metadata.url).toBe(
-      'https://shop.test/demo/shop',
-    );
   });
 });

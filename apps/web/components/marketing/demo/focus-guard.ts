@@ -23,6 +23,9 @@ interface Focusable {
  * makes that iframe the landing's `document.activeElement`: keys would scroll the iframe, not the
  * page, and a focused landing control would lose focus. Whenever focus lands inside `root`, it
  * goes back to the element that just lost it (without scrolling), or to the page body.
+ * Shadow-aware: for a control inside an open shadow root (the landing's own widget) the document
+ * only sees the retargeted shadow host, which usually is not focusable itself, so the guard
+ * remembers the real element (`composedPath()[0]`).
  * Returns the cleanup.
  */
 export function installFocusGuard(root: { contains(node: unknown): boolean }, win: FocusGuardHost) {
@@ -44,7 +47,9 @@ export function installFocusGuard(root: { contains(node: unknown): boolean }, wi
     if (pending === null) pending = win.setTimeout(check, 0);
   };
   const onFocusOut = (event: Event) => {
-    const target = event.target as Focusable | null;
+    // The innermost target: `event.target` is retargeted to the shadow host at document level.
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    const target = (path[0] ?? event.target) as Focusable | null;
     if (target && !root.contains(target) && typeof target.focus === 'function') previous = target;
     schedule();
   };
