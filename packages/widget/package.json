@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite --config vite.dev.config.ts --configLoader runner",
-    "build": "vite build --config vite.screenshot.config.ts && vite build --config vite.widget.config.ts && vite build --config vite.preview.config.ts",
+    "build": "vite build --config vite.screenshot.config.ts && vite build --config vite.annotate.config.ts && vite build --config vite.widget.config.ts && vite build --config vite.preview.config.ts",
     "size": "size-limit",
     "check:bundle": "node scripts/check-bundle.mjs",
     "typecheck": "tsc --noEmit",

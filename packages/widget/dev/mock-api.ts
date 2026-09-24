@@ -70,6 +70,11 @@ export function mockApi(): Plugin {
       req.url = `/src/screenshot.ts${url.search}`;
       return false;
     }
+    if (url.pathname === '/src/annotate.js') {
+      // Source mode: widget asks for annotate.js next to src/entry.ts; serve the TS module.
+      req.url = `/src/annotate/index.ts${url.search}`;
+      return false;
+    }
     if (req.method === 'GET' && url.pathname === '/api/v1/widget/config') {
       const key = url.searchParams.get('key') ?? '';
       if (!PUBLIC_KEY_PATTERN.test(key)) sendJson(res, 404, { error: 'unknown project' });

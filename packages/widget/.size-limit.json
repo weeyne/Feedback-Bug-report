@@ -1,4 +1,5 @@
 [
   { "name": "widget.js", "path": "dist/widget.js", "limit": "20 KB", "gzip": true },
-  { "name": "screenshot.js", "path": "dist/screenshot.js", "limit": "40 KB", "gzip": true }
+  { "name": "screenshot.js", "path": "dist/screenshot.js", "limit": "40 KB", "gzip": true },
+  { "name": "annotate.js", "path": "dist/annotate.js", "limit": "15 KB", "gzip": true }
 ]
