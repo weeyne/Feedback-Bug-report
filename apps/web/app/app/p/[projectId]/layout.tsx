@@ -2,8 +2,7 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { PageEnter } from '@/components/app/page-enter';
 import { requireUser } from '@/lib/auth/session';
-import { getProject } from '@/lib/dashboard/projects';
-import { getDeps } from '@/lib/deps';
+import { getRequestProject } from '@/lib/dashboard/request-project';
 
 export default async function ProjectLayout({
   children,
@@ -14,6 +13,6 @@ export default async function ProjectLayout({
 }) {
   const user = await requireUser();
   const { projectId } = await params;
-  if (!(await getProject(await getDeps(), user.id, projectId))) notFound();
+  if (!(await getRequestProject(user.id, projectId))) notFound();
   return <PageEnter>{children}</PageEnter>;
 }

@@ -7,7 +7,7 @@ import { RecentFeedback } from '@/components/app/overview/recent-feedback';
 import { StatCards } from '@/components/app/overview/stat-cards';
 import { requireUser } from '@/lib/auth/session';
 import { getOverview } from '@/lib/dashboard/overview';
-import { getProject } from '@/lib/dashboard/projects';
+import { getRequestProject } from '@/lib/dashboard/request-project';
 import { getDeps } from '@/lib/deps';
 
 export default async function OverviewPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -18,7 +18,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ proje
 
   const [overview, project] = await Promise.all([
     getOverview(deps, user.id, projectId),
-    getProject(deps, user.id, projectId),
+    getRequestProject(user.id, projectId),
   ]);
   if (!overview || !project) notFound();
 

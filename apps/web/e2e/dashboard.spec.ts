@@ -52,6 +52,11 @@ test('onboarding: create a project, receive the first feedback, resolve it', asy
   await page.goto(`/app/p/${projectId}`);
   await expect(page.getByTestId('overview-recent')).toContainText('the cart button does nothing');
   await expect(page.getByTestId('checklist-feedback')).toHaveAttribute('data-done', 'true');
+  // Stat numbers animate; assert on CountUp's data-value, not on textContent.
+  await expect(page.getByTestId('stat-new').locator('[data-value]')).toHaveAttribute(
+    'data-value',
+    '1',
+  );
   await page.goto(`/app/p/${projectId}/feedback`);
   const row = page.getByTestId('feedback-row').filter({ hasText: 'the cart button does nothing' });
   await expect(row).toBeVisible();
