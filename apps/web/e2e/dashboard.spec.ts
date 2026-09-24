@@ -49,6 +49,9 @@ test('onboarding: create a project, receive the first feedback, resolve it', asy
   await host.close();
 
   await expect(page.getByTestId('install-received')).toBeVisible({ timeout: 15_000 });
+  await page.goto(`/app/p/${projectId}`);
+  await expect(page.getByTestId('overview-recent')).toContainText('the cart button does nothing');
+  await expect(page.getByTestId('checklist-feedback')).toHaveAttribute('data-done', 'true');
   await page.goto(`/app/p/${projectId}/feedback`);
   const row = page.getByTestId('feedback-row').filter({ hasText: 'the cart button does nothing' });
   await expect(row).toBeVisible();
