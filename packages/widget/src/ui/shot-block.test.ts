@@ -149,6 +149,27 @@ describe('shot block', () => {
     await flush();
     expect(block.state()).toBe('empty');
   });
+  it('result() waits for an addImage started while a capture is still pending', async () => {
+    let finishCapture!: (b: Blob) => void;
+    let finishPrepare!: (b: Blob) => void;
+    const pasted = new Blob(['pasted'], { type: 'image/webp' });
+    const { block } = setup({
+      loadCapture: async () => () => new Promise<Blob>((r) => (finishCapture = r)),
+      prepare: () => new Promise<Blob>((r) => (finishPrepare = r)),
+    });
+    block.reset(true);
+    await flush();
+    expect(block.state()).toBe('capturing');
+    // A paste arrives while the capture is still pending: it must become the operation result()
+    // waits for, not the stale capture that resolves later.
+    void block.addImage(new Blob(['p'], { type: 'image/png' }));
+    const resultPromise = block.result(8000);
+    finishCapture(shot);
+    await flush();
+    expect(block.state()).toBe('capturing'); // the stale capture was dropped by the generation check
+    finishPrepare(pasted);
+    expect(await resultPromise).toBe(pasted);
+  });
   it('result() gives up on a capture that is still pending after waitMs', async () => {
     vi.useFakeTimers();
     const { block } = setup({ loadCapture: async () => () => new Promise<Blob>(() => {}) });

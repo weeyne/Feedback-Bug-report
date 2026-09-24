@@ -69,7 +69,12 @@ export function createShotBlock(options: {
   let strokes: Stroke[] = [];
   let thumbUrl: string | null = null;
   let generation = 0;
-  let capturePromise: Promise<void> | null = null;
+  /**
+   * The in-flight async operation for the current generation (capture, or an addImage prepare).
+   * `result()` waits on this — reassigned synchronously (before any await) by every op that starts
+   * one, so a newer operation always wins over a stale one still settling in the background.
+   */
+  let pending: Promise<void> = Promise.resolve();
 
   const liveRegion = h('span', { class: 'bp-shot-live', role: 'status', 'aria-live': 'polite' });
   liveRegion.style.cssText =
@@ -267,7 +272,7 @@ export function createShotBlock(options: {
     clearImage();
     clearError();
     setState('capturing');
-    const pending = deps
+    pending = deps
       .loadCapture()
       .catch(() => null)
       .then((captureFn) => {
@@ -283,24 +288,27 @@ export function createShotBlock(options: {
           setState('failed');
         }
       });
-    capturePromise = pending;
   }
 
-  async function addImage(blob: Blob): Promise<void> {
-    if (!deps) return;
+  function addImage(blob: Blob): Promise<void> {
+    if (!deps) return Promise.resolve();
     const gen = nextGeneration();
     const prepare = deps.prepare ?? prepareImage;
-    try {
-      const prepared = await prepare(blob);
-      if (gen !== generation) return;
-      clearImage();
-      original = prepared;
-      clearError();
-      setState('ready');
-    } catch (error) {
-      if (gen !== generation) return;
-      showError(errorMessage(t, error));
-    }
+    const task = (async () => {
+      try {
+        const prepared = await prepare(blob);
+        if (gen !== generation) return;
+        clearImage();
+        original = prepared;
+        clearError();
+        setState('ready');
+      } catch (error) {
+        if (gen !== generation) return;
+        showError(errorMessage(t, error));
+      }
+    })();
+    pending = task;
+    return task;
   }
 
   async function openAnnotate(): Promise<void> {
@@ -339,6 +347,7 @@ export function createShotBlock(options: {
     nextGeneration();
     clearImage();
     clearError();
+    pending = Promise.resolve();
     setState('empty');
   }
 
@@ -372,10 +381,37 @@ export function createShotBlock(options: {
     return false;
   }
 
+  /**
+   * Waits up to `waitMs` (total, not per attempt) for whatever is currently pending — a capture or
+   * an addImage prepare — for the *current* generation. If a newer operation replaces `pending`
+   * while this is waiting (e.g. a paste arrives mid-capture), it keeps waiting on that one instead,
+   * still bounded by the same overall deadline, so the newest operation always wins.
+   */
   async function result(waitMs: number): Promise<Blob | null> {
     if (!deps) return null;
-    if (state === 'capturing' && capturePromise) {
-      await settlesWithin(capturePromise, waitMs);
+    let expired = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        expired = true;
+        resolve();
+      }, waitMs);
+    });
+    try {
+      let waitedFor = pending;
+      for (;;) {
+        await Promise.race([
+          waitedFor.then(
+            () => undefined,
+            () => undefined,
+          ),
+          timeout,
+        ]);
+        if (expired || waitedFor === pending) break;
+        waitedFor = pending;
+      }
+    } finally {
+      clearTimeout(timer);
     }
     return annotated ?? original ?? null;
   }
@@ -384,7 +420,7 @@ export function createShotBlock(options: {
     nextGeneration();
     clearImage();
     clearError();
-    capturePromise = null;
+    pending = Promise.resolve();
     if (preview) {
       // Ready-looking static placeholder: no image, all actions disabled.
       setState('ready');
