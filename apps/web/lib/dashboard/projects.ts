@@ -20,6 +20,8 @@ export interface ProjectDetail extends ProjectSummary {
   hide_badge: boolean;
   custom_css: string | null;
   locale: WidgetLocale;
+  /** ISO timestamp of the last widget config request (throttled to hourly), or null if never. */
+  widget_seen_at: string | null;
 }
 
 export function listProjects(deps: DashDeps, userId: string): Promise<ProjectSummary[]> {
@@ -37,14 +39,19 @@ export async function getProject(
 ): Promise<ProjectDetail | null> {
   if (!isUuid(projectId)) return null;
   const [row] = await withUser(deps.db, userId, (tx) =>
-    tx.query<ProjectDetail>(
+    tx.query<Omit<ProjectDetail, 'widget_seen_at'> & { widget_seen_at: Date | string | null }>(
       `select id, name, public_key, allowed_origins, primary_color, trigger_text, "position"::text as "position",
-              hide_badge, custom_css, locale::text as locale
+              hide_badge, custom_css, locale::text as locale, widget_seen_at
        from public.projects where id = $1`,
       [projectId],
     ),
   );
-  return row ?? null;
+  if (!row) return null;
+  const seen = row.widget_seen_at;
+  return {
+    ...row,
+    widget_seen_at: seen == null ? null : new Date(seen).toISOString(),
+  } as ProjectDetail;
 }
 
 /** Shared by the read-only `canCreateProject` check and `createProject`'s in-transaction re-check. */

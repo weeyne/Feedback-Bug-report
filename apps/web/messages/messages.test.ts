@@ -17,7 +17,7 @@ function flatten(tree: Tree, prefix = ''): Record<string, string> {
 
 // Dummy values covering every ICU argument name used across en.json/ru.json
 // (feedback.hidden, feedback.usage/billing.usage, settings.cssBytes,
-// integrations.*, billing.current, billing.renews/endsOn, overview.* and empty.noneOfType). Passing one
+// integrations.*, billing.renews/endsOn, overview.* and empty.noneOfType). Passing one
 // superset object keeps this test independent from which locale/key is
 // being formatted.
 const dummyValues = {
@@ -76,11 +76,11 @@ describe('messages', () => {
 
   it('renders the install page hints literally (no ICU interpretation)', () => {
     const tEn = createTranslator({ locale: 'en', messages: en });
-    expect(tEn('install.intro')).toBe(
-      'Paste this snippet before the closing </body> tag of your site.',
-    );
+    expect(tEn('install.step2Title')).toBe('Paste it before </body>');
     expect(tEn('install.identifyHint')).toBe(
       'Call Bugping.identify({ email, id, name }) after sign-in.',
     );
+    const tRu = createTranslator({ locale: 'ru', messages: ru });
+    expect(tRu('install.step2Title')).toBe('Вставьте его перед </body>');
   });
 });

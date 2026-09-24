@@ -37,7 +37,17 @@ describe('projects', () => {
       expect(await listProjects(deps(db), a)).toEqual([
         { id: mine.id, name: 'Mine', public_key: mine.public_key },
       ]);
-      expect((await getProject(deps(db), a, mine.id))?.name).toBe('Mine');
+      expect(await getProject(deps(db), a, mine.id)).toMatchObject({
+        name: 'Mine',
+        widget_seen_at: null,
+      });
+      await db.query(
+        `update public.projects set widget_seen_at = '2026-09-20T10:00:00Z' where id = $1`,
+        [mine.id],
+      );
+      expect((await getProject(deps(db), a, mine.id))?.widget_seen_at).toBe(
+        '2026-09-20T10:00:00.000Z',
+      );
       expect(await getProject(deps(db), b, mine.id)).toBeNull();
       expect(await getProject(deps(db), a, 'not-a-uuid')).toBeNull();
     }));

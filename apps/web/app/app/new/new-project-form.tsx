@@ -42,11 +42,20 @@ export function NewProjectForm() {
         <p className="text-xs text-muted-foreground">{t('projects.siteUrlHint')}</p>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        >
           {t(error)}
         </p>
       )}
-      <Button type="submit" disabled={pending} data-testid="project-create">
+      <Button
+        type="submit"
+        size="lg"
+        className="font-semibold"
+        disabled={pending}
+        data-testid="project-create"
+      >
         {t('projects.create')}
       </Button>
     </form>

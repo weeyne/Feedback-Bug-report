@@ -1,9 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { Bell, Bot, ExternalLink, Gamepad2, Lock, Send, type LucideIcon } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
+import { cn } from 'cn';
 import {
   createTelegramLinkAction,
   disconnectIntegrationAction,
@@ -12,6 +21,7 @@ import {
   saveDiscordAction,
   sendTestAction,
 } from '@/app/app/actions';
+import { EmptyState } from '@/components/app/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type {
@@ -23,33 +33,48 @@ import type {
 const POLL_MS = 2000;
 const POLL_LIMIT_MS = 60_000;
 
-function IntegrationStatusLabel({ status }: { status: IntegrationStatus }) {
-  const t = useTranslations();
-  const format = useFormatter();
+const ICONS: Record<IntegrationKind, LucideIcon> = {
+  telegram_shared: Send,
+  telegram_custom: Bot,
+  discord: Gamepad2,
+};
+
+function IntegrationStatusChip({ status }: { status: IntegrationStatus }) {
+  const t = useTranslations('integrations');
+  const state = status.connected ? 'connected' : status.lastError ? 'error' : 'off';
   return (
-    <div className="text-xs" data-testid={`integration-${status.kind}-status`}>
-      {status.connected ? (
-        <span className="text-green-600">{t('integrations.connected')}</span>
-      ) : status.lastError ? (
-        <span className="text-destructive">
-          {t('integrations.error', { message: status.lastError })}
-        </span>
-      ) : (
-        <span className="text-muted-foreground">{t('integrations.notConnected')}</span>
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
+        state === 'connected' &&
+          'bg-green-600/10 text-green-700 dark:bg-green-400/10 dark:text-green-400',
+        state === 'error' && 'bg-destructive/10 text-destructive',
+        state === 'off' && 'bg-muted text-muted-foreground',
       )}
-      {status.lastDeliveredAt && (
-        <span className="ml-2 text-muted-foreground">
-          {t('integrations.lastDelivery', {
-            time: format.relativeTime(new Date(status.lastDeliveredAt)),
-          })}
-        </span>
-      )}
-    </div>
+      data-testid={`integration-${status.kind}-status`}
+      data-state={state}
+    >
+      <span
+        className={cn(
+          'size-1.5 shrink-0 rounded-full',
+          state === 'connected' && 'bg-green-600 dark:bg-green-400',
+          state === 'error' && 'bg-destructive',
+          state === 'off' && 'border border-muted-foreground/60',
+        )}
+        aria-hidden
+      />
+      {state === 'connected'
+        ? t('connected')
+        : state === 'error'
+          ? t('errorChip')
+          : t('notConnected')}
+    </span>
   );
 }
 
 function IntegrationCard({
   kind,
+  index,
   status,
   hint,
   children,
@@ -59,6 +84,7 @@ function IntegrationCard({
   onDisconnect,
 }: {
   kind: IntegrationKind;
+  index: number;
   status: IntegrationStatus;
   hint: string;
   children: ReactNode;
@@ -68,25 +94,50 @@ function IntegrationCard({
   onDisconnect: () => void;
 }) {
   const t = useTranslations();
+  const format = useFormatter();
   const exists = status.enabled || status.connected || status.lastError !== null;
+  const Icon = ICONS[kind];
   return (
     <section
-      className="flex flex-col gap-3 rounded-lg border p-4"
+      className="animate-enter flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5"
+      style={{ '--i': index } as CSSProperties}
       data-testid={`integration-${kind}`}
       data-connected={String(status.connected)}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-medium">
-            {t(`integrations.${kind}`)} {locked && <span className="text-xs">🔒 Pro</span>}
-          </h2>
-          <p className="text-sm text-muted-foreground">{hint}</p>
+      <div className="flex items-start gap-3">
+        <span
+          className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"
+          aria-hidden
+        >
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex flex-wrap items-center gap-2 font-bold">
+              {t(`integrations.${kind}`)}
+              {locked && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                  <Lock className="size-3" aria-hidden />
+                  Pro
+                </span>
+              )}
+            </h2>
+            <IntegrationStatusChip status={status} />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
         </div>
-        <IntegrationStatusLabel status={status} />
       </div>
+      {!status.connected && status.lastError && (
+        <p
+          className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm break-words text-destructive"
+          role="status"
+        >
+          {t('integrations.error', { message: status.lastError })}
+        </p>
+      )}
       {children}
       {exists && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-t pt-4">
           <Button
             size="sm"
             variant="outline"
@@ -105,6 +156,13 @@ function IntegrationCard({
           >
             {t('integrations.disconnect')}
           </Button>
+          {status.lastDeliveredAt && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              {t('integrations.lastDelivery', {
+                time: format.relativeTime(new Date(status.lastDeliveredAt)),
+              })}
+            </span>
+          )}
         </div>
       )}
     </section>
@@ -162,10 +220,22 @@ export function IntegrationsPanel(props: {
     });
 
   const custom = byKind('telegram_custom');
+  const noneConnected = statuses.every((s) => !s.connected);
   return (
     <div className="flex flex-col gap-4">
+      {noneConnected && (
+        <div className="animate-fade rounded-xl border border-dashed bg-card/60">
+          <EmptyState
+            icon={<Bell />}
+            title={t('integrations.emptyTitle')}
+            body={t('integrations.emptyBody')}
+            testId="integrations-empty"
+          />
+        </div>
+      )}
       <IntegrationCard
         kind="telegram_shared"
+        index={0}
         status={byKind('telegram_shared')}
         hint={t('integrations.telegram_sharedHint', { bot: props.bot })}
         pending={pending}
@@ -177,28 +247,45 @@ export function IntegrationsPanel(props: {
         }
       >
         {link ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
-              <a
-                href={link.privateUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-                data-testid="tg-private-link"
+              <Button
+                size="sm"
+                nativeButton={false}
+                render={
+                  <a
+                    href={link.privateUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="tg-private-link"
+                  />
+                }
               >
                 {t('integrations.privateChat')}
-              </a>
-              <a
-                href={link.groupUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-                data-testid="tg-group-link"
+                <ExternalLink aria-hidden />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                nativeButton={false}
+                render={
+                  <a
+                    href={link.groupUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="tg-group-link"
+                  />
+                }
               >
                 {t('integrations.addToGroup')}
-              </a>
+                <ExternalLink aria-hidden />
+              </Button>
             </div>
-            <p className="animate-pulse text-xs text-muted-foreground">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span
+                className="size-2 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+                aria-hidden
+              />
               {t('integrations.waitingTelegram')}
             </p>
           </div>
@@ -225,6 +312,7 @@ export function IntegrationsPanel(props: {
 
       <IntegrationCard
         kind="telegram_custom"
+        index={1}
         status={custom}
         hint={t('integrations.telegram_customHint')}
         locked={!props.pro}
@@ -237,10 +325,12 @@ export function IntegrationsPanel(props: {
         }
       >
         {custom.botUsername && (
-          <p className="text-sm">{t('integrations.bot', { username: custom.botUsername })}</p>
+          <p className="text-sm font-semibold">
+            {t('integrations.bot', { username: custom.botUsername })}
+          </p>
         )}
         <form
-          className="flex flex-wrap gap-2"
+          className="flex flex-wrap items-center gap-2"
           action={(form) =>
             run(
               () =>
@@ -259,13 +349,13 @@ export function IntegrationsPanel(props: {
               type="password"
               autoComplete="off"
               placeholder={t('integrations.botToken')}
-              className="max-w-xs"
+              className="min-w-40 flex-[2_1_12rem]"
               data-testid="custom-token"
             />
             <Input
               name="chatId"
               placeholder={t('integrations.chatId')}
-              className="max-w-[12rem]"
+              className="min-w-32 flex-[1_1_8rem]"
               data-testid="custom-chat"
             />
             <Button type="submit" size="sm" data-testid="custom-save">
@@ -277,6 +367,7 @@ export function IntegrationsPanel(props: {
 
       <IntegrationCard
         kind="discord"
+        index={2}
         status={byKind('discord')}
         hint={t('integrations.discordHint')}
         pending={pending}
@@ -286,7 +377,7 @@ export function IntegrationsPanel(props: {
         onDisconnect={() => run(() => disconnectIntegrationAction(props.projectId, 'discord'))}
       >
         <form
-          className="flex flex-wrap gap-2"
+          className="flex flex-wrap items-center gap-2"
           action={(form) =>
             run(
               () => saveDiscordAction(props.projectId, String(form.get('webhookUrl') ?? '')),
@@ -299,7 +390,7 @@ export function IntegrationsPanel(props: {
             type="url"
             autoComplete="off"
             placeholder="https://discord.com/api/webhooks/…"
-            className="max-w-md"
+            className="min-w-48 flex-[1_1_16rem]"
             disabled={pending}
             data-testid="discord-url"
           />

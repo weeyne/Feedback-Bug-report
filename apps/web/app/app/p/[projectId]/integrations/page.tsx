@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { IntegrationsPanel } from '@/components/app/integrations/integrations-panel';
+import { PageHeader } from '@/components/app/page-header';
 import { requireUser } from '@/lib/auth/session';
 import { integrationStatus } from '@/lib/dashboard/integrations';
 import { isPro } from '@/lib/dashboard/settings';
@@ -19,8 +20,8 @@ export default async function IntegrationsPage({
     isPro(deps, user.id),
   ]);
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 md:p-6">
+      <PageHeader title={t('title')} description={t('description')} />
       <IntegrationsPanel
         projectId={projectId}
         bot={deps.env.TELEGRAM_BOT_USERNAME}

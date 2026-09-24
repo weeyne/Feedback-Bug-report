@@ -1,9 +1,11 @@
 'use client';
 
+import { Check, Infinity as InfinityIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { SectionCard } from '@/components/app/page-header';
 import { Button } from '@/components/ui/button';
 import { billingStatusAction, openPortalAction, startCheckoutAction } from '@/app/app/actions';
 import { openPendingTab, pollActivation } from '@/lib/billing/browser';
@@ -80,47 +82,72 @@ export function BillingPanel(props: {
   const { overview } = props;
 
   if (activation !== 'idle') {
-    return activation === 'waiting' ? (
-      <p className="animate-pulse" data-testid="billing-activating">
-        {t('billing.activating')}
-      </p>
-    ) : (
-      <p data-testid="billing-activation-slow">{t('billing.activationSlow')}</p>
+    return (
+      <SectionCard>
+        {activation === 'waiting' ? (
+          <p className="flex items-center gap-2 text-sm" data-testid="billing-activating">
+            <span
+              className="size-2 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+              aria-hidden
+            />
+            {t('billing.activating')}
+          </p>
+        ) : (
+          <p className="text-sm" data-testid="billing-activation-slow">
+            {t('billing.activationSlow')}
+          </p>
+        )}
+      </SectionCard>
     );
   }
 
   if (overview.state === 'free') {
+    // One message, split into list items; items after the first start lowercase in the source.
+    const features = t('billing.features')
+      .split(' · ')
+      .map((f) => f.charAt(0).toLocaleUpperCase(locale) + f.slice(1));
     return (
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <section
-            className="flex flex-col gap-3 rounded-lg border p-5"
-            data-testid="billing-card-monthly"
-          >
-            <h2 className="font-semibold">{t('billing.monthly')}</h2>
-            <p className="text-sm text-muted-foreground">{t('billing.features')}</p>
+          <SectionCard index={1} title={t('billing.monthly')} data-testid="billing-card-monthly">
+            <ul className="flex flex-1 flex-col gap-1.5 text-sm">
+              {features.map((feature) => (
+                <li key={feature} className="flex items-start gap-2">
+                  <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                  <span className="text-muted-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
             <Button
+              size="lg"
+              className="font-semibold"
               disabled={pending}
               onClick={() => checkout('monthly')}
               data-testid="billing-upgrade-monthly"
             >
               {t('billing.buyMonthly')}
             </Button>
-          </section>
-          <section
-            className="flex flex-col gap-3 rounded-lg border p-5"
+          </SectionCard>
+          <SectionCard
+            index={2}
+            title={t('billing.lifetime')}
+            className="border-primary/40"
             data-testid="billing-card-lifetime"
           >
-            <h2 className="font-semibold">{t('billing.lifetime')}</h2>
-            <p className="text-sm text-muted-foreground">{t('billing.lifetimeNote')}</p>
+            <p className="flex flex-1 items-start gap-2 text-sm text-muted-foreground">
+              <InfinityIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+              {t('billing.lifetimeNote')}
+            </p>
             <Button
+              size="lg"
+              className="font-semibold"
               disabled={pending}
               onClick={() => checkout('lifetime')}
               data-testid="billing-upgrade-lifetime"
             >
               {t('billing.buyLifetime')}
             </Button>
-          </section>
+          </SectionCard>
         </div>
         <p className="text-xs text-muted-foreground">{t('billing.taxNote')}</p>
       </div>
@@ -128,26 +155,29 @@ export function BillingPanel(props: {
   }
 
   if (overview.state === 'lifetime') {
+    if (!overview.hasCustomer) return null;
     return (
-      <div className="flex flex-col items-start gap-3">
-        {overview.hasCustomer && (
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={portal}
-            data-testid="billing-manage"
-          >
-            {t('billing.receipts')}
-          </Button>
-        )}
-      </div>
+      <SectionCard index={1}>
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={pending}
+          onClick={portal}
+          data-testid="billing-manage"
+        >
+          {t('billing.receipts')}
+        </Button>
+      </SectionCard>
     );
   }
 
   return (
-    <div className="flex flex-col items-start gap-3">
+    <SectionCard index={1}>
       {overview.state === 'past_due' ? (
-        <p className="text-sm text-destructive" data-testid="billing-past-due">
+        <p
+          className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          data-testid="billing-past-due"
+        >
           {t('billing.pastDue')}
         </p>
       ) : (
@@ -173,6 +203,6 @@ export function BillingPanel(props: {
           </Button>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }

@@ -7,14 +7,13 @@ export interface EmptyStateProps {
   title: string;
   body?: string;
   action?: { href: string; label: string; variant?: 'default' | 'outline' };
+  /** Overrides the default `empty-state` test id. */
+  testId?: string;
 }
 
-export function EmptyState({ icon, title, body, action }: EmptyStateProps) {
+export function EmptyState({ icon, title, body, action, testId = 'empty-state' }: EmptyStateProps) {
   return (
-    <div
-      className="flex flex-col items-center gap-2 px-6 py-8 text-center"
-      data-testid="empty-state"
-    >
+    <div className="flex flex-col items-center gap-2 px-6 py-8 text-center" data-testid={testId}>
       {icon && (
         <div
           className="mb-1 grid size-11 place-items-center rounded-full bg-muted text-muted-foreground [&_svg]:size-5"

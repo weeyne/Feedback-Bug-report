@@ -25,4 +25,10 @@ describe('EmptyState', () => {
     expect(html).not.toContain('<a');
     expect(html).not.toContain('<p');
   });
+
+  it('accepts a custom test id', () => {
+    const html = renderToStaticMarkup(<EmptyState icon={null} title="None" testId="x-empty" />);
+    expect(html).toContain('data-testid="x-empty"');
+    expect(html).not.toContain('data-testid="empty-state"');
+  });
 });

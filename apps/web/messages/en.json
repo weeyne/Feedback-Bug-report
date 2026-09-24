@@ -170,11 +170,13 @@
     "nameInvalid": "Enter a name from 1 to 80 characters.",
     "urlInvalid": "Enter a valid website address.",
     "limitReached": "The Free plan includes one project. Upgrade to Pro for unlimited projects.",
-    "upgrade": "Upgrade to Pro"
+    "upgrade": "Upgrade to Pro",
+    "firstTitle": "Create your first project",
+    "welcome": "Welcome to Bugping! A project is one website: create it and you get a snippet to paste right away.",
+    "newDescription": "Each project is one website with its own widget and settings."
   },
   "install": {
     "title": "Install the widget",
-    "intro": "Paste this snippet before the closing '</body>' tag of your site.",
     "nextjsTitle": "Next.js / React",
     "nextjsHint": "Use next/script with strategy \"afterInteractive\" in your root layout.",
     "customTitle": "Your own button",
@@ -184,7 +186,15 @@
     "waiting": "Waiting for your first feedback…",
     "received": "🎉 Your first feedback arrived!",
     "openFeedback": "Open feedback",
-    "connectTelegram": "Connect Telegram"
+    "connectTelegram": "Connect Telegram",
+    "description": "Three steps and your site starts collecting feedback.",
+    "step1Title": "Copy the snippet",
+    "step2Title": "Paste it before '</body>'",
+    "step2Hint": "Add it to every page where the widget should appear.",
+    "step3Title": "Open your site — the checklist ticks itself",
+    "step3Hint": "Then send a test from the widget: it shows up here right away.",
+    "seen": "Widget seen {time}",
+    "notSeen": "Not seen yet"
   },
   "feedback": {
     "title": "Feedback",
@@ -252,7 +262,12 @@
     "danger": "Danger zone",
     "deleteProject": "Delete project",
     "deleteHint": "This deletes all feedback, screenshots and integrations. Type the project name to confirm.",
-    "confirmMismatch": "The name does not match."
+    "confirmMismatch": "The name does not match.",
+    "description": "How the widget looks and where it accepts feedback from.",
+    "groupProject": "Project",
+    "groupAppearance": "Appearance",
+    "appearanceHint": "Changes show up in the preview right away.",
+    "groupPro": "Branding and custom CSS"
   },
   "integrations": {
     "title": "Integrations",
@@ -284,11 +299,14 @@
     "invalidWebhook": "Enter a Discord webhook URL (https://discord.com/api/webhooks/…).",
     "testFailed": "The test message could not be delivered. Check the settings.",
     "proRequired": "Available on Pro.",
-    "notConnectedError": "Connect this integration first."
+    "notConnectedError": "Connect this integration first.",
+    "description": "Get every new report in Telegram or Discord the moment it is sent.",
+    "errorChip": "Error",
+    "emptyTitle": "No notifications yet",
+    "emptyBody": "Connect Telegram or Discord below so new feedback never waits in the dashboard."
   },
   "billing": {
     "title": "Billing",
-    "current": "Current plan: {plan}",
     "free": "Free",
     "pro": "Pro",
     "proLifetime": "Pro Lifetime",
@@ -316,7 +334,9 @@
     "alreadySubscribed": "You already have an active Pro subscription.",
     "checkoutFailed": "Could not open checkout. Try again.",
     "noCustomer": "No billing account yet.",
-    "portalFailed": "Could not open the billing portal. Try again."
+    "portalFailed": "Could not open the billing portal. Try again.",
+    "description": "Your plan, this month’s usage and payments.",
+    "currentLabel": "Current plan"
   },
   "account": {
     "title": "Account",
@@ -325,6 +345,8 @@
     "deleteTitle": "Delete account",
     "deleteHint": "Deletes all projects, feedback, screenshots and integrations. Type your email to confirm.",
     "delete": "Delete my account",
-    "confirmMismatch": "The email does not match."
+    "confirmMismatch": "The email does not match.",
+    "description": "Your sign-in details and interface language.",
+    "profile": "Profile"
   }
 }
