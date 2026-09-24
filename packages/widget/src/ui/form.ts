@@ -194,13 +194,16 @@ export function createForm(options: {
   }
 
   function start(next: FeedbackType, canGoBack = true) {
+    // A send in flight owns this form (its type, timer and screenshot): navigating back to a
+    // form meanwhile returns to that send instead of starting a new one underneath it.
+    if (sending) return;
     type = next;
     emoji.textContent = TYPE_EMOJI[next];
     titleText.textContent = t.cards[next];
     message.placeholder = t.placeholders[next];
     message.setAttribute('aria-label', t.placeholders[next]);
     back.hidden = !canGoBack;
-    if (!sending) clearMessages();
+    clearMessages();
     openedAt = safeNow();
     shotBlock.reset(next === 'bug');
   }
@@ -243,16 +246,22 @@ export function createForm(options: {
     setBusy(true);
     status.textContent = '';
     retry.hidden = true;
+    // Everything the payload needs is read now, before any await, so nothing that happens while
+    // the screenshot settles can change what this send submits.
+    const sentType = type;
+    const elapsedMs = safeNow() - openedAt;
+    const website = honeypot.value;
     try {
+      const metadata = deps.collectMetadata();
       const screenshot = await shotBlock.result(CAPTURE_WAIT_MS);
       const payload = buildPayload({
         projectKey: deps.projectKey,
-        type,
+        type: sentType,
         message: text,
         email: mail,
-        metadata: deps.collectMetadata(),
-        elapsedMs: safeNow() - openedAt,
-        website: honeypot.value,
+        metadata,
+        elapsedMs,
+        website,
       });
       const result = await deps.submit(payload, screenshot);
       if (result.ok) options.onSent();

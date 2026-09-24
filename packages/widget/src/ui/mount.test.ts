@@ -687,6 +687,42 @@ describe('preview and lifecycle', () => {
     expect(submit.mock.calls[0]![1]).toBe(shotB);
   });
 
+  for (const via of ['back', 'close and reopen'] as const) {
+    it(`a send waiting for the capture keeps its type, time and screenshot (${via} → idea)`, async () => {
+      const capture = deferred<Blob | null>();
+      const { handle, q, root, panel, message, escape, submit, tick } = setup({
+        deps: { loadCapture: async () => () => capture.promise },
+      });
+      handle.open('bug');
+      tick(30000);
+      message().value = 'Checkout fails';
+      q('.bp-send')!.click();
+      await flush();
+      expect(submit).not.toHaveBeenCalled();
+
+      if (via === 'back') {
+        q('.bp-back')!.click();
+      } else {
+        escape();
+        handle.open();
+      }
+      expect(panel().dataset.screen).toBe('home');
+      q('.bp-card[data-type="idea"]')!.click();
+      // The in-flight bug send is shown again instead of a fresh idea form.
+      expect(panel().dataset.screen).toBe('form');
+      expect(root.getElementById('bp-form-title')!.textContent).toContain('Report a bug');
+      expect(q('.bp-send')!.getAttribute('aria-busy')).toBe('true');
+
+      tick(500);
+      capture.resolve(shot);
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      const [payload, blob] = submit.mock.calls[0]!;
+      expect(payload).toMatchObject({ type: 'bug', message: 'Checkout fails', elapsedMs: 30000 });
+      expect(blob).toBe(shot);
+      await vi.waitFor(() => expect(q('.bp-thanks')!.hidden).toBe(false));
+    });
+  }
+
   it('resets instead of showing thanks when closed while a send is in flight', async () => {
     const pending = deferred<SubmitResult>();
     const submit = vi.fn<() => Promise<SubmitResult>>().mockReturnValue(pending.promise);
