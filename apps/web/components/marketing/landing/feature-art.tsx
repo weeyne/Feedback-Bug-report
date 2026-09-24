@@ -221,8 +221,9 @@ export function BrandArt({ trigger }: { trigger: string }) {
           />
         ))}
       </div>
-      {/* The round launcher; the button text is its tooltip and accessible name. */}
-      <span className="flex items-center gap-2">
+      {/* The round launcher; the button text is its tooltip and accessible name. Stays on the
+          right (like the real one in the corner) when a long label wraps it below the swatches. */}
+      <span className="ml-auto flex items-center gap-2">
         <span className="rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-sm">
           {trigger}
         </span>

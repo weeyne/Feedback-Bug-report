@@ -43,7 +43,10 @@ export async function Pricing() {
                   </span>
                 ) : null}
                 <h3 className="text-lg font-extrabold tracking-tight">{t(`pricing.${key}Name`)}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{t(`pricing.${key}Tagline`)}</p>
+                {/* Two lines reserved side by side, so a wrapping tagline doesn't push one price lower. */}
+                <p className="mt-1 text-sm text-muted-foreground lg:min-h-10">
+                  {t(`pricing.${key}Tagline`)}
+                </p>
                 <p className="mt-6 flex items-baseline gap-1.5">
                   <span className="text-4xl font-extrabold tracking-tight">
                     {t(`pricing.${key}Price`)}
