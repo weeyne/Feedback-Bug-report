@@ -193,6 +193,11 @@
     transform: translateY(6px);
   }
 }
+@keyframes bp-fade {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes bp-grow {
   from {
     transform: scaleY(0);
@@ -214,6 +219,11 @@
 .animate-enter {
   animation: bp-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
   animation-delay: calc(var(--i, 0) * 60ms);
+}
+/* Page-level enter: opacity only, because any transform (even mid-animation) makes the wrapper the
+   containing block of `position: fixed` descendants such as the mobile feedback detail panel. */
+.animate-fade {
+  animation: bp-fade 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
 }
 .animate-grow {
   transform-origin: bottom;
@@ -245,6 +255,7 @@
     transition: none;
   }
   .animate-enter,
+  .animate-fade,
   .animate-grow,
   .animate-draw,
   .animate-slide {
