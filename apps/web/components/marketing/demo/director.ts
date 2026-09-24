@@ -331,7 +331,9 @@ export function createDirector(options: DirectorOptions): Director {
     const pay = frame?.document.querySelector(`#${DEMO_PAY_ID}`);
     if (!frame || !pay) fail(`#${DEMO_PAY_ID} is missing`);
     // The screenshot is the shop's viewport (screenshot.ts), shown whole on the canvas: map
-    // viewport coordinates onto the canvas box.
+    // viewport coordinates onto the canvas box. This assumes the capture is not downscaled, i.e.
+    // frame.innerWidth ≤ the screenshot's MAX_WIDTH (1600 px, packages/widget/src/screenshot.ts),
+    // so image px = CSS px; the demo store's iframe is 1280 px wide.
     const box = canvas.getBoundingClientRect();
     const target = pay.getBoundingClientRect();
     const sx = box.width / frame.innerWidth;
@@ -357,7 +359,7 @@ export function createDirector(options: DirectorOptions): Director {
           pointerType: 'mouse',
           isPrimary: true,
           button: 0,
-          buttons: type === 'pointerup' ? 0 : 1,
+          buttons: type === 'pointerdown' || type === 'pointermove' ? 1 : 0,
           clientX: x,
           clientY: y,
         }),
@@ -366,16 +368,33 @@ export function createDirector(options: DirectorOptions): Director {
     stage.moveCursor(from.x, from.y, CURSOR_MOVE_MS);
     await scheduler.sleep(CURSOR_MOVE_MS);
     stage.press();
-    pointer('pointerdown', from.x, from.y);
-    const stepMs = DRAG_MS / DRAG_STEPS;
-    for (let i = 1; i <= DRAG_STEPS; i++) {
-      await scheduler.sleep(stepMs);
-      const x = from.x + ((to.x - from.x) * i) / DRAG_STEPS;
-      const y = from.y + ((to.y - from.y) * i) / DRAG_STEPS;
-      stage.moveCursor(x, y, stepMs);
-      pointer('pointermove', x, y);
+    /** Where the pointer is while pressed; null once released (or before the press). */
+    let pressed: { x: number; y: number } | null = null;
+    try {
+      pointer('pointerdown', from.x, from.y);
+      pressed = from;
+      const stepMs = DRAG_MS / DRAG_STEPS;
+      for (let i = 1; i <= DRAG_STEPS; i++) {
+        await scheduler.sleep(stepMs);
+        const x = from.x + ((to.x - from.x) * i) / DRAG_STEPS;
+        const y = from.y + ((to.y - from.y) * i) / DRAG_STEPS;
+        stage.moveCursor(x, y, stepMs);
+        pointer('pointermove', x, y);
+        pressed = { x, y };
+      }
+      pointer('pointerup', to.x, to.y);
+      pressed = null;
+    } finally {
+      // Interrupted mid-drag (stop(), a failure): release the pointer so the editor never keeps a
+      // half-drawn stroke. Best effort: the frame may already be gone.
+      if (pressed) {
+        try {
+          pointer('pointercancel', pressed.x, pressed.y);
+        } catch {
+          // nothing left to release
+        }
+      }
     }
-    pointer('pointerup', to.x, to.y);
   }
 
   async function type(textarea: HTMLTextAreaElement, text: string) {

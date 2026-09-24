@@ -41,9 +41,9 @@ export async function HowItWorks({ appUrl }: { appUrl: string }) {
   const t = await getTranslations('landing.how');
   const snippet = installSnippet(appUrl, PLACEHOLDER_KEY);
   return (
-    <section id="how" className="border-y bg-muted/40">
+    <section id="how" aria-labelledby="how-title" className="border-y bg-muted/40">
       <div className={cn(CONTAINER, 'py-20')}>
-        <SectionHeading title={t('title')} subtitle={t('subtitle')} />
+        <SectionHeading id="how-title" title={t('title')} subtitle={t('subtitle')} />
         <Reveal stagger className="mt-12">
           <ol className="grid gap-4 lg:grid-cols-3 lg:gap-5">
             <Step n={1} title={t('step1Title')} body={t('step1Body')} />

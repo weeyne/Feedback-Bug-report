@@ -24,8 +24,17 @@ const PLANS: {
 export async function Pricing() {
   const t = await getTranslations('landing');
   return (
-    <section id="pricing" data-testid="landing-pricing" className={cn(CONTAINER, 'py-20')}>
-      <SectionHeading title={t('pricing.title')} subtitle={t('pricing.subtitle')} />
+    <section
+      id="pricing"
+      aria-labelledby="pricing-title"
+      data-testid="landing-pricing"
+      className={cn(CONTAINER, 'py-20')}
+    >
+      <SectionHeading
+        id="pricing-title"
+        title={t('pricing.title')}
+        subtitle={t('pricing.subtitle')}
+      />
       <Reveal stagger className="mt-12">
         <ul className="mx-auto grid max-w-md gap-4 lg:max-w-none lg:grid-cols-3 lg:items-stretch lg:gap-5">
           {PLANS.map(({ key, features, href, cta, featured }, i) => (

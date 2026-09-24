@@ -26,7 +26,11 @@ import {
   type Director,
   type DirectorStage,
 } from './director';
-import { DEMO_MESSAGE, type DemoScreenshotMessage } from './protocol';
+import {
+  DEMO_MESSAGE,
+  type DemoDashboardShowMessage,
+  type DemoScreenshotMessage,
+} from './protocol';
 import type { SubmittedMessage } from './shop-bridge';
 import {
   appHost,
@@ -249,6 +253,11 @@ function LiveStage({ runtime, locale, host, loop, active, onFallback, onDone }: 
         setScene(next);
         setLabel(next);
         if (next === 'telegram') later(() => setTelegramShow(true), TELEGRAM_BUBBLE_DELAY_MS);
+        if (next === 'dashboard') {
+          // The dashboard loaded (and ran its entry animations) while hidden: replay them now.
+          const message: DemoDashboardShowMessage = { type: DEMO_MESSAGE.dashboardShow };
+          dashboardRef.current?.contentWindow?.postMessage(message, origin);
+        }
       },
       waitSubmitted() {
         return new Promise((resolve) => {
@@ -437,17 +446,21 @@ function StaticFrames({
   host: string;
 }) {
   const [time] = useState(() => clockTime(new Date()));
+  /** Object URL of the static store's capture, for the Telegram frame; null until it is taken. */
+  const [image, setImage] = useState<string | null>(null);
   const load = runtime !== null;
   const shopRef = useRef<HTMLIFrameElement>(null);
   const dashboardRef = useRef<HTMLIFrameElement>(null);
 
-  // The fixture dashboard gets the static store's real auto-capture (the widget's thumbnail blob),
-  // so its screenshot panel is never empty.
+  // The fixture dashboard and the Telegram frame get the static store's real auto-capture (the
+  // widget's thumbnail blob), so both show the same screenshot. Until it exists, the Telegram
+  // frame shows the report as a text message.
   useEffect(() => {
     if (!load) return;
     const origin = window.location.origin;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let imageUrl: string | null = null;
     const deliver = (target: Window, attempt: number) => {
       timer = null;
       const img = shopRef.current?.contentDocument
@@ -465,6 +478,9 @@ function StaticFrames({
           if (cancelled) return;
           const message: DemoScreenshotMessage = { type: DEMO_MESSAGE.screenshot, blob };
           target.postMessage(message, origin);
+          if (imageUrl) URL.revokeObjectURL(imageUrl);
+          imageUrl = URL.createObjectURL(blob);
+          setImage(imageUrl);
         })
         .catch(() => undefined);
     };
@@ -482,6 +498,8 @@ function StaticFrames({
       cancelled = true;
       window.removeEventListener('message', onMessage);
       if (timer !== null) clearTimeout(timer);
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      setImage(null);
     };
   }, [load]);
 
@@ -506,7 +524,7 @@ function StaticFrames({
       </div>
       <BrowserFrame scene="telegram" host={host}>
         {runtime && (
-          <TelegramChat caption={runtime.fixtureCaption(locale)} image={null} time={time} show />
+          <TelegramChat caption={runtime.fixtureCaption(locale)} image={image} time={time} show />
         )}
       </BrowserFrame>
       <BrowserFrame scene="dashboard" host={host}>

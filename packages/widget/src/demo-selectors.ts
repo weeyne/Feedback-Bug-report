@@ -30,8 +30,8 @@ export const DEMO_SELECTORS = Object.freeze({
   message: '.bp-message',
   /** The form's Send button. */
   send: '.bp-send',
-  /** The "Thanks" screen. */
-  thanks: '.bp-thanks',
+  /** The "Thanks" screen, once shown (it is in the panel from the start, `hidden`). */
+  thanks: '.bp-thanks:not([hidden])',
 } as const);
 
 export type DemoSelector = keyof typeof DEMO_SELECTORS;

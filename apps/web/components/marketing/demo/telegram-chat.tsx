@@ -8,6 +8,7 @@ import {
   SendHorizontal,
   SmilePlus,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { cn } from 'cn';
 import { LadybugMark } from '@/components/brand/logo';
@@ -19,7 +20,9 @@ import { TelegramHtml } from './telegram-html';
  * 1280×720 canvas). The history is what a real connection leaves behind: the owner's `/start`
  * (read ticks) and the bot's "Connected" reply; then the report arrives as a photo with the real
  * caption (or as a text message when there is no screenshot). Telegram's own colours are literal
- * values with light/dark pairs; no Telegram assets are used.
+ * values with light/dark pairs; no Telegram assets are used. The client's chrome ("Today",
+ * "Message", "bot") follows the page locale, like a real Telegram client would; the bot's
+ * messages and the owner's `/start` stay English, as the real bot sends them.
  */
 export interface TelegramChatProps {
   /** Telegram HTML, as `formatTelegram(...).full` produces it (see `demoCaption`). */
@@ -196,6 +199,7 @@ function Report({ caption, image, time }: Pick<TelegramChatProps, 'caption' | 'i
 const REPORT_GAP = 8;
 
 export function TelegramChat({ caption, image, time, show, className }: TelegramChatProps) {
+  const t = useTranslations('landing.demo.telegram');
   const reportRef = useRef<HTMLDivElement>(null);
   const [reportHeight, setReportHeight] = useState(0);
   // No transitions until the report is measured, so the first paint never animates.
@@ -229,7 +233,9 @@ export function TelegramChat({ caption, image, time, show, className }: Telegram
         </span>
         <span className="flex min-w-0 flex-col">
           <span className="text-[16px] leading-[1.35] font-medium">Bugping</span>
-          <span className="text-[14px] leading-[1.3] text-[#707579] dark:text-[#aaaaaa]">bot</span>
+          <span className="text-[14px] leading-[1.3] text-[#707579] dark:text-[#aaaaaa]">
+            {t('bot')}
+          </span>
         </span>
         <span className="ml-auto flex items-center gap-[4px] text-[#707579] dark:text-[#aaaaaa]">
           <span className="flex size-[40px] items-center justify-center">
@@ -260,7 +266,7 @@ export function TelegramChat({ caption, image, time, show, className }: Telegram
           >
             <div className="flex justify-center">
               <span className="rounded-full bg-[#4a7a3a]/40 px-[10px] py-[3px] text-[14px] leading-[1.35] font-medium text-white dark:bg-black/40">
-                Today
+                {t('today')}
               </span>
             </div>
             <OutgoingText text="/start" time={earlier(time, 3)} />
@@ -284,7 +290,9 @@ export function TelegramChat({ caption, image, time, show, className }: Telegram
         <div className="relative mx-auto flex w-full max-w-[728px] shrink-0 items-end gap-[8px] px-[16px] pb-[18px]">
           <div className="relative flex h-[54px] flex-1 items-center gap-[10px] rounded-[16px] rounded-br-none bg-white px-[14px] text-[#707579] shadow-[0_1px_2px_rgba(16,35,47,.15)] dark:bg-[#212121] dark:text-[#aaaaaa]">
             <SmilePlus className="size-[24px]" strokeWidth={1.8} aria-hidden="true" />
-            <span className="flex-1 text-[16px] text-[#a2acb4] dark:text-[#707579]">Message</span>
+            <span className="flex-1 text-[16px] text-[#a2acb4] dark:text-[#707579]">
+              {t('message')}
+            </span>
             <Paperclip className="size-[24px]" strokeWidth={1.8} aria-hidden="true" />
             <Tail side="right" className="text-white dark:text-[#212121]" />
           </div>

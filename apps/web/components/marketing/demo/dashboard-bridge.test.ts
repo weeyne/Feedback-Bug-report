@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DEMO_REPLAY_SELECTOR,
   DEMO_SCREENSHOT_SELECTOR,
   installDashboardBridge,
   type DashboardBridgeWindow,
@@ -8,19 +9,46 @@ import { DEMO_MESSAGE } from './protocol';
 
 const ORIGIN = 'https://bugping.app';
 
-function fakeWindow({ embedded = true } = {}) {
+/** An element that logs its `animation-name` writes and the style flush (`offsetWidth`). */
+const fakeElement = (name: string, calls: string[]) => {
+  const style = {
+    set animationName(value: string) {
+      calls.push(`${name}:${value || 'stylesheet'}`);
+    },
+    get animationName() {
+      return '';
+    },
+  };
+  return {
+    src: '',
+    style,
+    get offsetWidth() {
+      calls.push('flush');
+      return 0;
+    },
+  };
+};
+
+function fakeWindow({ embedded = true, reduced = false } = {}) {
   const postMessage = vi.fn();
   const parent = { postMessage };
-  const images = [{ src: 'data:placeholder' }];
+  const calls: string[] = [];
+  const image = fakeElement('img', calls);
+  image.src = 'data:placeholder';
+  const images = [image];
+  const animated = [fakeElement('page', calls), fakeElement('detail', calls)];
   const listeners = new Set<(event: MessageEvent) => void>();
   let next = 0;
   const createObjectURL = vi.fn(() => `blob:${ORIGIN}/${++next}`);
   const revokeObjectURL = vi.fn();
-  const querySelectorAll = vi.fn(() => images);
+  const querySelectorAll = vi.fn((selector: string) =>
+    selector === DEMO_REPLAY_SELECTOR ? animated : images,
+  );
   const win: DashboardBridgeWindow = {
     parent,
     location: { origin: ORIGIN },
     document: { querySelectorAll },
+    matchMedia: () => ({ matches: reduced }),
     URL: { createObjectURL, revokeObjectURL },
     addEventListener: (_type, listener) => listeners.add(listener),
     removeEventListener: (_type, listener) => listeners.delete(listener),
@@ -32,6 +60,8 @@ function fakeWindow({ embedded = true } = {}) {
   return {
     win,
     parent,
+    calls,
+    animated,
     postMessage,
     images,
     listeners,
@@ -101,5 +131,39 @@ describe('demo dashboard bridge', () => {
     cleanup();
     expect(listeners.size).toBe(0);
     expect(revokeObjectURL).toHaveBeenCalledWith(`blob:${ORIGIN}/1`);
+  });
+
+  it('restarts the entry animations when the stage shows scene 3', () => {
+    const { win, parent, dispatch, calls } = fakeWindow();
+    installDashboardBridge(win);
+    const source = parent as unknown as Window;
+    dispatch({ origin: ORIGIN, source, data: { type: DEMO_MESSAGE.dashboardShow } });
+    // Off, one style flush, back to the stylesheet's own animation.
+    expect(calls).toEqual([
+      'page:none',
+      'detail:none',
+      'flush',
+      'page:stylesheet',
+      'detail:stylesheet',
+    ]);
+    // Not from another source or origin.
+    dispatch({ origin: ORIGIN, source: {} as Window, data: { type: DEMO_MESSAGE.dashboardShow } });
+    dispatch({
+      origin: 'https://evil.example',
+      source,
+      data: { type: DEMO_MESSAGE.dashboardShow },
+    });
+    expect(calls).toHaveLength(5);
+  });
+
+  it('replays nothing under reduced motion', () => {
+    const { win, parent, dispatch, calls } = fakeWindow({ reduced: true });
+    installDashboardBridge(win);
+    dispatch({
+      origin: ORIGIN,
+      source: parent as unknown as Window,
+      data: { type: DEMO_MESSAGE.dashboardShow },
+    });
+    expect(calls).toEqual([]);
   });
 });

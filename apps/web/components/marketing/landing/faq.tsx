@@ -11,9 +11,15 @@ const QUESTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 export async function Faq({ hasOwnWidget }: { hasOwnWidget: boolean }) {
   const t = await getTranslations('landing.faq');
   return (
-    <section id="faq" data-testid="landing-faq" className={cn(CONTAINER, 'py-20')}>
+    <section
+      id="faq"
+      aria-labelledby="faq-title"
+      data-testid="landing-faq"
+      className={cn(CONTAINER, 'py-20')}
+    >
       <div className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-16">
         <SectionHeading
+          id="faq-title"
           align="start"
           className="lg:sticky lg:top-24 lg:self-start"
           title={t('title')}

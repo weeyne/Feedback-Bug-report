@@ -106,9 +106,12 @@ function createShop(options: { missing?: string; captureMs?: number } = {}) {
   const rectTool = new FakeElement('rectTool', box(500, 680));
   const canvas = new FakeElement('canvas', CANVAS);
   const done = new FakeElement('done', box(700, 680), () => {
-    editorOpen = false;
-    thumb = null;
-    setTimeout(() => (thumb = new FakeElement('annotatedThumb', box(1000, 200))), EXPORT_MS);
+    // Like the real editor: it stays open (the old thumbnail stays ready) while the annotated image
+    // exports, then closes in the same step the new thumbnail appears.
+    setTimeout(() => {
+      editorOpen = false;
+      thumb = new FakeElement('annotatedThumb', box(1000, 200));
+    }, EXPORT_MS);
   });
   const pay = new FakeElement('pay', PAY);
 
@@ -419,6 +422,26 @@ describe('demo director', () => {
       'fallback',
     ]);
     expect(stage.fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the pointer with pointercancel when stopped mid-drag', async () => {
+    const shop = createShop();
+    const stage = createStage(shop);
+    director = createDirector({ frame: () => shop.frame, stage, clock, locale: 'en' });
+    director.start();
+    await until(() => shop.canvas.events.filter((e) => e.type === 'pointermove').length >= 3);
+    director.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    const types = shop.canvas.events.map((e) => e.type);
+    expect(types.at(-1)).toBe('pointercancel');
+    expect(types).not.toContain('pointerup');
+    const last = shop.canvas.events.at(-1)!.init;
+    expect(last).toMatchObject({ buttons: 0, pointerId: 1 });
+    expect(last).toMatchObject({
+      clientX: shop.canvas.events.at(-2)!.init.clientX,
+      clientY: shop.canvas.events.at(-2)!.init.clientY,
+    });
+    expect(stage.fallback).not.toHaveBeenCalled();
   });
 
   it('gives up on a target after STEP_TIMEOUT_MS of polling', async () => {

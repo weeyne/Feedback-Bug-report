@@ -81,6 +81,7 @@ describe('DEMO_SELECTORS', () => {
     expect(root).not.toBeNull();
 
     // 1. Launcher → home screen.
+    expect(root.querySelector(DEMO_SELECTORS.thanks)).toBeNull();
     one(root, DEMO_SELECTORS.launcher).click();
     // 2. "Report a bug" → the form; the auto-capture settles into the ready state.
     one(root, DEMO_SELECTORS.bugCard).click();
@@ -115,7 +116,9 @@ describe('DEMO_SELECTORS', () => {
     message.value = 'The pay button does nothing';
     message.dispatchEvent(new Event('input', { bubbles: true }));
 
-    // 6. Send → the thanks screen.
+    // 6. Send → the thanks screen. Until then the (hidden) thanks screen must not match.
+    expect(root.querySelector('.bp-thanks')).not.toBeNull();
+    expect(root.querySelector(DEMO_SELECTORS.thanks)).toBeNull();
     one(root, DEMO_SELECTORS.send).click();
     await flush();
     await flush();

@@ -145,7 +145,12 @@
       "sceneTelegram": "Your Telegram",
       "sceneDashboard": "Your Bugping dashboard",
       "play": "Play demo",
-      "srDescription": "Demo: on an online store, a customer opens the Bugping widget, takes a screenshot, draws a box around the broken Pay button, types “The pay button does nothing” and sends the report. Seconds later it arrives in your Telegram with the screenshot, page, browser and console error, and appears in your Bugping dashboard."
+      "srDescription": "Demo: on an online store, a customer opens the Bugping widget, takes a screenshot, draws a box around the broken Pay button, types “The pay button does nothing” and sends the report. Seconds later it arrives in your Telegram with the screenshot, page, browser and console error, and appears in your Bugping dashboard.",
+      "telegram": {
+        "today": "Today",
+        "message": "Message",
+        "bot": "bot"
+      }
     },
     "nav": {
       "label": "Main",

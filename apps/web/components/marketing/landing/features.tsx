@@ -60,8 +60,8 @@ export async function Features() {
     getTranslations('feedback'),
   ]);
   return (
-    <section id="features" className={cn(CONTAINER, 'py-20')}>
-      <SectionHeading title={t('title')} subtitle={t('subtitle')} />
+    <section id="features" aria-labelledby="features-title" className={cn(CONTAINER, 'py-20')}>
+      <SectionHeading id="features-title" title={t('title')} subtitle={t('subtitle')} />
       <Reveal stagger className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
         <Tile
           index={0}
