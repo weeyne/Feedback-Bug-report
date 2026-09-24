@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { ArrowLeft, LogOut, UserRound } from 'lucide-react';
@@ -37,16 +37,16 @@ async function Nav({ projects, email, usage, plan, newCounts, pathname }: ShellP
         <PlanCard plan={plan} usage={usage} />
         <ul className="flex flex-col gap-0.5 text-sm">
           <li>
-            <Link href="/" className={footerLink} data-testid="nav-back-to-site">
+            <AppLink href="/" className={footerLink} data-testid="nav-back-to-site">
               <ArrowLeft className="size-4 shrink-0" aria-hidden />
               {t('backToSite')}
-            </Link>
+            </AppLink>
           </li>
           <li>
-            <Link href="/app/account" className={footerLink} data-testid="nav-account">
+            <AppLink href="/app/account" className={footerLink} data-testid="nav-account">
               <UserRound className="size-4 shrink-0" aria-hidden />
               {t('account')}
-            </Link>
+            </AppLink>
           </li>
         </ul>
         <div className="flex items-center gap-2 border-t border-sidebar-border pt-3">

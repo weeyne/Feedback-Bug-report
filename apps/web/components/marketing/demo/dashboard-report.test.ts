@@ -6,6 +6,7 @@ import {
   DEMO_REPORT_MAX_CHARS,
   encodeDemoReport,
   toFeedbackDetail,
+  trustedReportParam,
   type DemoReport,
 } from './dashboard-report';
 import { DEMO_FEEDBACK_ID, DEMO_PROJECT_ID, fixtureReport } from './demo-report';
@@ -79,6 +80,27 @@ describe('demo dashboard report (?r=)', () => {
   });
 });
 
+describe('trustedReportParam', () => {
+  const frame = { dest: 'iframe', site: 'same-origin' };
+
+  it('honours ?r= only for a same-origin iframe load', () => {
+    expect(trustedReportParam('abc', frame)).toBe('abc');
+  });
+
+  it('ignores ?r= for direct visits, cross-site frames and missing headers', () => {
+    expect(trustedReportParam('abc', { dest: 'document', site: 'none' })).toBeUndefined();
+    expect(trustedReportParam('abc', { dest: 'document', site: 'same-origin' })).toBeUndefined();
+    expect(trustedReportParam('abc', { dest: 'iframe', site: 'cross-site' })).toBeUndefined();
+    expect(trustedReportParam('abc', { dest: 'iframe', site: 'same-site' })).toBeUndefined();
+    expect(trustedReportParam('abc', { dest: null, site: null })).toBeUndefined();
+  });
+
+  it('ignores a missing or repeated ?r=', () => {
+    expect(trustedReportParam(undefined, frame)).toBeUndefined();
+    expect(trustedReportParam(['a', 'b'], frame)).toBeUndefined();
+  });
+});
+
 describe('toFeedbackDetail', () => {
   const now = new Date('2026-09-24T14:32:05.000Z');
 
@@ -120,5 +142,7 @@ describe('toFeedbackDetail', () => {
     expect(item.message.endsWith('😀')).toBe(true);
     expect(detail.message).toBe(message);
     expect(detail.metadata.consoleErrors).toEqual(fixtureReport('ru').metadata.consoleErrors);
+    // The fixture's page is the fictional store's checkout.
+    expect(item.page).toBe('/checkout');
   });
 });

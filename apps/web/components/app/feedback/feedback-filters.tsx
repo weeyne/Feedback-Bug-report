@@ -1,6 +1,6 @@
 import type { FeedbackType } from '@bugping/shared';
 import { Bug, Lightbulb, MessageCircle } from 'lucide-react';
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { cn } from 'cn';
@@ -47,7 +47,7 @@ export async function StatusTabs({
           const active = status === value;
           return (
             <li key={value}>
-              <Link
+              <AppLink
                 href={feedHref(base, value, type)}
                 aria-current={active ? 'page' : undefined}
                 data-testid={`status-tab-${value}`}
@@ -64,7 +64,7 @@ export async function StatusTabs({
                     {counts.new}
                   </span>
                 )}
-              </Link>
+              </AppLink>
             </li>
           );
         })}
@@ -91,7 +91,7 @@ export async function TypeChips({
           const active = (type ?? 'all') === value;
           return (
             <li key={value}>
-              <Link
+              <AppLink
                 href={feedHref(base, status, value)}
                 aria-current={active ? 'true' : undefined}
                 data-testid={`filter-type-${value}`}
@@ -104,7 +104,7 @@ export async function TypeChips({
               >
                 {value !== 'all' && TYPE_ICON[value]}
                 {value === 'all' ? t('typeAll') : t(`types_${value}`)}
-              </Link>
+              </AppLink>
             </li>
           );
         })}

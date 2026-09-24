@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
@@ -51,7 +51,7 @@ export function ProjectNav({
             const active = section === key;
             return (
               <li key={key}>
-                <Link
+                <AppLink
                   href={
                     key === 'overview'
                       ? `/app/p/${currentProjectId}`
@@ -76,7 +76,7 @@ export function ProjectNav({
                       {newCount}
                     </span>
                   )}
-                </Link>
+                </AppLink>
               </li>
             );
           })}

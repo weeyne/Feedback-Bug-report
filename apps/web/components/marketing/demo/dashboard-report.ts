@@ -73,6 +73,21 @@ export function encodeDemoReport(
 }
 
 /**
+ * The `?r=` value the page may honour, or `undefined` (→ the fixture). The demo stage loads
+ * /demo/dashboard in a same-origin iframe; anyone else (a shared link, a cross-site frame, a
+ * crawler) must not get arbitrary text rendered as a Bugping dashboard on the brand's domain, so
+ * `r` counts only for a same-origin iframe navigation, as the browser's `Sec-Fetch-Dest` and
+ * `Sec-Fetch-Site` request headers report it (a page cannot forge them).
+ */
+export function trustedReportParam(
+  r: string | string[] | undefined,
+  fetch: { dest: string | null; site: string | null },
+): string | undefined {
+  if (typeof r !== 'string') return undefined;
+  return fetch.dest === 'iframe' && fetch.site === 'same-origin' ? r : undefined;
+}
+
+/**
  * Decodes and validates a `?r=` value; a missing, oversized, malformed or invalid value yields
  * the built-in fixture report for `locale`.
  */

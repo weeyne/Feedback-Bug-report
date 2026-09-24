@@ -1,5 +1,5 @@
 import { ChevronDown, ImageIcon, Lock } from 'lucide-react';
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { buttonVariants } from '@/components/ui/button';
@@ -32,7 +32,7 @@ export async function FeedbackList({
         const meta = metaLine(item);
         return (
           <li key={item.id}>
-            <Link
+            <AppLink
               href={hrefFor(item.id)}
               data-testid="feedback-row"
               data-id={item.id}
@@ -66,7 +66,7 @@ export async function FeedbackList({
               >
                 {format.relativeTime(new Date(item.created_at), { style: 'short' })}
               </time>
-            </Link>
+            </AppLink>
           </li>
         );
       })}
@@ -89,25 +89,25 @@ export async function FeedbackList({
             </li>
           ))}
           <li data-testid="feedback-hidden">
-            <Link
+            <AppLink
               href="/app/billing"
               className="flex items-center gap-2 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary transition-colors duration-200 hover:bg-primary/10 md:px-6"
             >
               <Lock className="size-4 shrink-0" aria-hidden />
               {t('hidden', { count: hidden })}
-            </Link>
+            </AppLink>
           </li>
         </>
       )}
       {loadMoreHref && (
         <li className="flex justify-center p-4">
-          <Link
+          <AppLink
             href={loadMoreHref}
             className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'font-semibold')}
           >
             <ChevronDown aria-hidden />
             {t('loadMore')}
-          </Link>
+          </AppLink>
         </li>
       )}
     </ul>

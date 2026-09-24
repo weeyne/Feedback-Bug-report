@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { useId } from 'react';
 import { cn } from 'cn';
 
@@ -111,9 +111,9 @@ export function Logo({
   );
   const classes = cn('inline-flex items-center gap-2 text-foreground', className);
   return href ? (
-    <Link href={href} className={classes}>
+    <AppLink href={href} className={classes}>
       {content}
-    </Link>
+    </AppLink>
   ) : (
     <span className={classes}>{content}</span>
   );

@@ -11,6 +11,12 @@ const config: NextConfig = {
   async headers() {
     return [
       {
+        // The landing demo's store and dashboard: only the landing itself (same origin) may frame
+        // them, so nobody can present them inside another site.
+        source: '/demo/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: "frame-ancestors 'self'" }],
+      },
+      {
         source: '/w/widget.js',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=300, s-maxage=3600' },
