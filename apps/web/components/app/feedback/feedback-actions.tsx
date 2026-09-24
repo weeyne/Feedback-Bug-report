@@ -1,20 +1,24 @@
 'use client';
 
+import { Archive, Check, Mail, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { deleteFeedbackAction, setFeedbackStatusAction } from '@/app/app/actions';
 import { Button } from '@/components/ui/button';
+import { replyHref } from '@/lib/dashboard/feed-view';
 import type { FeedbackStatus } from '@/lib/dashboard/feedback';
 
 export function FeedbackActions({
   id,
   status,
+  email,
   closeHref,
 }: {
   id: string;
   status: FeedbackStatus;
+  email: string | null;
   closeHref: string;
 }) {
   const t = useTranslations();
@@ -27,44 +31,73 @@ export function FeedbackActions({
       else after?.();
       router.refresh();
     });
+  const setStatus = (next: FeedbackStatus) => () => run(() => setFeedbackStatusAction(id, next));
   return (
-    <div className="flex flex-wrap gap-2">
-      {status !== 'resolved' && (
+    <div className="flex flex-wrap items-center gap-2">
+      {status === 'resolved' ? (
         <Button
-          size="sm"
           disabled={pending}
-          data-testid="feedback-resolve"
-          onClick={() => run(() => setFeedbackStatusAction(id, 'resolved'))}
+          className="font-semibold"
+          data-testid="feedback-reopen"
+          onClick={setStatus('new')}
         >
+          <RotateCcw aria-hidden />
+          {t('feedback.reopen')}
+        </Button>
+      ) : (
+        <Button
+          disabled={pending}
+          className="font-semibold"
+          data-testid="feedback-resolve"
+          onClick={setStatus('resolved')}
+        >
+          <Check aria-hidden />
           {t('feedback.resolve')}
         </Button>
       )}
-      {status !== 'archived' && (
+      {email && (
         <Button
-          size="sm"
           variant="outline"
-          disabled={pending}
-          data-testid="feedback-archive"
-          onClick={() => run(() => setFeedbackStatusAction(id, 'archived'))}
+          className="font-semibold"
+          data-testid="feedback-reply"
+          nativeButton={false}
+          render={<a href={replyHref(email, t('feedback.replySubject'))} />}
         >
-          {t('feedback.archive')}
+          <Mail aria-hidden />
+          {t('feedback.reply')}
         </Button>
       )}
-      {status !== 'new' && (
+      {status === 'archived' ? (
         <Button
-          size="sm"
           variant="outline"
           disabled={pending}
+          className="font-semibold"
           data-testid="feedback-reopen"
-          onClick={() => run(() => setFeedbackStatusAction(id, 'new'))}
+          onClick={setStatus('new')}
         >
+          <RotateCcw aria-hidden />
           {t('feedback.reopen')}
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          disabled={pending}
+          className="font-semibold"
+          data-testid="feedback-archive"
+          onClick={setStatus('archived')}
+        >
+          <Archive aria-hidden />
+          {/* Icon-only on the narrowest phones so the action row fits on one line. */}
+          <span className="max-[400px]:sr-only">{t('feedback.archive')}</span>
         </Button>
       )}
       <Button
-        size="sm"
+        size="icon"
         variant="destructive"
         disabled={pending}
+        className="ml-auto"
+        aria-label={t('common.delete')}
+        title={t('common.delete')}
         data-testid="feedback-delete"
         onClick={() => {
           if (confirm(t('feedback.deleteConfirm')))
@@ -74,7 +107,7 @@ export function FeedbackActions({
             );
         }}
       >
-        {t('common.delete')}
+        <Trash2 aria-hidden />
       </Button>
     </div>
   );

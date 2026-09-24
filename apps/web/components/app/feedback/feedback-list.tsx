@@ -1,15 +1,15 @@
+import { ChevronDown, ImageIcon, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { cn } from 'cn';
+import { Button } from '@/components/ui/button';
 import type { FeedbackListItem } from '@/lib/dashboard/feedback';
-
-const DOT: Record<string, string> = {
-  bug: 'bg-red-500',
-  idea: 'bg-green-500',
-  general: 'bg-indigo-500',
-};
+import { metaLine } from '@/lib/dashboard/feed-view';
+import { TypePill } from './type-pill';
 
 const MAX_HIDDEN_PLACEHOLDER_ROWS = 5;
 
+/** The feed rows; the page renders an empty state instead when there is nothing to list. */
 export async function FeedbackList({
   items,
   hidden,
@@ -25,60 +25,92 @@ export async function FeedbackList({
 }) {
   const t = await getTranslations('feedback');
   const format = await getFormatter();
-  if (!items.length && !hidden) {
-    return (
-      <p className="p-6 text-sm text-muted-foreground" data-testid="feedback-empty">
-        {t('empty')}
-      </p>
-    );
-  }
   return (
     <ul className="divide-y">
-      {items.map((item) => (
-        <li key={item.id}>
-          <Link
-            href={hrefFor(item.id)}
-            data-testid="feedback-row"
-            data-id={item.id}
-            className={`flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted ${selectedId === item.id ? 'bg-muted' : ''}`}
-          >
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${DOT[item.type]}`}
-              aria-label={t(`type_${item.type}`)}
-            />
-            <span className="min-w-0 flex-1 truncate">{item.message}</span>
-            {item.has_screenshot && <span aria-hidden>🖼</span>}
-            <time className="shrink-0 text-xs text-muted-foreground" dateTime={item.created_at}>
-              {format.relativeTime(new Date(item.created_at))}
-            </time>
-          </Link>
-        </li>
-      ))}
+      {items.map((item) => {
+        const selected = selectedId === item.id;
+        const meta = metaLine(item);
+        return (
+          <li key={item.id}>
+            <Link
+              href={hrefFor(item.id)}
+              data-testid="feedback-row"
+              data-id={item.id}
+              aria-current={selected ? 'true' : undefined}
+              className={cn(
+                'flex items-start gap-3 px-4 py-3 text-sm transition-colors duration-200 md:px-6',
+                selected
+                  ? 'bg-primary/5 shadow-[inset_3px_0_0_var(--primary)]'
+                  : 'hover:bg-muted/70',
+              )}
+            >
+              <TypePill type={item.type} className="mt-px" />
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 leading-snug break-words">{item.message}</span>
+                {meta && (
+                  <span className="mt-1 block truncate text-xs text-muted-foreground">{meta}</span>
+                )}
+              </span>
+              {item.has_screenshot && (
+                <span
+                  className="grid h-7 w-9 shrink-0 place-items-center rounded-md border bg-muted text-muted-foreground"
+                  title={t('screenshot')}
+                >
+                  <ImageIcon className="size-3.5" aria-hidden />
+                  <span className="sr-only">{t('screenshot')}</span>
+                </span>
+              )}
+              <time
+                className="shrink-0 pt-px text-xs whitespace-nowrap text-muted-foreground"
+                dateTime={item.created_at}
+              >
+                {format.relativeTime(new Date(item.created_at), { style: 'short' })}
+              </time>
+            </Link>
+          </li>
+        );
+      })}
       {hidden > 0 && (
         <>
           {Array.from({ length: Math.min(hidden, MAX_HIDDEN_PLACEHOLDER_ROWS) }).map((_, i) => (
             <li
               key={`hidden-${i}`}
               aria-hidden
-              className="flex select-none items-center gap-3 px-4 py-3 text-sm blur-[2px]"
+              className="flex items-start gap-3 px-4 py-3 text-sm select-none md:px-6"
             >
-              <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">████████ ████ ██████</span>
-              <span className="shrink-0 text-xs text-muted-foreground">•• •• ••••</span>
+              <span className="mt-px h-[18px] w-10 shrink-0 rounded-full bg-muted" />
+              <span className="min-w-0 flex-1 blur-[3px]">
+                <span className="block truncate">████████ ████ ██████ ███</span>
+                <span className="mt-1 block truncate text-xs text-muted-foreground">
+                  ███ · ██████ ██
+                </span>
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground blur-[2px]">•• ••</span>
             </li>
           ))}
-          <li className="px-4 py-3 text-sm" data-testid="feedback-hidden">
-            <Link href="/app/billing" className="underline">
+          <li data-testid="feedback-hidden">
+            <Link
+              href="/app/billing"
+              className="flex items-center gap-2 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary transition-colors duration-200 hover:bg-primary/10 md:px-6"
+            >
+              <Lock className="size-4 shrink-0" aria-hidden />
               {t('hidden', { count: hidden })}
             </Link>
           </li>
         </>
       )}
       {loadMoreHref && (
-        <li className="p-3 text-center">
-          <Link href={loadMoreHref} className="text-sm underline">
+        <li className="flex justify-center p-4">
+          <Button
+            size="sm"
+            variant="outline"
+            className="font-semibold"
+            nativeButton={false}
+            render={<Link href={loadMoreHref} />}
+          >
+            <ChevronDown aria-hidden />
             {t('loadMore')}
-          </Link>
+          </Button>
         </li>
       )}
     </ul>

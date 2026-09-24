@@ -198,6 +198,12 @@
     transform: scaleY(0);
   }
 }
+@keyframes bp-slide {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
 @keyframes bp-draw {
   from {
     stroke-dashoffset: 24;
@@ -218,6 +224,16 @@
   stroke-dasharray: 24;
   animation: bp-draw 0.35s ease-out both;
 }
+/* Feedback detail panel: the full-screen mobile sheet fades up like `.animate-enter`; from md up
+   the side panel slides in from the right. `backwards` for the same reason as above. */
+.animate-slide {
+  animation: bp-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+@media (width >= 48rem) {
+  .animate-slide {
+    animation: bp-slide 0.2s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
   ::view-transition-new(root) {
@@ -230,7 +246,8 @@
   }
   .animate-enter,
   .animate-grow,
-  .animate-draw {
+  .animate-draw,
+  .animate-slide {
     animation: none;
   }
 }

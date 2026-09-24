@@ -1,10 +1,13 @@
-import { getTranslations } from 'next-intl/server';
+import { Archive, Bug, CircleCheck, CircleDashed, ListFilter } from 'lucide-react';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { AutoRefresh } from '@/components/app/auto-refresh';
+import { EmptyState, type EmptyStateProps } from '@/components/app/empty-state';
 import { FeedbackDetailPanel } from '@/components/app/feedback/feedback-detail';
-import { FeedbackFilters } from '@/components/app/feedback/feedback-filters';
+import { feedHref, StatusTabs, TypeChips } from '@/components/app/feedback/feedback-filters';
 import { FeedbackList } from '@/components/app/feedback/feedback-list';
 import { UsageBar } from '@/components/app/usage-bar';
 import { requireUser } from '@/lib/auth/session';
+import { feedEmptyKind, type FeedEmptyKind } from '@/lib/dashboard/feed-view';
 import {
   decodeCursor,
   encodeCursor,
@@ -12,6 +15,7 @@ import {
   hiddenFeedbackCount,
   listFeedback,
   screenshotUrl,
+  statusCounts,
   usage,
   type FeedbackStatus,
 } from '@/lib/dashboard/feedback';
@@ -32,6 +36,8 @@ export default async function FeedbackPage({
   const query = await searchParams;
   const deps = await getDeps();
   const t = await getTranslations('feedback');
+  const tEmpty = await getTranslations('empty');
+  const locale = await getLocale();
 
   const type = TYPES.find((v) => v === query.type);
   const status: FeedbackStatus = STATUSES.find((v) => v === query.status) ?? 'new';
@@ -46,10 +52,11 @@ export default async function FeedbackPage({
     return `${base}?${next.toString()}`;
   };
 
-  const [{ items, nextCursor }, hidden, plan] = await Promise.all([
+  const [{ items, nextCursor }, hidden, plan, counts] = await Promise.all([
     listFeedback(deps, user.id, { projectId, type, status, cursor }),
     hiddenFeedbackCount(deps, user.id, projectId),
     usage(deps, user.id),
+    statusCounts(deps, user.id, projectId),
   ]);
   const selectedRaw = query.f ? await getFeedback(deps, user.id, query.f) : null;
   // getFeedback scopes by owner (RLS), not by project: a feedback id from a different
@@ -60,29 +67,71 @@ export default async function FeedbackPage({
     ? await screenshotUrl(deps, user.id, selected.id)
     : null;
 
+  const shownHidden = status === 'new' && !type && !cursor ? hidden : 0;
+  // statusCounts sees exactly the rows `hasFeedback` would (both run as the user under RLS),
+  // so their sum answers "does this project have any feedback" without another query.
+  const hasFeedback = counts.new + counts.resolved + counts.archived > 0;
+  const empty: Record<FeedEmptyKind, EmptyStateProps> = {
+    quiet: {
+      icon: <Bug />,
+      title: tEmpty('quietTitle'),
+      body: tEmpty('quietBody'),
+      action: { href: `/app/p/${projectId}/install`, label: tEmpty('installCta') },
+    },
+    caughtUp: {
+      icon: <CircleCheck />,
+      title: tEmpty('caughtUpTitle'),
+      body: tEmpty('caughtUpBody'),
+      action: {
+        href: feedHref(base, 'resolved'),
+        label: tEmpty('openResolved'),
+        variant: 'outline',
+      },
+    },
+    noneResolved: { icon: <CircleDashed />, title: tEmpty('noneResolved') },
+    noneArchived: { icon: <Archive />, title: tEmpty('noneArchived') },
+    noneOfType: {
+      icon: <ListFilter />,
+      title: tEmpty('noneOfType', {
+        type: type ? t(`types_${type}`).toLocaleLowerCase(locale) : '',
+      }),
+      action: { href: feedHref(base, status), label: tEmpty('clearFilter'), variant: 'outline' },
+    },
+  };
+
   return (
     <div className="flex min-h-full">
       <section className="min-w-0 flex-1">
-        <header className="flex flex-col gap-3 border-b p-4">
+        <header className="flex flex-col gap-3 border-b px-4 pt-4 pb-3 md:px-6 md:pt-6">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold">{t('title')}</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">{t('title')}</h1>
             <AutoRefresh intervalMs={30_000} />
           </div>
-          <FeedbackFilters base={base} type={type} status={status} />
-          <UsageBar used={plan.used} limit={plan.limit} />
+          <StatusTabs base={base} type={type} status={status} counts={counts} />
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <TypeChips base={base} type={type} status={status} />
+            <UsageBar used={plan.used} limit={plan.limit} />
+          </div>
         </header>
-        <FeedbackList
-          items={items}
-          hidden={status === 'new' && !type && !cursor ? hidden : 0}
-          selectedId={selected?.id}
-          hrefFor={(id) => keep({ f: id })}
-          loadMoreHref={
-            nextCursor ? keep({ before: encodeCursor(nextCursor), f: undefined }) : null
-          }
-        />
+        {items.length === 0 && shownHidden === 0 ? (
+          <div data-testid="feedback-empty" className="py-8">
+            <EmptyState {...empty[feedEmptyKind({ hasFeedback, status, type })]} />
+          </div>
+        ) : (
+          <FeedbackList
+            items={items}
+            hidden={shownHidden}
+            selectedId={selected?.id}
+            hrefFor={(id) => keep({ f: id })}
+            loadMoreHref={
+              nextCursor ? keep({ before: encodeCursor(nextCursor), f: undefined }) : null
+            }
+          />
+        )}
       </section>
       {selected && (
         <FeedbackDetailPanel
+          key={selected.id}
           feedback={selected}
           screenshot={screenshot}
           closeHref={keep({ f: undefined })}
