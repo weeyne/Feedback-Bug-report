@@ -28,3 +28,12 @@
 - The host `div` styles are inline without `!important`: host rules like `div { display: none !important }` still apply. Consider re-attaching the widget if a Turbo/pjax navigation removes it.
 - `requestIdleCallback` fallback, entry selector and CSP notes are done; document `data-feedback-mask` for site owners.
 - `replaceSync` drops `@import` in custom CSS (documented in the spec).
+
+## Deferred after stage 2 (widget redesign)
+- A chunk-load failure (`screenshot.js`/`annotate.js`) is memoized for the page: retry on the next panel open instead.
+- `annotate.js` is not minified.
+- The paste hint is shown on touch devices, where there is no paste shortcut.
+- The screenshot block's live region is re-inserted on every render, and the `ready` state is not announced.
+- An editor export failure resolves like Cancel, with no message to the visitor.
+- Back in a sheet opened from the speed-dial shows the home screen instead of returning to the dial.
+- The sheet drag is not scoped to one `pointerId` (a second finger can move or end it).
