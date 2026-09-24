@@ -7,14 +7,14 @@ import {
   demoDashboardUrl,
   DEMO_FEEDBACK_ID,
   DEMO_PROJECT_ID,
-  FIXTURE_REPORT,
+  fixtureReport,
 } from './demo-report';
 import { DEMO_CONSOLE_ERROR, DEMO_TEXT } from './protocol';
 import { SubmitPayloadSchema } from '@bugping/shared';
 
 describe('demo report', () => {
   it('builds the notification the real pipeline would build', () => {
-    const payload = FIXTURE_REPORT.en;
+    const payload = fixtureReport('en');
     const message = buildDemoMessage({
       payload,
       dashboardUrl: 'https://bugping.app/app/p/x/feedback?f=y',
@@ -34,7 +34,7 @@ describe('demo report', () => {
 
   it('keeps an email from the payload', () => {
     const message = buildDemoMessage({
-      payload: { ...FIXTURE_REPORT.en, email: 'ann@example.com' },
+      payload: { ...fixtureReport('en'), email: 'ann@example.com' },
       describe: describeAgent,
     });
     expect(message.email).toBe('ann@example.com');
@@ -49,7 +49,7 @@ describe('demo report', () => {
   it('captions with the real formatTelegram output', () => {
     for (const locale of ['en', 'ru'] as const) {
       const message = buildDemoMessage({
-        payload: FIXTURE_REPORT[locale],
+        payload: fixtureReport(locale),
         describe: describeAgent,
       });
       const caption = demoCaption(message);
@@ -65,8 +65,11 @@ describe('demo report', () => {
 
   it('ships fixtures that pass the real submit schema', () => {
     for (const locale of ['en', 'ru'] as const) {
-      expect(SubmitPayloadSchema.safeParse(FIXTURE_REPORT[locale]).success).toBe(true);
-      expect(FIXTURE_REPORT[locale].metadata.url).toMatch(/\/demo\/shop$/);
+      expect(SubmitPayloadSchema.safeParse(fixtureReport(locale)).success).toBe(true);
+      expect(fixtureReport(locale).metadata.url).toMatch(/\/demo\/shop$/);
     }
+    expect(fixtureReport('en', 'https://shop.test').metadata.url).toBe(
+      'https://shop.test/demo/shop',
+    );
   });
 });

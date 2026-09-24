@@ -223,6 +223,7 @@ export function TelegramChat({ caption, image, time, show, className }: Telegram
       style={{ fontFamily: 'Roboto, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif' }}
     >
       <header className="relative z-10 flex h-[56px] shrink-0 items-center gap-[12px] bg-white px-[20px] shadow-[0_1px_3px_rgba(0,0,0,.12)] dark:bg-[#212121] dark:shadow-[0_1px_3px_rgba(0,0,0,.5)]">
+        {/* No dark pair on purpose: Telegram avatars keep their colours in both app themes. */}
         <span className="flex size-[42px] items-center justify-center rounded-full bg-[#ffd9d2] text-[#1a1414]">
           <LadybugMark size={30} />
         </span>

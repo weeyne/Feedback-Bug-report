@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ENTITLEMENTS } from '../billing/plans';
 import type { Row } from '../db/types';
 import { withUser } from '../db/with-user';
+import { pagePath } from './feed-view';
 import { ownsProject } from './projects';
 import { isUuid, type ActionResult, type DashDeps } from './result';
 
@@ -46,16 +47,6 @@ interface ListRow extends Row {
   url: string | null;
   browser: string | null;
   email: string | null;
-}
-
-/** Best-effort URL path extraction for the feed's "page" column; malformed or missing URLs yield `null`. */
-function pagePath(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return null;
-  }
 }
 
 const iso = (value: Date | string) => new Date(value).toISOString();

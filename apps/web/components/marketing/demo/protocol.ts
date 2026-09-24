@@ -18,6 +18,17 @@ export const DEMO_MESSAGE = {
 
 export type DemoMessageType = (typeof DEMO_MESSAGE)[keyof typeof DEMO_MESSAGE];
 
+/** stage → /demo/dashboard: the (annotated) scene-1 screenshot for the detail panel. */
+export interface DemoScreenshotMessage {
+  type: typeof DEMO_MESSAGE.screenshot;
+  blob: Blob;
+}
+
+/** /demo/dashboard → stage: posted once on mount; the stage may send the screenshot now. */
+export interface DemoDashboardReadyMessage {
+  type: typeof DEMO_MESSAGE.dashboardReady;
+}
+
 /** The message the demo visitor types into the widget, per landing locale. */
 export const DEMO_TEXT: Record<AppLocale, string> = {
   en: 'The pay button does nothing',

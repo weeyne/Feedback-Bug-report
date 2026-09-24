@@ -53,7 +53,15 @@ export const FIXTURE_USER_AGENT =
 /** Fixed "now" of the fixture (2026-09-24 14:32 UTC), so static frames are deterministic. */
 const FIXTURE_AT = Date.UTC(2026, 8, 24, 14, 32, 0);
 
-function fixture(locale: AppLocale, appUrl: string): SubmitPayload {
+/**
+ * A realistic scene-1 submission for `locale`, for static frames and the demo dashboard's
+ * fallback when no live report is available. A function (not a module-level constant) so that
+ * importing this module never reads the environment.
+ */
+export function fixtureReport(
+  locale: AppLocale,
+  appUrl: string = getPublicEnv().appUrl,
+): SubmitPayload {
   return {
     projectKey: DEMO_PROJECT_KEY,
     type: 'bug',
@@ -72,12 +80,3 @@ function fixture(locale: AppLocale, appUrl: string): SubmitPayload {
     website: '',
   };
 }
-
-/**
- * A realistic scene-1 submission per landing locale, for static frames and the demo dashboard's
- * fallback when no live report is available.
- */
-export const FIXTURE_REPORT: Readonly<Record<AppLocale, SubmitPayload>> = Object.freeze({
-  en: fixture('en', getPublicEnv().appUrl),
-  ru: fixture('ru', getPublicEnv().appUrl),
-});

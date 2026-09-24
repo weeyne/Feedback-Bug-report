@@ -28,12 +28,16 @@ const ITEMS: {
 export function ProjectNav({
   projects,
   newCounts,
+  pathname: pathnameOverride,
 }: {
   projects: ShellProject[];
   newCounts: Record<string, number>;
+  /** Overrides the current route (the landing demo renders a fixture project's feed). */
+  pathname?: string;
 }) {
   const t = useTranslations('nav');
-  const pathname = usePathname();
+  const currentPathname = usePathname();
+  const pathname = pathnameOverride ?? currentPathname;
   const match = /^\/app\/p\/([^/]+)(?:\/([^/]+))?/.exec(pathname);
   const currentProjectId = match?.[1] ?? null;
   const section = match?.[2] ?? 'overview';

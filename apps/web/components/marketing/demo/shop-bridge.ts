@@ -18,7 +18,10 @@ export interface SubmittedMessage {
  * Posts `message` to the embedding page, only when there is one (the store is inside the demo
  * stage's iframe) and only to this page's own origin. Returns whether it was posted.
  */
-export function postToParent(win: BridgeWindow, message: { type: string }): boolean {
+export function postToParent(
+  win: Pick<BridgeWindow, 'parent' | 'location'>,
+  message: { type: string },
+): boolean {
   const parent = win.parent;
   if (!parent || (parent as unknown) === win) return false;
   try {
