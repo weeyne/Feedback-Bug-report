@@ -75,11 +75,9 @@
 .bp-trigger:hover {
   transform: scale(1.06);
 }
-@media (max-width: 640px) {
-  .bp-trigger {
-    width: 48px;
-    height: 48px;
-  }
+.bp-root[data-compact='true'] .bp-trigger {
+  width: 48px;
+  height: 48px;
 }
 .bp-trigger .bp-icon {
   grid-area: 1 / 1;
@@ -217,6 +215,12 @@
   padding: 8px 0 4px;
   touch-action: none;
   cursor: grab;
+}
+/* Drags can also start on a screen's header (see onSheetPointerDown): claim the gesture there
+   too, so a touch device doesn't pan the page or cancel the drag before it begins. */
+.bp-sheet .bp-home-head,
+.bp-sheet .bp-form-head {
+  touch-action: none;
 }
 .bp-sheet-handle::before {
   content: '';

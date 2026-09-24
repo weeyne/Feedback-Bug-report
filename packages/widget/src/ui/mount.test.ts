@@ -859,6 +859,34 @@ describe('compact layout', () => {
     expect(panel().hidden).toBe(true);
   });
 
+  it('a downward drag on the form header past 80px also closes the sheet', () => {
+    const { handle, q, panel } = setup({ compact: true });
+    handle.open('bug');
+    const header = q('.bp-form-head')!;
+    dragSheet(header, 0, 50);
+    expect(panel().hidden).toBe(false);
+    dragSheet(header, 0, 90);
+    expect(panel().hidden).toBe(true);
+  });
+
+  it('a pointercancel mid-drag snaps back without closing, regardless of distance', () => {
+    const { handle, q, panel } = setup({ compact: true });
+    handle.open('bug');
+    const sheetHandle = q('.bp-sheet-handle')!;
+    sheetHandle.setPointerCapture = () => {};
+    sheetHandle.dispatchEvent(
+      new PointerEvent('pointerdown', { clientY: 0, pointerId: 1, bubbles: true }),
+    );
+    sheetHandle.dispatchEvent(
+      new PointerEvent('pointermove', { clientY: 120, pointerId: 1, bubbles: true }),
+    );
+    sheetHandle.dispatchEvent(
+      new PointerEvent('pointercancel', { clientY: 120, pointerId: 1, bubbles: true }),
+    );
+    expect(panel().hidden).toBe(false);
+    expect(panel().style.transform).toBe('');
+  });
+
   it('isOpen() and close() account for the dial as well as the panel', () => {
     const { handle, q } = setup({ compact: true });
     expect(handle.isOpen()).toBe(false);
@@ -868,5 +896,35 @@ describe('compact layout', () => {
     expect(handle.isOpen()).toBe(false);
     expect(q('.bp-dial')!.hidden).toBe(true);
     expect(q('.bp-trigger')!.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reflects the compact predicate on the root as data-compact, set at mount', () => {
+    const on = setup({ compact: true });
+    expect(on.q('.bp-root')!.getAttribute('data-compact')).toBe('true');
+    on.handle.destroy();
+
+    const off = setup({ compact: false });
+    expect(off.q('.bp-root')!.getAttribute('data-compact')).toBe('false');
+  });
+
+  it('data-compact updates when the predicate flips between opens', () => {
+    let compact = false;
+    handle = mountWidget(document.body, baseConfig, {
+      deps: {
+        projectKey: 'pk_AbCdEfGh12345678',
+        submit: async () => ({ ok: true }),
+        loadCapture: async () => async () => shot,
+        loadAnnotate: async () => null,
+        collectMetadata: () => metadata,
+        now: () => 0,
+      },
+      languages: ['en-US'],
+      compact: () => compact,
+    });
+    const root = handle.host.shadowRoot!.querySelector<HTMLElement>('.bp-root')!;
+    expect(root.getAttribute('data-compact')).toBe('false');
+    compact = true;
+    handle.open();
+    expect(root.getAttribute('data-compact')).toBe('true');
   });
 });

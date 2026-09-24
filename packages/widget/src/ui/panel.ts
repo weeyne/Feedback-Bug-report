@@ -113,7 +113,7 @@ export function createPanel(options: {
       onpointerdown: onSheetPointerDown,
       onpointermove: onSheetPointerMove,
       onpointerup: onSheetPointerUp,
-      onpointercancel: onSheetPointerUp,
+      onpointercancel: onSheetPointerCancel,
     },
     sheetHandle,
     home.element,
@@ -155,6 +155,17 @@ export function createPanel(options: {
     const dy = Math.max(0, (event as PointerEvent).clientY - dragStartY);
     element.style.transform = '';
     if (dy > SHEET_CLOSE_DRAG_PX) close();
+  }
+
+  /**
+   * The browser interrupted the gesture (e.g. another touch, a system gesture): always snap back,
+   * regardless of how far the drag had moved — a cancel is never a deliberate swipe-to-close.
+   */
+  function onSheetPointerCancel() {
+    if (!dragging) return;
+    dragging = false;
+    element.classList.remove('bp-dragging');
+    element.style.transform = '';
   }
 
   function showScreen(next: PanelScreen, direction: Direction, focus = true) {

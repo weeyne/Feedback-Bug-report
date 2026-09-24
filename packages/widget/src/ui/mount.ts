@@ -95,12 +95,23 @@ export function mountWidget(
   const isCompact = options.compact ?? defaultCompact;
   let dial: Dial | null = null;
 
+  /**
+   * Reflects `isCompact()` on the root so CSS keys compact-only visuals (the 48px launcher) off
+   * the same injectable predicate every other compact behavior uses, instead of a hardcoded media
+   * query. Set at mount and re-evaluated on every open, so a resize between opens still applies.
+   */
+  function syncCompact() {
+    root.dataset.compact = String(isCompact());
+  }
+  syncCompact();
+
   function setLauncherExpanded(expanded: boolean) {
     launcher?.setAttribute('aria-expanded', String(expanded));
   }
 
   /** No type: the dial on a compact launcher, else the home screen (or the sheet, hidden-trigger). */
   function openWidget(type?: FeedbackType) {
+    syncCompact();
     if (type || !dial || !isCompact()) {
       dial?.close();
       panel.open(type);
@@ -136,7 +147,7 @@ export function mountWidget(
   if (launcher) {
     dial = createDial({
       t: MESSAGES[locale],
-      onPick: (type) => panel.open(type),
+      onPick: (type) => openWidget(type),
       onClose: () => {
         setLauncherExpanded(false);
         launcher.focus();
