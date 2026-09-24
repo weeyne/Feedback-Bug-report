@@ -70,7 +70,9 @@
     "refresh": "Обновить",
     "loading": "Загрузка…",
     "language": "Язык",
-    "comingSoon": "Скоро"
+    "comingSoon": "Скоро",
+    "themeDark": "Тёмная тема",
+    "themeLight": "Светлая тема"
   },
   "auth": {
     "title": "Вход в Bugping",
