@@ -9,6 +9,7 @@ import { requireUser } from '@/lib/auth/session';
 import { hasFeedback } from '@/lib/dashboard/projects';
 import { getRequestProject } from '@/lib/dashboard/request-project';
 import { getDeps } from '@/lib/deps';
+import { installSnippet, widgetSrc } from '@/lib/widget/snippet';
 
 /** Code sample in a dark block (dark in both themes on purpose) with a copy button. */
 function CodeBlock({ code, label, testId }: { code: string; label: string; testId?: string }) {
@@ -57,8 +58,8 @@ export default async function InstallPage({ params }: { params: Promise<{ projec
     getFormatter(),
     hasFeedback(deps, user.id, project.id),
   ]);
-  const src = `${deps.env.NEXT_PUBLIC_APP_URL}/w/widget.js`;
-  const snippet = `<script async src="${src}" data-project-id="${project.public_key}"></script>`;
+  const src = widgetSrc(deps.env.NEXT_PUBLIC_APP_URL);
+  const snippet = installSnippet(deps.env.NEXT_PUBLIC_APP_URL, project.public_key);
   const nextSnippet = `import Script from 'next/script';\n\n<Script src="${src}" data-project-id="${project.public_key}" strategy="afterInteractive" />`;
   const seenAt = project.widget_seen_at;
 

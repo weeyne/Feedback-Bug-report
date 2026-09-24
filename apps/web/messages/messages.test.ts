@@ -67,8 +67,9 @@ describe('messages', () => {
       // Keys are dynamic (not string literals), so next-intl's key-based
       // overload resolution can't narrow the values type here; the dummy
       // values above are a superset of every ICU argument name in use.
+      // `t.markup` also formats rich-text tags (e.g. `<em>` in landing.hero.title).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      t(key as any, dummyValues);
+      t.markup(key as any, { ...dummyValues, em: (chunks) => chunks });
     }
 
     expect(errors).toEqual([]);
@@ -82,5 +83,16 @@ describe('messages', () => {
     );
     const tRu = createTranslator({ locale: 'ru', messages: ru });
     expect(tRu('install.step2Title')).toBe('Вставьте его перед </body>');
+    expect(tEn('landing.how.step2Body')).toContain('before </body>');
+    expect(tRu('landing.how.step2Body')).toContain('перед </body>');
+  });
+
+  it('highlights exactly one word in the landing headline', () => {
+    for (const messages of [en, ru]) {
+      const t = createTranslator({ locale: 'en', messages });
+      expect(t.markup('landing.hero.title', { em: (chunks) => `[${chunks}]` })).toMatch(
+        /^[^[\]]+\[[^\s[\]]+\][^[\]]+$/,
+      );
+    }
   });
 });
