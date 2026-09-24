@@ -37,6 +37,9 @@ export interface Panel {
 /** Direction of a screen change, for the slide-in animation. */
 type Direction = 'none' | 'forward' | 'back';
 
+/** A downward drag on the sheet's handle/header past this many pixels closes it. */
+const SHEET_CLOSE_DRAG_PX = 80;
+
 /** The actually-focused element, descending into this document's own open shadow trees. */
 function activeElementDeep(): HTMLElement | null {
   let active: Element | null = document.activeElement;
@@ -61,6 +64,8 @@ export function createPanel(options: {
   const { config, t, launcher } = options;
   let screen: PanelScreen = 'home';
   let previouslyFocused: HTMLElement | null = null;
+  let dragging = false;
+  let dragStartY = 0;
 
   const home = createHome({ t, onPick: (type) => showForm(type, 'forward'), onClose: close });
   const form = createForm({
@@ -88,6 +93,8 @@ export function createPanel(options: {
         )
       : null;
 
+  const sheetHandle = h('div', { class: 'bp-sheet-handle', 'aria-hidden': 'true' });
+
   const element = h(
     'div',
     {
@@ -102,12 +109,53 @@ export function createPanel(options: {
       onpaste: (e: Event) => {
         if (screen === 'form' && !element.hidden) form.handlePaste(e as ClipboardEvent);
       },
+      // Bottom-sheet dismissal: a downward drag starting on the handle or a screen's header.
+      onpointerdown: onSheetPointerDown,
+      onpointermove: onSheetPointerMove,
+      onpointerup: onSheetPointerUp,
+      onpointercancel: onSheetPointerUp,
     },
+    sheetHandle,
     home.element,
     form.element,
     thanks.element,
     footer,
   );
+
+  function isSheet() {
+    return element.classList.contains('bp-sheet');
+  }
+
+  function onSheetPointerDown(event: Event) {
+    const e = event as PointerEvent;
+    const target = e.target;
+    if (
+      !isSheet() ||
+      !(target instanceof Element) ||
+      !target.closest('.bp-sheet-handle, .bp-home-head, .bp-form-head')
+    ) {
+      return;
+    }
+    dragging = true;
+    dragStartY = e.clientY;
+    element.classList.add('bp-dragging');
+    (target as Element & { setPointerCapture?(id: number): void }).setPointerCapture?.(e.pointerId);
+  }
+
+  function onSheetPointerMove(event: Event) {
+    if (!dragging) return;
+    const dy = Math.max(0, (event as PointerEvent).clientY - dragStartY);
+    element.style.transform = `translateY(${dy}px)`;
+  }
+
+  function onSheetPointerUp(event: Event) {
+    if (!dragging) return;
+    dragging = false;
+    element.classList.remove('bp-dragging');
+    const dy = Math.max(0, (event as PointerEvent).clientY - dragStartY);
+    element.style.transform = '';
+    if (dy > SHEET_CLOSE_DRAG_PX) close();
+  }
 
   function showScreen(next: PanelScreen, direction: Direction, focus = true) {
     screen = next;
@@ -129,6 +177,8 @@ export function createPanel(options: {
   }
 
   function open(type?: FeedbackType) {
+    // Re-evaluated on every open so a resize between opens picks up the right layout.
+    element.classList.toggle('bp-sheet', options.compact());
     thanks.cancel();
     const wasHidden = element.hidden;
     if (wasHidden) previouslyFocused = activeElementDeep();

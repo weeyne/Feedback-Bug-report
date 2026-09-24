@@ -57,6 +57,7 @@ function setup(
     config?: Partial<WidgetConfig>;
     hideTrigger?: boolean;
     preview?: boolean;
+    compact?: boolean;
   } = {},
 ) {
   let clock = 1000;
@@ -80,7 +81,7 @@ function setup(
       languages: ['en-US'],
       hideTrigger: options.hideTrigger,
       preview: options.preview,
-      compact: () => false,
+      compact: () => options.compact ?? false,
     },
   );
   const root = handle.host.shadowRoot!;
@@ -741,5 +742,131 @@ describe('preview and lifecycle', () => {
     expect(message().value).toBe('');
     expect(q('.bp-thanks')!.hidden).toBe(true);
     expect(q('.bp-form')!.hidden).toBe(false);
+  });
+});
+
+describe('compact layout', () => {
+  function dragSheet(el: Element, from: number, to: number) {
+    el.setPointerCapture = () => {};
+    el.dispatchEvent(
+      new PointerEvent('pointerdown', { clientY: from, pointerId: 1, bubbles: true }),
+    );
+    el.dispatchEvent(new PointerEvent('pointermove', { clientY: to, pointerId: 1, bubbles: true }));
+    el.dispatchEvent(new PointerEvent('pointerup', { clientY: to, pointerId: 1, bubbles: true }));
+  }
+
+  it('launcher opens the dial with three items, first focused, and expands the launcher', () => {
+    const { q, root } = setup({ compact: true });
+    const trigger = q('.bp-trigger')!;
+    trigger.click();
+    const dial = q('.bp-dial')!;
+    expect(dial.hidden).toBe(false);
+    expect(dial.getAttribute('role')).toBe('menu');
+    const items = Array.from(root.querySelectorAll<HTMLElement>('.bp-dial-item'));
+    expect(items).toHaveLength(3);
+    expect(items.map((i) => i.dataset.type)).toEqual(['bug', 'idea', 'general']);
+    for (const item of items) expect(item.getAttribute('role')).toBe('menuitem');
+    expect(root.activeElement).toBe(items[0]);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(q('.bp-panel')!.hidden).toBe(true);
+  });
+
+  it('clicking the launcher again closes the dial', () => {
+    const { q } = setup({ compact: true });
+    const trigger = q('.bp-trigger')!;
+    trigger.click();
+    trigger.click();
+    expect(q('.bp-dial')!.hidden).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('picking an item closes the dial and opens the form for that type as a bottom sheet', () => {
+    const { q, panel, message } = setup({ compact: true });
+    q('.bp-trigger')!.click();
+    q('.bp-dial-item[data-type="idea"]')!.click();
+    expect(q('.bp-dial')!.hidden).toBe(true);
+    expect(panel().hidden).toBe(false);
+    expect(panel().classList.contains('bp-sheet')).toBe(true);
+    expect(panel().dataset.screen).toBe('form');
+    expect(message().placeholder).toBe("What's your idea?");
+  });
+
+  it('Escape closes the dial and returns focus to the launcher', () => {
+    const { q, root } = setup({ compact: true });
+    const trigger = q('.bp-trigger')!;
+    trigger.click();
+    const dial = q('.bp-dial')!;
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(dial.hidden).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(root.activeElement).toBe(trigger);
+  });
+
+  it('arrow keys move focus between dial items, wrapping at the ends', () => {
+    const { q, root } = setup({ compact: true });
+    q('.bp-trigger')!.click();
+    const dial = q('.bp-dial')!;
+    const items = Array.from(root.querySelectorAll<HTMLElement>('.bp-dial-item'));
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(root.activeElement).toBe(items[1]);
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(root.activeElement).toBe(items[2]);
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(root.activeElement).toBe(items[0]);
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(root.activeElement).toBe(items[2]);
+  });
+
+  it("open('bug') opens the form directly as a sheet, bypassing the dial", () => {
+    const { handle, q, panel, message } = setup({ compact: true });
+    handle.open('bug');
+    expect(q('.bp-dial')!.hidden).toBe(true);
+    expect(panel().hidden).toBe(false);
+    expect(panel().classList.contains('bp-sheet')).toBe(true);
+    expect(panel().dataset.screen).toBe('form');
+    expect(message().placeholder).toBe('What happened? What did you expect?');
+  });
+
+  it('open() with hideTrigger shows the home screen inside the sheet, with no dial', () => {
+    const { handle, q, panel } = setup({ compact: true, hideTrigger: true });
+    expect(q('.bp-dial')).toBeNull();
+    handle.open();
+    expect(panel().hidden).toBe(false);
+    expect(panel().classList.contains('bp-sheet')).toBe(true);
+    expect(panel().dataset.screen).toBe('home');
+  });
+
+  it('open() without a type and a visible launcher opens the dial, not the sheet', () => {
+    const { handle, q, panel } = setup({ compact: true });
+    handle.open();
+    expect(q('.bp-dial')!.hidden).toBe(false);
+    expect(panel().hidden).toBe(true);
+  });
+
+  it('desktop open() (compact false) never shows a sheet', () => {
+    const { handle, panel } = setup({ compact: false });
+    handle.open('bug');
+    expect(panel().classList.contains('bp-sheet')).toBe(false);
+  });
+
+  it('a downward drag on the handle past 80px closes the sheet; below it snaps back', () => {
+    const { handle, q, panel } = setup({ compact: true });
+    handle.open('bug');
+    const sheetHandle = q('.bp-sheet-handle')!;
+    dragSheet(sheetHandle, 0, 50);
+    expect(panel().hidden).toBe(false);
+    dragSheet(sheetHandle, 0, 90);
+    expect(panel().hidden).toBe(true);
+  });
+
+  it('isOpen() and close() account for the dial as well as the panel', () => {
+    const { handle, q } = setup({ compact: true });
+    expect(handle.isOpen()).toBe(false);
+    q('.bp-trigger')!.click();
+    expect(handle.isOpen()).toBe(true);
+    handle.close();
+    expect(handle.isOpen()).toBe(false);
+    expect(q('.bp-dial')!.hidden).toBe(true);
+    expect(q('.bp-trigger')!.getAttribute('aria-expanded')).toBe('false');
   });
 });

@@ -75,6 +75,12 @@
 .bp-trigger:hover {
   transform: scale(1.06);
 }
+@media (max-width: 640px) {
+  .bp-trigger {
+    width: 48px;
+    height: 48px;
+  }
+}
 .bp-trigger .bp-icon {
   grid-area: 1 / 1;
   width: 24px;
@@ -91,6 +97,65 @@
 .bp-trigger[aria-expanded='true'] .bp-icon-close {
   opacity: 1;
   transform: none;
+}
+
+/* Speed-dial (compact launcher) */
+.bp-dial {
+  position: fixed;
+  bottom: 80px;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+[data-position='bottom-right'] .bp-dial {
+  right: 16px;
+}
+[data-position='bottom-left'] .bp-dial {
+  left: 16px;
+  align-items: flex-start;
+}
+.bp-dial-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+[data-position='bottom-left'] .bp-dial-item {
+  flex-direction: row-reverse;
+}
+.bp-dial-open .bp-dial-item {
+  opacity: 1;
+  transform: none;
+}
+.bp-dial-label {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #1a1414;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bp-dial-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bp-bg);
+  box-shadow: 0 6px 16px rgba(20, 20, 30, 0.2);
+  font-size: 18px;
 }
 
 /* Panel */
@@ -125,6 +190,40 @@
 [data-preview] .bp-trigger,
 [data-preview] .bp-panel {
   position: absolute;
+}
+
+/* Bottom sheet (compact panel) */
+.bp-panel.bp-sheet {
+  right: 0;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 16px 16px 0 0;
+  animation: bp-sheet-up 0.22s ease-out;
+  transition: transform 0.2s ease;
+}
+.bp-panel.bp-sheet.bp-dragging {
+  transition: none;
+}
+.bp-sheet-handle {
+  display: none;
+}
+.bp-sheet .bp-sheet-handle {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  padding: 8px 0 4px;
+  touch-action: none;
+  cursor: grab;
+}
+.bp-sheet-handle::before {
+  content: '';
+  width: 36px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--bp-border);
 }
 .bp-screen {
   flex: 1 1 auto;
@@ -535,6 +634,11 @@ button.bp-thumb:not(:disabled) {
   from {
     opacity: 0;
     transform: translateX(-16px);
+  }
+}
+@keyframes bp-sheet-up {
+  from {
+    transform: translateY(100%);
   }
 }
 @keyframes bp-fade {

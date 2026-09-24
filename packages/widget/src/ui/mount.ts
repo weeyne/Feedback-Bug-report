@@ -3,6 +3,7 @@ import { HEX_COLOR_PATTERN, type FeedbackType } from '@bugping/shared/constants'
 import type { IdentifiedUser } from '../context/metadata';
 import { MESSAGES, resolveLocale } from '../i18n';
 import { onAccent, tint } from './color';
+import { createDial, type Dial } from './dial';
 import { h } from './h';
 import { createLauncher } from './launcher';
 import { createPanel, type PanelDeps } from './panel';
@@ -91,27 +92,74 @@ export function mountWidget(
   root.style.setProperty('--bp-accent-2', tint(accent, 0.25));
   root.style.setProperty('--bp-on-accent', onAccent(accent));
 
+  const isCompact = options.compact ?? defaultCompact;
+  let dial: Dial | null = null;
+
+  function setLauncherExpanded(expanded: boolean) {
+    launcher?.setAttribute('aria-expanded', String(expanded));
+  }
+
+  /** No type: the dial on a compact launcher, else the home screen (or the sheet, hidden-trigger). */
+  function openWidget(type?: FeedbackType) {
+    if (type || !dial || !isCompact()) {
+      dial?.close();
+      panel.open(type);
+      return;
+    }
+    panel.close();
+    dial.open();
+    setLauncherExpanded(true);
+  }
+
   const launcher = options.hideTrigger
     ? null
-    : createLauncher(config.triggerText, () => (panel.isOpen() ? panel.close() : panel.open()));
+    : createLauncher(config.triggerText, () => {
+        if (dial?.isOpen()) {
+          dial.close();
+          setLauncherExpanded(false);
+          return;
+        }
+        if (panel.isOpen()) {
+          panel.close();
+          return;
+        }
+        openWidget();
+      });
   const panel = createPanel({
     config,
     t: MESSAGES[locale],
     deps: options.preview ? null : (options.deps ?? null),
     host,
     launcher,
-    compact: options.compact ?? defaultCompact,
+    compact: isCompact,
   });
+  if (launcher) {
+    dial = createDial({
+      t: MESSAGES[locale],
+      onPick: (type) => panel.open(type),
+      onClose: () => {
+        setLauncherExpanded(false);
+        launcher.focus();
+      },
+    });
+  }
   if (launcher) root.append(launcher);
+  if (dial) root.append(dial.element);
   root.append(panel.element);
   shadow.append(root);
   container.append(host);
 
   return {
     host,
-    open: (type) => panel.open(type),
-    close: () => panel.close(),
-    isOpen: () => panel.isOpen(),
+    open: (type) => openWidget(type),
+    close: () => {
+      if (dial?.isOpen()) {
+        dial.close();
+        setLauncherExpanded(false);
+      }
+      panel.close();
+    },
+    isOpen: () => panel.isOpen() || (dial?.isOpen() ?? false),
     identify: (user) => panel.setEmail(user.email ?? ''),
     destroy: () => {
       panel.destroy();
