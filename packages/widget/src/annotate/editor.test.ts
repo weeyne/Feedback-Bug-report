@@ -65,7 +65,10 @@ function drag(from: [number, number], to: [number, number]) {
 }
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-afterEach(() => document.querySelector('[data-bugping-annotate]')?.remove());
+afterEach(() => {
+  document.querySelector('[data-bugping-annotate]')?.remove();
+  vi.unstubAllGlobals();
+});
 
 describe('annotation editor', () => {
   it('records a rectangle in image space and returns it with the exported image', async () => {
@@ -135,5 +138,74 @@ describe('annotation editor', () => {
     drag([10, 10], [11, 11]);
     button('Done').click();
     expect((await result)?.strokes).toEqual([]);
+  });
+
+  it('cancels a queued redraw on settle so it never draws after cleanup (regression)', async () => {
+    // Drive requestAnimationFrame manually: capture the queued callback instead of running it,
+    // so we can settle the editor first and only then decide whether to flush it.
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const raf = vi.fn((cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+    const caf = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('cancelAnimationFrame', caf);
+
+    const e = env();
+    const result = openEditor({ image: new Blob(['x'], { type: 'image/png' }), t }, e);
+    await flush();
+
+    const canvas = shadow().querySelector('canvas')!;
+    canvas.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width: 1000,
+      height: 500,
+      right: 1000,
+      bottom: 500,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    });
+    canvas.setPointerCapture = () => {};
+    const drawImage = vi.fn();
+    canvas.getContext = (() => ({
+      setTransform: () => {},
+      clearRect: () => {},
+      drawImage,
+      beginPath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      stroke: () => {},
+      strokeRect: () => {},
+      fillRect: () => {},
+    })) as unknown as HTMLCanvasElement['getContext'];
+
+    // A pointer move queues exactly one redraw via requestAnimationFrame; it is not flushed.
+    canvas.dispatchEvent(
+      new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1, bubbles: true }),
+    );
+    canvas.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: 60, clientY: 60, pointerId: 1, bubbles: true }),
+    );
+    expect(raf).toHaveBeenCalledTimes(1);
+
+    // Settle the editor (Done resolves, cleanup runs) before that queued frame ever fires.
+    canvas.dispatchEvent(
+      new PointerEvent('pointerup', { clientX: 60, clientY: 60, pointerId: 1, bubbles: true }),
+    );
+    button('Done').click();
+    await result;
+
+    // cleanup() must have cancelled the still-pending frame.
+    expect(caf).toHaveBeenCalledWith(1);
+
+    // Even if a browser ran the queued callback anyway, it must not throw and must not draw
+    // against the now-removed host / closed image.
+    drawImage.mockClear();
+    const pending = rafCallbacks[0]!;
+    expect(() => pending(0)).not.toThrow();
+    expect(drawImage).not.toHaveBeenCalled();
   });
 });

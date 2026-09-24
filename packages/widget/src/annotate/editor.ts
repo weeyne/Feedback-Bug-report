@@ -83,9 +83,16 @@ export function openEditor(
       close(): void;
     } | null = null;
     let host: HTMLDivElement | null = null;
+    // Owned by mount()'s redraw/scheduleRedraw, but cancelled from cleanup() so a redraw queued
+    // just before Done/Cancel/Escape can never run against a removed host or a closed image.
+    let rafId: number | null = null;
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
     function cleanup() {
+      if (rafId !== null) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       host?.remove();
       decoded?.close();
     }
@@ -143,17 +150,25 @@ export function openEditor(
       canvas.width = Math.max(1, Math.round(fit.width * dpr));
       canvas.height = Math.max(1, Math.round(fit.height * dpr));
 
-      let rafId: number | null = null;
       function redraw() {
         rafId = null;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const canvasScale = canvas.width / image.width;
-        ctx.setTransform(canvasScale, 0, 0, canvasScale, 0, 0);
-        ctx.clearRect(0, 0, image.width, image.height);
-        ctx.drawImage(image.source, 0, 0, image.width, image.height);
-        const all = currentStroke ? [...strokes, currentStroke] : strokes;
-        drawStrokes(ctx, all, 1 / fit.scale);
+        // Guards a redraw that was already queued (via requestAnimationFrame) when Done/Cancel/
+        // Escape settled the editor: cleanup() cancels the rAF, but this is a second line of
+        // defense, and the try/catch below stops any draw failure (e.g. a closed image source)
+        // from ever escaping as an uncaught exception into the host page.
+        if (settled) return;
+        try {
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          const canvasScale = canvas.width / image.width;
+          ctx.setTransform(canvasScale, 0, 0, canvasScale, 0, 0);
+          ctx.clearRect(0, 0, image.width, image.height);
+          ctx.drawImage(image.source, 0, 0, image.width, image.height);
+          const all = currentStroke ? [...strokes, currentStroke] : strokes;
+          drawStrokes(ctx, all, 1 / fit.scale);
+        } catch {
+          // ignore: never let a draw failure surface as an uncaught error in the host page
+        }
       }
       function scheduleRedraw() {
         if (typeof requestAnimationFrame !== 'function') {
