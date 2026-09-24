@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Logo } from '@/components/brand/logo';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { getSessionUser } from '@/lib/auth/session';
 import { LoginCard } from './login-form';
 
@@ -26,6 +27,7 @@ export default async function LoginPage({
         <ArrowLeft className="size-4" aria-hidden />
         {t('backToSite')}
       </Link>
+      <ThemeToggle className="absolute right-4 top-4" />
       <Logo size="lg" href="/" />
       <LoginCard
         error={
