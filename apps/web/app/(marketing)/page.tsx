@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { DemoStage } from '@/components/marketing/demo/demo-stage';
 import { OwnWidget } from '@/components/marketing/own-widget';
 import { buttonVariants } from '@/components/ui/button';
+import { getPublicEnv } from '@/lib/public-env';
 
 export default async function LandingPage() {
   const t = await getTranslations('landing');
@@ -17,11 +19,14 @@ export default async function LandingPage() {
           <Link href="/login" data-testid="landing-cta" className={buttonVariants({ size: 'lg' })}>
             {t('startFree')}
           </Link>
-          <a href="#how" className={buttonVariants({ size: 'lg', variant: 'outline' })}>
+          <a href="#demo" className={buttonVariants({ size: 'lg', variant: 'outline' })}>
             {t('howItWorks')}
           </a>
         </div>
       </section>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <DemoStage appUrl={getPublicEnv().appUrl} />
+      </div>
 
       <section id="how" className={section}>
         <h2 className="text-2xl font-semibold">{t('stepsTitle')}</h2>
