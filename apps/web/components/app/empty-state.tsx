@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
+import { buttonVariants } from '@/components/ui/button';
 
 export interface EmptyStateProps {
   icon: ReactNode;
@@ -25,15 +26,15 @@ export function EmptyState({ icon, title, body, action, testId = 'empty-state' }
       <h3 className="text-sm font-bold">{title}</h3>
       {body && <p className="max-w-xs text-sm text-muted-foreground">{body}</p>}
       {action && (
-        <Button
-          size="sm"
-          variant={action.variant ?? 'default'}
-          className="mt-2 font-semibold"
-          nativeButton={false}
-          render={<Link href={action.href} />}
+        <Link
+          href={action.href}
+          className={cn(
+            buttonVariants({ size: 'sm', variant: action.variant ?? 'default' }),
+            'mt-2 font-semibold',
+          )}
         >
           {action.label}
-        </Button>
+        </Link>
       )}
     </div>
   );

@@ -4,7 +4,8 @@ import { Lock } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { PageHeader, SectionCard } from '@/components/app/page-header';
 import { LadybugMark } from '@/components/brand/logo';
-import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
+import { buttonVariants } from '@/components/ui/button';
 import { requireUser } from '@/lib/auth/session';
 import { canCreateProject, listProjects } from '@/lib/dashboard/projects';
 import { getDeps } from '@/lib/deps';
@@ -51,13 +52,9 @@ export default async function NewProjectPage() {
             </span>
             <p className="text-sm">{t('limitReached')}</p>
           </div>
-          <Button
-            className="self-start font-semibold"
-            nativeButton={false}
-            render={<Link href="/app/billing" />}
-          >
+          <Link href="/app/billing" className={cn(buttonVariants(), 'self-start font-semibold')}>
             {t('upgrade')}
-          </Button>
+          </Link>
         </SectionCard>
       )}
     </div>

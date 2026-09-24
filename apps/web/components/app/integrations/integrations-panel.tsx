@@ -22,7 +22,7 @@ import {
   sendTestAction,
 } from '@/app/app/actions';
 import { EmptyState } from '@/components/app/empty-state';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type {
   IntegrationKind,
@@ -249,37 +249,26 @@ export function IntegrationsPanel(props: {
         {link ? (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                nativeButton={false}
-                render={
-                  <a
-                    href={link.privateUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="tg-private-link"
-                  />
-                }
+              <a
+                href={link.privateUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="tg-private-link"
+                className={buttonVariants({ size: 'sm' })}
               >
                 {t('integrations.privateChat')}
                 <ExternalLink aria-hidden />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                nativeButton={false}
-                render={
-                  <a
-                    href={link.groupUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="tg-group-link"
-                  />
-                }
+              </a>
+              <a
+                href={link.groupUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="tg-group-link"
+                className={buttonVariants({ size: 'sm', variant: 'outline' })}
               >
                 {t('integrations.addToGroup')}
                 <ExternalLink aria-hidden />
-              </Button>
+              </a>
             </div>
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <span

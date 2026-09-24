@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
+import { buttonVariants } from '@/components/ui/button';
 
 export type PlanKind = 'free' | 'pro_monthly' | 'pro_lifetime';
 
@@ -41,27 +42,24 @@ export async function PlanCard({ plan, usage }: { plan: PlanKind; usage: ShellUs
             />
           </div>
           <p className="text-muted-foreground">{t('planUsage', { used: usage.used, limit })}</p>
-          <Button
-            size="sm"
-            className="w-full font-bold"
-            nativeButton={false}
-            render={<Link href="/app/billing" data-testid="nav-billing" />}
+          <Link
+            href="/app/billing"
+            data-testid="nav-billing"
+            className={cn(buttonVariants({ size: 'sm' }), 'w-full font-bold')}
           >
             {t('upgrade')}
-          </Button>
+          </Link>
         </>
       ) : (
         <>
           <p className="text-muted-foreground">{t('unlimited')}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full"
-            nativeButton={false}
-            render={<Link href="/app/billing" data-testid="nav-billing" />}
+          <Link
+            href="/app/billing"
+            data-testid="nav-billing"
+            className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'w-full')}
           >
             {t('manage')}
-          </Button>
+          </Link>
         </>
       )}
     </div>

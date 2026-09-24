@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { OwnWidget } from '@/components/marketing/own-widget';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 
 export default async function LandingPage() {
   const t = await getTranslations('landing');
@@ -14,17 +14,12 @@ export default async function LandingPage() {
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">{t('heroBody')}</p>
         <div className="mt-8 flex justify-center gap-3">
-          <Button
-            size="lg"
-            data-testid="landing-cta"
-            nativeButton={false}
-            render={<Link href="/login" />}
-          >
+          <Link href="/login" data-testid="landing-cta" className={buttonVariants({ size: 'lg' })}>
             {t('startFree')}
-          </Button>
-          <Button size="lg" variant="outline" nativeButton={false} render={<a href="#how" />}>
+          </Link>
+          <a href="#how" className={buttonVariants({ size: 'lg', variant: 'outline' })}>
             {t('howItWorks')}
-          </Button>
+          </a>
         </div>
       </section>
 
@@ -69,14 +64,13 @@ export default async function LandingPage() {
           ))}
         </div>
         <div className="mt-8 flex justify-center">
-          <Button
-            size="lg"
-            nativeButton={false}
-            render={<Link href="/app/billing" />}
+          <Link
+            href="/app/billing"
             data-testid="landing-pricing-cta"
+            className={buttonVariants({ size: 'lg' })}
           >
             {t('choosePlan')}
-          </Button>
+          </Link>
         </div>
       </section>
 

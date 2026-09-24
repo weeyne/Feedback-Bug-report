@@ -2,7 +2,7 @@ import { ChevronDown, ImageIcon, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import type { FeedbackListItem } from '@/lib/dashboard/feedback';
 import { metaLine } from '@/lib/dashboard/feed-view';
 import { TypePill } from './type-pill';
@@ -101,16 +101,13 @@ export async function FeedbackList({
       )}
       {loadMoreHref && (
         <li className="flex justify-center p-4">
-          <Button
-            size="sm"
-            variant="outline"
-            className="font-semibold"
-            nativeButton={false}
-            render={<Link href={loadMoreHref} />}
+          <Link
+            href={loadMoreHref}
+            className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'font-semibold')}
           >
             <ChevronDown aria-hidden />
             {t('loadMore')}
-          </Button>
+          </Link>
         </li>
       )}
     </ul>

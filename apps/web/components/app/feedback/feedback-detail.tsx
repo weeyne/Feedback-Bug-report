@@ -2,7 +2,8 @@ import { X } from 'lucide-react';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
+import { buttonVariants } from '@/components/ui/button';
 import type { FeedbackDetail } from '@/lib/dashboard/feedback';
 import { FeedbackActions } from './feedback-actions';
 import { ScreenshotViewer } from './screenshot-viewer';
@@ -62,18 +63,18 @@ export async function FeedbackDetailPanel({
               })}
             </time>
           </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="-mr-1 text-muted-foreground"
+          <Link
+            href={closeHref}
             aria-label={t('close')}
             title={t('close')}
             data-testid="feedback-close"
-            nativeButton={false}
-            render={<Link href={closeHref} />}
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'icon-sm' }),
+              '-mr-1 text-muted-foreground',
+            )}
           >
             <X aria-hidden />
-          </Button>
+          </Link>
         </header>
         {screenshot && <ScreenshotViewer src={screenshot} />}
         <p

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 
 export interface ChecklistState {
   widgetSeen: boolean;
@@ -82,15 +82,15 @@ export function Checklist({ projectId, state }: { projectId: string; state: Chec
               </div>
             </div>
             {!step.done && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-auto self-start"
-                nativeButton={false}
-                render={<Link href={step.href} />}
+              <Link
+                href={step.href}
+                className={cn(
+                  buttonVariants({ size: 'sm', variant: 'outline' }),
+                  'mt-auto self-start',
+                )}
               >
                 {step.cta}
-              </Button>
+              </Link>
             )}
           </li>
         ))}

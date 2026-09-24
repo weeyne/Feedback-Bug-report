@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { deleteFeedbackAction, setFeedbackStatusAction } from '@/app/app/actions';
-import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { replyHref } from '@/lib/dashboard/feed-view';
 import type { FeedbackStatus } from '@/lib/dashboard/feedback';
 
@@ -56,16 +57,14 @@ export function FeedbackActions({
         </Button>
       )}
       {email && (
-        <Button
-          variant="outline"
-          className="font-semibold"
+        <a
+          href={replyHref(email, t('feedback.replySubject'))}
           data-testid="feedback-reply"
-          nativeButton={false}
-          render={<a href={replyHref(email, t('feedback.replySubject'))} />}
+          className={cn(buttonVariants({ variant: 'outline' }), 'font-semibold')}
         >
           <Mail aria-hidden />
           {t('feedback.reply')}
-        </Button>
+        </a>
       )}
       {status === 'archived' ? (
         <Button

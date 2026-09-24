@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Code2, Gamepad2, Send, type LucideIcon } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { cn } from 'cn';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import type { Overview } from '@/lib/dashboard/overview';
 
 function Tile({
@@ -57,9 +57,9 @@ function Tile({
     return (
       <div data-testid={`connection-${id}`} data-ok={ok} className={tile}>
         {body}
-        <Button size="xs" className="ml-auto" nativeButton={false} render={<Link href={href} />}>
+        <Link href={href} className={cn(buttonVariants({ size: 'xs' }), 'ml-auto')}>
           {action}
-        </Button>
+        </Link>
       </div>
     );
   }

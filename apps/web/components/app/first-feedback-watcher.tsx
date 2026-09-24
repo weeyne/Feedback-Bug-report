@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { hasFeedbackAction } from '@/app/app/actions';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 
 const POLL_MS = 3000;
 
@@ -46,21 +46,15 @@ export function FirstFeedbackWatcher({
     >
       <span className="font-semibold text-green-800 dark:text-green-300">{t('received')}</span>
       <span className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          nativeButton={false}
-          render={<Link href={`/app/p/${projectId}/feedback`} />}
-        >
+        <Link href={`/app/p/${projectId}/feedback`} className={buttonVariants({ size: 'sm' })}>
           {t('openFeedback')}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          nativeButton={false}
-          render={<Link href={`/app/p/${projectId}/integrations`} />}
+        </Link>
+        <Link
+          href={`/app/p/${projectId}/integrations`}
+          className={buttonVariants({ size: 'sm', variant: 'outline' })}
         >
           {t('connectTelegram')}
-        </Button>
+        </Link>
       </span>
     </div>
   );

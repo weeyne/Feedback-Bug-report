@@ -243,9 +243,8 @@ test('feed: a fresh project shows the empty state with the install CTA', async (
   await expect(page.getByTestId('feedback-empty')).toBeVisible();
   const empty = page.getByTestId('empty-state');
   await expect(empty).toBeVisible();
-  // The action renders as an <a>, but the Button component gives it an accessible role of
-  // "button" regardless of the underlying element.
-  const cta = empty.getByRole('button', { name: 'Install the widget' });
+  // The action is a real link styled with buttonVariants, so it keeps the "link" role.
+  const cta = empty.getByRole('link', { name: 'Install the widget' });
   await expect(cta).toBeVisible();
   await expect(cta).toHaveAttribute('href', `/app/p/${projectId}/install`);
 });
