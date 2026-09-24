@@ -19,6 +19,7 @@ import {
   listFeedback,
   screenshotUrl,
   setFeedbackStatus,
+  statusCounts,
   usage,
 } from './feedback';
 import type { DashDeps } from './result';
@@ -176,5 +177,61 @@ describe('feedback use cases', () => {
       expect(await usage(deps, owner)).toEqual({ used: 7, limit: 20, pro: false });
       await grantPro(db, owner);
       expect(await usage(deps, owner)).toEqual({ used: 7, limit: null, pro: true });
+    }));
+
+  it('counts feedback by status, excluding over-quota rows for free owners', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const project = await createProject(db, owner);
+      await createFeedback(db, project.id, { message: 'visible' });
+      const hiddenId = await createFeedback(db, project.id, { message: 'hidden', overQuota: true });
+      await db.query(`update public.feedback set status = 'resolved' where id = $1`, [hiddenId]);
+      expect(await statusCounts(deps, owner, project.id)).toEqual({
+        new: 1,
+        resolved: 0,
+        archived: 0,
+      });
+      await grantPro(db, owner);
+      expect(await statusCounts(deps, owner, project.id)).toEqual({
+        new: 1,
+        resolved: 1,
+        archived: 0,
+      });
+      const stranger = await createUser(db);
+      expect(await statusCounts(deps, stranger, project.id)).toEqual({
+        new: 0,
+        resolved: 0,
+        archived: 0,
+      });
+      expect(await statusCounts(deps, owner, 'not-a-uuid')).toEqual({
+        new: 0,
+        resolved: 0,
+        archived: 0,
+      });
+    }));
+
+  it('returns page, browser and email meta fields', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const project = await createProject(db, owner);
+      const id = await createFeedback(db, project.id, { message: 'meta' });
+      await db.query(
+        `update public.feedback set email = $2,
+                metadata = $3::jsonb
+         where id = $1`,
+        [
+          id,
+          'user@example.com',
+          JSON.stringify({ url: 'https://shop.example/checkout?x=1', browser: 'Chrome 128' }),
+        ],
+      );
+      const { items } = await listFeedback(deps, owner, { projectId: project.id });
+      expect(items[0]).toMatchObject({
+        page: '/checkout',
+        browser: 'Chrome 128',
+        email: 'user@example.com',
+      });
     }));
 });

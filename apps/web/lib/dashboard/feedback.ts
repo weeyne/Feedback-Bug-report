@@ -21,6 +21,9 @@ export interface FeedbackListItem {
   status: FeedbackStatus;
   created_at: string;
   has_screenshot: boolean;
+  page: string | null;
+  browser: string | null;
+  email: string | null;
 }
 
 export interface FeedbackDetail extends FeedbackListItem {
@@ -40,6 +43,19 @@ interface ListRow extends Row {
    * from this raw Postgres-formatted string instead. Never exposed on `FeedbackListItem`. */
   cursor_at: string;
   has_screenshot: boolean;
+  url: string | null;
+  browser: string | null;
+  email: string | null;
+}
+
+/** Best-effort URL path extraction for the feed's "page" column; malformed or missing URLs yield `null`. */
+function pagePath(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return null;
+  }
 }
 
 const iso = (value: Date | string) => new Date(value).toISOString();
@@ -80,7 +96,8 @@ export async function listFeedback(
     tx.query<ListRow>(
       `select id, type::text as type, left(message, 200) as message, status::text as status, created_at,
               to_char(created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at,
-              screenshot_path is not null as has_screenshot
+              screenshot_path is not null as has_screenshot,
+              metadata->>'url' as url, metadata->>'browser' as browser, email
        from public.feedback
        where project_id = $1 and status = $2::feedback_status
          and ($3::text is null or type = $3::feedback_type)
@@ -98,9 +115,10 @@ export async function listFeedback(
     ),
   );
   const pageRows = rows.slice(0, FEEDBACK_PAGE_SIZE);
-  const page = pageRows.map(({ cursor_at: _cursor_at, ...r }) => ({
+  const page = pageRows.map(({ cursor_at: _cursor_at, url, ...r }) => ({
     ...r,
     created_at: iso(r.created_at),
+    page: pagePath(url),
   }));
   const last = pageRows[pageRows.length - 1];
   return {
@@ -121,12 +139,34 @@ export async function getFeedback(
       ListRow & { project_id: string; email: string | null; metadata: Partial<FeedbackMetadata> }
     >(
       `select id, project_id, type::text as type, message, email, status::text as status, created_at, metadata,
-              screenshot_path is not null as has_screenshot
+              screenshot_path is not null as has_screenshot,
+              metadata->>'url' as url, metadata->>'browser' as browser
        from public.feedback where id = $1`,
       [feedbackId],
     ),
   );
-  return row ? { ...row, created_at: iso(row.created_at) } : null;
+  if (!row) return null;
+  const { url, ...rest } = row;
+  return { ...rest, created_at: iso(row.created_at), page: pagePath(url) };
+}
+
+export async function statusCounts(
+  deps: DashDeps,
+  userId: string,
+  projectId: string,
+): Promise<Record<FeedbackStatus, number>> {
+  const zero: Record<FeedbackStatus, number> = { new: 0, resolved: 0, archived: 0 };
+  if (!isUuid(projectId)) return zero;
+  const rows = await withUser(deps.db, userId, (tx) =>
+    tx.query<{ status: FeedbackStatus; n: number }>(
+      `select status::text as status, count(*)::int as n from public.feedback
+       where project_id = $1 group by status`,
+      [projectId],
+    ),
+  );
+  const counts = { ...zero };
+  for (const row of rows) counts[row.status] = row.n;
+  return counts;
 }
 
 export async function hiddenFeedbackCount(
