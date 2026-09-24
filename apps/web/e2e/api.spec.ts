@@ -17,6 +17,7 @@ const state = async (page: Page): Promise<State> =>
 async function submitFromWidget(page: Page, key: string, message: string) {
   await page.goto(`/e2e-host?key=${key}`);
   await page.locator('[data-bugping] .bp-trigger').click();
+  await page.locator('.bp-card[data-type="bug"]').click();
   await expect(page.locator('.bp-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
     timeout: 15_000,
   });

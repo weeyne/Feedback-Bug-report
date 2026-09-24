@@ -38,6 +38,7 @@ test('onboarding: create a project, receive the first feedback, resolve it', asy
   const host = await context.newPage();
   await host.goto(`/e2e-host?key=${key}`);
   await host.locator('[data-bugping] .bp-trigger').click();
+  await host.locator('.bp-card[data-type="bug"]').click();
   await expect(host.locator('.bp-thumb')).toHaveAttribute('data-state', /ready|unavailable/, {
     timeout: 15_000,
   });

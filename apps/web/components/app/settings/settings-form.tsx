@@ -173,6 +173,9 @@ export function SettingsForm({
               onChange={(e) => set('customCss', e.target.value)}
               data-testid="settings-css"
             />
+            <p className="text-xs text-muted-foreground" data-testid="settings-css-hint">
+              {t('settings.cssHint')}
+            </p>
             <p
               className={`text-xs ${cssBytes > CUSTOM_CSS_MAX_BYTES ? 'text-destructive' : 'text-muted-foreground'}`}
               data-testid="settings-css-bytes"
