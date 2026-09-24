@@ -3,32 +3,79 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import {
+  Bell,
+  Code2,
+  LayoutDashboard,
+  MessageSquare,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react';
+import { cn } from 'cn';
 import { ProjectSwitcher, type ShellProject } from './project-switcher';
 
-const SECTIONS = ['feedback', 'install', 'settings', 'integrations'] as const;
+const ITEMS: {
+  key: 'overview' | 'feedback' | 'install' | 'integrations' | 'settings';
+  icon: LucideIcon;
+}[] = [
+  { key: 'overview', icon: LayoutDashboard },
+  { key: 'feedback', icon: MessageSquare },
+  { key: 'install', icon: Code2 },
+  { key: 'integrations', icon: Bell },
+  { key: 'settings', icon: Settings },
+];
 
-export function ProjectNav({ projects }: { projects: ShellProject[] }) {
+export function ProjectNav({
+  projects,
+  newCounts,
+}: {
+  projects: ShellProject[];
+  newCounts: Record<string, number>;
+}) {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const match = /^\/app\/p\/([^/]+)(?:\/([^/]+))?/.exec(pathname);
   const currentProjectId = match?.[1] ?? null;
-  const section = match?.[2];
+  const section = match?.[2] ?? 'overview';
+  const newCount = currentProjectId ? (newCounts[currentProjectId] ?? 0) : 0;
   return (
     <>
       <ProjectSwitcher projects={projects} currentProjectId={currentProjectId} />
       {currentProjectId && (
-        <ul className="flex flex-col gap-1 text-sm">
-          {SECTIONS.map((key) => (
-            <li key={key}>
-              <Link
-                href={`/app/p/${currentProjectId}/${key}`}
-                className={`block rounded-md px-3 py-2 hover:bg-muted ${section === key ? 'bg-muted font-medium' : ''}`}
-                data-testid={`nav-${key}`}
-              >
-                {t(key)}
-              </Link>
-            </li>
-          ))}
+        <ul className="flex flex-col gap-0.5 text-sm">
+          {ITEMS.map(({ key, icon: Icon }) => {
+            const active = section === key;
+            return (
+              <li key={key}>
+                <Link
+                  href={
+                    key === 'overview'
+                      ? `/app/p/${currentProjectId}`
+                      : `/app/p/${currentProjectId}/${key}`
+                  }
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors duration-200',
+                    active
+                      ? 'bg-card font-bold text-foreground shadow-sm dark:bg-accent dark:shadow-none'
+                      : 'text-foreground/80 hover:bg-card/70 hover:text-foreground dark:hover:bg-accent/60',
+                  )}
+                  data-testid={`nav-${key}`}
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden />
+                  <span className="truncate">{t(key)}</span>
+                  {key === 'feedback' && newCount > 0 && (
+                    <span
+                      className="ml-auto rounded-full bg-primary px-1.5 text-[11px] leading-[18px] font-bold text-primary-foreground tabular-nums"
+                      data-testid="nav-feedback-count"
+                    >
+                      {newCount}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </>

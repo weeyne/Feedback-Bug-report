@@ -6,5 +6,5 @@ import { getDeps } from '@/lib/deps';
 export default async function AppIndex() {
   const user = await requireUser();
   const [first] = await listProjects(await getDeps(), user.id);
-  redirect(first ? `/app/p/${first.id}/feedback` : '/app/new');
+  redirect(first ? `/app/p/${first.id}` : '/app/new');
 }

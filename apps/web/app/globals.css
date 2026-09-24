@@ -203,13 +203,15 @@
     stroke-dashoffset: 24;
   }
 }
+/* `backwards` (not `both`): the end state equals the natural style, and a transform kept by a
+   forwards fill would make the element the containing block of `position: fixed` descendants. */
 .animate-enter {
-  animation: bp-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: bp-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
   animation-delay: calc(var(--i, 0) * 60ms);
 }
 .animate-grow {
   transform-origin: bottom;
-  animation: bp-grow 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: bp-grow 0.5s cubic-bezier(0.4, 0, 0.2, 1) backwards;
   animation-delay: calc(var(--i, 0) * 12ms);
 }
 .animate-draw {

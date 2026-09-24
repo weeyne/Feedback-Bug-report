@@ -102,7 +102,16 @@
     "account": "Account",
     "newProject": "New project",
     "projects": "Projects",
-    "menu": "Menu"
+    "menu": "Menu",
+    "overview": "Overview",
+    "backToSite": "Back to site",
+    "planFree": "Free plan",
+    "planPro": "Pro",
+    "planLifetime": "Lifetime",
+    "planUsage": "{used} of {limit} feedback this month",
+    "unlimited": "Unlimited",
+    "upgrade": "Upgrade to Pro",
+    "manage": "Manage subscription"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",

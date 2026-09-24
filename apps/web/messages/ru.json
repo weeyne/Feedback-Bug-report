@@ -102,7 +102,16 @@
     "account": "Аккаунт",
     "newProject": "Новый проект",
     "projects": "Проекты",
-    "menu": "Меню"
+    "menu": "Меню",
+    "overview": "Обзор",
+    "backToSite": "На сайт",
+    "planFree": "Бесплатный тариф",
+    "planPro": "Pro",
+    "planLifetime": "Pro навсегда",
+    "planUsage": "{used} из {limit} отзывов в этом месяце",
+    "unlimited": "Без лимита",
+    "upgrade": "Перейти на Pro",
+    "manage": "Управлять подпиской"
   },
   "errors": {
     "generic": "Что-то пошло не так. Попробуйте ещё раз.",

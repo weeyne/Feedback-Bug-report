@@ -1,14 +1,35 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/app/app-shell';
+import type { PlanKind } from '@/components/app/plan-card';
 import { requireUser } from '@/lib/auth/session';
+import { billingOverview } from '@/lib/billing/checkout';
+import { statusCounts, usage } from '@/lib/dashboard/feedback';
 import { listProjects } from '@/lib/dashboard/projects';
 import { getDeps } from '@/lib/deps';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
-  const projects = await listProjects(await getDeps(), user.id);
+  const deps = await getDeps();
+  const [projects, plan, billing] = await Promise.all([
+    listProjects(deps, user.id),
+    usage(deps, user.id),
+    billingOverview(deps, user.id),
+  ]);
+  // Projects per user are few, so one small count query each is fine.
+  const counts = await Promise.all(
+    projects.map(async (p) => [p.id, (await statusCounts(deps, user.id, p.id)).new] as const),
+  );
+  // Same rule as the billing page: lifetime wins, otherwise any active Pro is monthly.
+  const kind: PlanKind =
+    billing.state === 'lifetime' ? 'pro_lifetime' : plan.pro ? 'pro_monthly' : 'free';
   return (
-    <AppShell projects={projects} email={user.email}>
+    <AppShell
+      projects={projects}
+      email={user.email}
+      usage={plan}
+      plan={kind}
+      newCounts={Object.fromEntries(counts)}
+    >
       {children}
     </AppShell>
   );
