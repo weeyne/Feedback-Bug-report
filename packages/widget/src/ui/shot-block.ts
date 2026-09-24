@@ -28,17 +28,9 @@ export interface ShotBlock {
   destroy(): void;
 }
 
-/** Resolves true if `promise` settles within `ms`, false otherwise. Never rejects. */
-export function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const cap = new Promise<boolean>((resolve) => {
-    timer = setTimeout(() => resolve(false), ms);
-  });
-  const done = promise.then(
-    () => true,
-    () => true,
-  );
-  return Promise.race([done, cap]).finally(() => clearTimeout(timer));
+function isTextField(target: EventTarget | null): boolean {
+  const tag = (target as Element | null)?.tagName;
+  return tag === 'TEXTAREA' || tag === 'INPUT';
 }
 
 function errorMessage(t: Messages, error: unknown): string {
@@ -69,6 +61,10 @@ export function createShotBlock(options: {
   let strokes: Stroke[] = [];
   let thumbUrl: string | null = null;
   let generation = 0;
+  /** Orders addImage calls among themselves: only the newest one may apply its result. */
+  let imageSeq = 0;
+  /** The editor is loading or open: further Annotate/thumbnail clicks are ignored. */
+  let annotating = false;
   /**
    * The in-flight async operation for the current generation (capture, or an addImage prepare).
    * `result()` waits on this — reassigned synchronously (before any await) by every op that starts
@@ -92,7 +88,8 @@ export function createShotBlock(options: {
     },
   });
 
-  const element = h('div', { class: 'bp-shot', 'data-state': state });
+  // tabindex -1: a focus target of last resort when a re-render removes the focused control.
+  const element = h('div', { class: 'bp-shot', 'data-state': state, tabindex: -1 });
 
   function announce(text: string) {
     liveRegion.textContent = text;
@@ -132,6 +129,28 @@ export function createShotBlock(options: {
   function focusThumb() {
     const thumb = element.querySelector<HTMLElement>('.bp-thumb');
     thumb?.focus();
+  }
+
+  /** Where focus goes when a re-render removed the focused control: never out of the block. */
+  function focusBest() {
+    const target =
+      state === 'ready'
+        ? element.querySelector<HTMLElement>('button.bp-thumb:not([disabled])')
+        : element.querySelector<HTMLElement>('.bp-shot-actions button:not([disabled])');
+    (target ?? element).focus();
+  }
+
+  function focusedElement(): Element | null {
+    const root = element.getRootNode() as Document | ShadowRoot | Node;
+    return 'activeElement' in root ? root.activeElement : null;
+  }
+
+  function setAnnotating(value: boolean) {
+    annotating = value;
+    for (const control of element.querySelectorAll('.bp-thumb, .bp-shot-annotate')) {
+      if (value) control.setAttribute('aria-disabled', 'true');
+      else control.removeAttribute('aria-disabled');
+    }
   }
 
   function buildEmpty(): Node[] {
@@ -184,6 +203,7 @@ export function createShotBlock(options: {
           class: 'bp-thumb',
           'data-state': 'ready',
           'aria-label': t.shot.annotate,
+          'aria-disabled': annotating ? 'true' : undefined,
           disabled: preview,
           onclick: () => void openAnnotate(),
         },
@@ -197,6 +217,7 @@ export function createShotBlock(options: {
           {
             type: 'button',
             class: 'bp-shot-annotate',
+            'aria-disabled': annotating ? 'true' : undefined,
             disabled: preview,
             onclick: () => void openAnnotate(),
           },
@@ -247,6 +268,8 @@ export function createShotBlock(options: {
   }
 
   function render() {
+    const active = focusedElement();
+    const hadFocus = active !== null && element.contains(active);
     element.dataset.state = state;
     const body =
       state === 'empty'
@@ -257,6 +280,11 @@ export function createShotBlock(options: {
             ? buildReady()
             : buildFailed();
     element.replaceChildren(...body, errorEl, liveRegion, fileInput);
+    // replaceChildren drops focus to <body> when it removes the focused control, which would
+    // take it out of the panel (and its Tab trap and Escape handling): keep it in the block.
+    if (!hadFocus) return;
+    const now = focusedElement();
+    if (now === null || now === element || !element.contains(now)) focusBest();
   }
 
   function setState(next: ShotState) {
@@ -290,28 +318,50 @@ export function createShotBlock(options: {
       });
   }
 
+  /**
+   * Prepares a visitor's own image. The current image — or a capture still in flight — is only
+   * replaced once preparation succeeds: on an error both are kept and the reason is shown.
+   */
   function addImage(blob: Blob): Promise<void> {
     if (!deps) return Promise.resolve();
-    const gen = nextGeneration();
+    const seq = ++imageSeq;
+    const gen = generation;
     const prepare = deps.prepare ?? prepareImage;
-    const task = (async () => {
-      try {
-        const prepared = await prepare(blob);
-        if (gen !== generation) return;
-        clearImage();
-        original = prepared;
-        clearError();
-        setState('ready');
-      } catch (error) {
-        if (gen !== generation) return;
-        showError(errorMessage(t, error));
-      }
-    })();
+    const previous = pending;
+    const current = () => seq === imageSeq && gen === generation;
+    const task: Promise<void> = Promise.resolve()
+      .then(() => prepare(blob))
+      .then(
+        (prepared) => {
+          if (!current()) return;
+          nextGeneration(); // supersedes a pending capture and any editor open on the old image
+          clearImage();
+          original = prepared;
+          clearError();
+          setState('ready');
+        },
+        (error: unknown) => {
+          if (!current()) return;
+          showError(errorMessage(t, error));
+          // result() goes back to waiting on whatever this attempt had replaced (e.g. a capture).
+          if (pending === task) pending = previous;
+        },
+      );
     pending = task;
     return task;
   }
 
   async function openAnnotate(): Promise<void> {
+    if (!deps || !original || annotating) return;
+    setAnnotating(true);
+    try {
+      await runEditor();
+    } finally {
+      setAnnotating(false);
+    }
+  }
+
+  async function runEditor(): Promise<void> {
     if (!deps || !original) return;
     const gen = generation;
     let loadFn: AnnotateFn | null;
@@ -337,6 +387,7 @@ export function createShotBlock(options: {
       annotated = outcome.image;
       strokes = outcome.strokes;
       clearError();
+      annotating = false; // so the re-rendered controls come back enabled
       setState('ready');
     }
     focusThumb();
@@ -355,7 +406,12 @@ export function createShotBlock(options: {
     if (!deps) return false;
     const items = event.clipboardData?.items;
     if (!items) return false;
-    for (const item of Array.from(items)) {
+    const list = Array.from(items);
+    // Text copied from e.g. Office also carries a rendered image of it: pasted into a text field,
+    // the visitor wants the text.
+    const hasText = list.some((item) => item.kind === 'string' && item.type === 'text/plain');
+    if (hasText && isTextField(event.target)) return false;
+    for (const item of list) {
       if (item.kind === 'file' && item.type.startsWith('image/')) {
         const file = item.getAsFile();
         if (!file) continue;
@@ -434,6 +490,8 @@ export function createShotBlock(options: {
   }
 
   function destroy() {
+    // Late async results (capture, prepare, editor) must never create object URLs after this.
+    nextGeneration();
     revokeThumb();
   }
 
