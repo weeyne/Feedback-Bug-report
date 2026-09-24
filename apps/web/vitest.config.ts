@@ -10,6 +10,7 @@ export default defineConfig({
       'app/**/*.test.ts',
       'i18n/**/*.test.ts',
       'messages/**/*.test.ts',
+      'components/**/*.test.ts',
       'components/**/*.test.tsx',
     ],
     setupFiles: ['./test/setup.ts'],
