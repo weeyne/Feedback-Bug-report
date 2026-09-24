@@ -262,6 +262,7 @@ export function openEditor(
           'button',
           {
             type: 'button',
+            'data-tool': tool,
             'aria-pressed': String(tool === activeTool),
             onClick: () => setActiveTool(tool),
           },
