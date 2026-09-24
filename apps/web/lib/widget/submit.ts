@@ -6,13 +6,13 @@ import {
   SubmitPayloadSchema,
   type FeedbackMetadata,
 } from '@bugping/shared';
-import { UAParser } from 'ua-parser-js';
 import { ENTITLEMENTS } from '../billing/plans';
 import type { Db } from '../db/types';
 import type { Env } from '../env';
 import { clientIp, corsHeaders, json } from '../http';
 import type { Storage } from '../storage';
 import { loadProjectByKey } from './project';
+import { describeAgent } from './user-agent';
 
 export const MAX_BODY_BYTES = 2.5 * 1024 * 1024;
 const RATE_LIMIT = { max: 5, windowSeconds: 60 } as const;
@@ -73,16 +73,6 @@ export function rateLimitIdentity(ip: string): string {
   }
   const prefix = groups.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, ''));
   return `${prefix.join(':')}::/64`;
-}
-
-function describeAgent(userAgent: string): { browser: string; os: string } {
-  const result = UAParser(userAgent);
-  const join = (...parts: Array<string | undefined>) =>
-    parts.filter(Boolean).join(' ') || 'Unknown';
-  return {
-    browser: join(result.browser.name, result.browser.major),
-    os: join(result.os.name, result.os.version),
-  };
 }
 
 export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<Response> {
