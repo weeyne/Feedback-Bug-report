@@ -140,6 +140,104 @@ describe('annotation editor', () => {
     expect((await result)?.strokes).toEqual([]);
   });
 
+  it('lays the canvas out through CSSOM and exports with the on-screen stroke scale', async () => {
+    const e = env();
+    const result = openEditor({ image: new Blob(['x'], { type: 'image/png' }), t }, e);
+    await flush();
+    const canvas = shadow().querySelector('canvas')!;
+    const width = parseFloat(canvas.style.width);
+    expect(width).toBeGreaterThan(0);
+    expect(canvas.style.height).toMatch(/px$/);
+    expect(canvas.style.left).toMatch(/px$/);
+    expect(canvas.style.top).toMatch(/px$/);
+    // touch-action comes from the stylesheet, not inline.
+    expect(canvas.style.getPropertyValue('touch-action')).toBe('');
+    drag([100, 50], [300, 150]);
+    button('Done').click();
+    await result;
+    expect(e.exportImage).toHaveBeenCalledOnce();
+    const lineScale = e.exportImage.mock.calls[0]![4] as number;
+    // Image-space units per CSS pixel, exactly what the visitor saw while drawing.
+    expect(lineScale).toBeCloseTo(1000 / width, 6);
+  });
+
+  it('Tab wraps inside the toolbar in both directions', async () => {
+    const result = openEditor({ image: new Blob(['x'], { type: 'image/png' }), t }, env());
+    await flush();
+    const buttons = [
+      ...shadow().querySelectorAll<HTMLButtonElement>('.bp-annotate-toolbar button'),
+    ];
+    const first = buttons[0]!;
+    const last = buttons[buttons.length - 1]!;
+    expect(last).toBe(button('Done'));
+    last.focus();
+    const forward = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+    });
+    last.dispatchEvent(forward);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(shadow().activeElement).toBe(first);
+    const backward = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+    });
+    first.dispatchEvent(backward);
+    expect(backward.defaultPrevented).toBe(true);
+    expect(shadow().activeElement).toBe(last);
+    button('Cancel').click();
+    expect(await result).toBeNull();
+  });
+
+  it('keeps key events inside the editor away from host shortcuts', async () => {
+    const result = openEditor({ image: new Blob(['x'], { type: 'image/png' }), t }, env());
+    await flush();
+    const hostListener = vi.fn();
+    const types = ['keydown', 'keypress', 'keyup'] as const;
+    for (const type of types) document.addEventListener(type, hostListener);
+    try {
+      for (const type of types) {
+        button('Pen').dispatchEvent(
+          new KeyboardEvent(type, { key: 'z', bubbles: true, composed: true }),
+        );
+      }
+      expect(hostListener).not.toHaveBeenCalled();
+    } finally {
+      for (const type of types) document.removeEventListener(type, hostListener);
+    }
+    button('Cancel').click();
+    expect(await result).toBeNull();
+  });
+
+  it('a throwing pointer handler never escapes into the host page', async () => {
+    const result = openEditor({ image: new Blob(['x'], { type: 'image/png' }), t }, env());
+    await flush();
+    const canvas = shadow().querySelector('canvas')!;
+    canvas.getBoundingClientRect = () => {
+      throw new Error('boom');
+    };
+    const errors = vi.fn();
+    window.addEventListener('error', errors);
+    try {
+      expect(() =>
+        canvas.dispatchEvent(
+          new PointerEvent('pointerdown', { clientX: 1, clientY: 1, pointerId: 1, bubbles: true }),
+        ),
+      ).not.toThrow();
+      await flush();
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('error', errors);
+    }
+    button('Cancel').click();
+    expect(await result).toBeNull();
+  });
+
   it('cancels a queued redraw on settle so it never draws after cleanup (regression)', async () => {
     // Drive requestAnimationFrame manually: capture the queued callback instead of running it,
     // so we can settle the editor first and only then decide whether to flush it.

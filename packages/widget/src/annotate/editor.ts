@@ -9,15 +9,23 @@ export interface EditorEnv {
   decode(
     blob: Blob,
   ): Promise<{ source: CanvasImageSource; width: number; height: number; close(): void }>;
+  /**
+   * Draws `strokes` over the image at full size. `lineScale` is the image-space stroke scale the
+   * visitor saw on screen, so the exported marks are exactly as thick as the drawn ones.
+   */
   exportImage(
     source: CanvasImageSource,
     width: number,
     height: number,
     strokes: Stroke[],
+    lineScale: number,
   ): Promise<Blob>;
 }
 
+/** Space kept free below the image for a one-row toolbar (48px + 16px offset + a small gap). */
 const TOOLBAR_HEIGHT = 72;
+/** The toolbar's distance from the viewport's bottom edge (see styles.css). */
+const TOOLBAR_BOTTOM = 16;
 const VIEWPORT_PADDING = 24;
 const MIN_RECT_SIZE = 4;
 const MIN_PEN_STEP = 2;
@@ -42,14 +50,14 @@ function adoptStyles(shadow: ShadowRoot, sources: string[]): boolean {
 
 export const browserEditorEnv: EditorEnv = {
   decode: browserImageEnv.decode,
-  async exportImage(source, width, height, strokes) {
+  async exportImage(source, width, height, strokes, lineScale) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(source, 0, 0, width, height);
-      drawStrokes(ctx, strokes, Math.max(1, width / 1000));
+      drawStrokes(ctx, strokes, lineScale);
     }
     return encodeWithinLimit(canvas, width, height);
   },
@@ -133,22 +141,30 @@ export function openEditor(
       let activePointerId: number | null = null;
       let activeTool: Tool = 'rect';
 
-      const fit = fitRect(
-        image.width,
-        image.height,
-        window.innerWidth,
-        window.innerHeight - TOOLBAR_HEIGHT,
-        VIEWPORT_PADDING,
-      );
       const dpr = window.devicePixelRatio || 1;
+      const canvas = h('canvas', { class: 'bp-annotate-canvas', 'aria-label': input.t.canvas });
+      /** Image-space stroke scale: a constant on-screen width, reused by the export. */
+      let lineScale = 1;
 
-      const canvas = h('canvas', {
-        class: 'bp-annotate-canvas',
-        'aria-label': input.t.canvas,
-        style: `position: absolute; left: ${fit.x}px; top: ${fit.y}px; width: ${fit.width}px; height: ${fit.height}px; touch-action: none;`,
-      });
-      canvas.width = Math.max(1, Math.round(fit.width * dpr));
-      canvas.height = Math.max(1, Math.round(fit.height * dpr));
+      /** Fits the image above `reserved` pixels of toolbar space. */
+      function layout(reserved: number) {
+        const fit = fitRect(
+          image.width,
+          image.height,
+          window.innerWidth,
+          window.innerHeight - reserved,
+          VIEWPORT_PADDING,
+        );
+        lineScale = 1 / fit.scale;
+        // CSSOM, not a `style` attribute: a strict `style-src` CSP on the host blocks the latter.
+        canvas.style.left = `${fit.x}px`;
+        canvas.style.top = `${fit.y}px`;
+        canvas.style.width = `${fit.width}px`;
+        canvas.style.height = `${fit.height}px`;
+        canvas.width = Math.max(1, Math.round(fit.width * dpr));
+        canvas.height = Math.max(1, Math.round(fit.height * dpr));
+      }
+      layout(TOOLBAR_HEIGHT);
 
       function redraw() {
         rafId = null;
@@ -165,7 +181,7 @@ export function openEditor(
           ctx.clearRect(0, 0, image.width, image.height);
           ctx.drawImage(image.source, 0, 0, image.width, image.height);
           const all = currentStroke ? [...strokes, currentStroke] : strokes;
-          drawStrokes(ctx, all, 1 / fit.scale);
+          drawStrokes(ctx, all, lineScale);
         } catch {
           // ignore: never let a draw failure surface as an uncaught error in the host page
         }
@@ -184,7 +200,22 @@ export function openEditor(
         return toImagePoint(e.clientX, e.clientY, box, image.width, image.height);
       }
 
-      canvas.addEventListener('pointerdown', (e) => {
+      /** Raw listeners (not via h()): guard them so nothing ever throws into the host page. */
+      function listen(
+        target: EventTarget,
+        type: string,
+        handler: (event: PointerEvent & KeyboardEvent) => void,
+      ) {
+        target.addEventListener(type, (event) => {
+          try {
+            handler(event as PointerEvent & KeyboardEvent);
+          } catch {
+            // ignore: an editor bug must never surface as an uncaught error in the host page
+          }
+        });
+      }
+
+      listen(canvas, 'pointerdown', (e) => {
         try {
           canvas.setPointerCapture(e.pointerId);
         } catch {
@@ -196,7 +227,7 @@ export function openEditor(
         scheduleRedraw();
       });
 
-      canvas.addEventListener('pointermove', (e) => {
+      listen(canvas, 'pointermove', (e) => {
         if (!currentStroke || e.pointerId !== activePointerId) return;
         const p = pointFromEvent(e);
         if (currentStroke.tool === 'pen') {
@@ -218,8 +249,8 @@ export function openEditor(
         if (isNonDegenerate(stroke)) strokes.push(stroke);
         scheduleRedraw();
       }
-      canvas.addEventListener('pointerup', endStroke);
-      canvas.addEventListener('pointercancel', endStroke);
+      listen(canvas, 'pointerup', endStroke);
+      listen(canvas, 'pointercancel', endStroke);
 
       const toolButtons: Array<[Tool, HTMLButtonElement]> = [];
       function setActiveTool(tool: Tool) {
@@ -280,6 +311,7 @@ export function openEditor(
                   image.width,
                   image.height,
                   strokes,
+                  lineScale,
                 );
                 finish({ image: exported, strokes: copyStrokes(strokes) });
               } catch {
@@ -315,7 +347,16 @@ export function openEditor(
       shadow.append(root);
       document.body.append(host);
 
-      host.addEventListener('keydown', (e) => {
+      // On a narrow phone the toolbar wraps onto a second row: fit the image above it instead.
+      const toolbarSpace = toolbar.getBoundingClientRect().height + TOOLBAR_BOTTOM + 8;
+      if (toolbarSpace > TOOLBAR_HEIGHT) layout(toolbarSpace);
+
+      // Composed key events would reach the host page's shortcuts; keep them in the editor.
+      for (const type of ['keypress', 'keyup']) {
+        listen(host, type, (e) => e.stopPropagation());
+      }
+      listen(host, 'keydown', (e) => {
+        e.stopPropagation();
         if (e.key === 'Escape') {
           finish(null);
           return;
@@ -325,10 +366,12 @@ export function openEditor(
           if (focusable.length === 0) return;
           const first = focusable[0]!;
           const last = focusable[focusable.length - 1]!;
-          if (e.shiftKey && document.activeElement === first) {
+          // Focus lives inside the shadow tree: document.activeElement is only the host.
+          const active = shadow.activeElement;
+          if (e.shiftKey && active === first) {
             e.preventDefault();
             last.focus();
-          } else if (!e.shiftKey && document.activeElement === last) {
+          } else if (!e.shiftKey && active === last) {
             e.preventDefault();
             first.focus();
           }
