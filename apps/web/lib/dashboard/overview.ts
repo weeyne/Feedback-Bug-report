@@ -11,7 +11,8 @@ export interface Overview {
   series: Array<{ day: string; bug: number; idea: number; general: number }>;
   recent: Array<{
     id: string;
-    type: FeedbackType;
+    /** `null` for hidden (over-quota) rows so their type never reaches the client. */
+    type: FeedbackType | null;
     status: FeedbackStatus;
     message: string;
     created_at: string;
@@ -57,20 +58,25 @@ export async function getOverview(
             count(f.id) filter (where f.type = 'general')::int as general
      from generate_series((now() at time zone 'utc')::date - 29, (now() at time zone 'utc')::date, interval '1 day') d
      left join public.feedback f
-       on f.project_id = $1 and (f.created_at at time zone 'utc')::date = d::date
+       on f.project_id = $1
+      -- Sargable lower bound (UTC midnight 29 days ago) so the scan stops at the window.
+      and f.created_at >= ((now() at time zone 'utc')::date - 29)::timestamp at time zone 'utc'
+      and (f.created_at at time zone 'utc')::date = d::date
      group by d order by d`,
     [projectId],
   );
 
   const recent = await deps.db.query<{
     id: string;
-    type: FeedbackType;
+    type: FeedbackType | null;
     status: FeedbackStatus;
     message: string;
     created_at: Date | string;
     hidden: boolean;
   }>(
-    `select f.id, f.type::text as type, f.status::text as status,
+    `select f.id,
+            case when f.over_quota and not public.is_pro(p.owner_id) then null else f.type::text end as type,
+            f.status::text as status,
             case when f.over_quota and not public.is_pro(p.owner_id) then '' else left(f.message, 200) end as message,
             f.created_at, (f.over_quota and not public.is_pro(p.owner_id)) as hidden
      from public.feedback f join public.projects p on p.id = f.project_id

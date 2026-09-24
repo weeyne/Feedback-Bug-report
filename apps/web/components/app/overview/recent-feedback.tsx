@@ -51,7 +51,11 @@ export function RecentFeedback({
                 title={item.hidden ? t('hiddenRow') : undefined}
                 className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-colors duration-200 hover:bg-muted"
               >
-                <TypePill type={item.type} />
+                {item.type ? (
+                  <TypePill type={item.type} />
+                ) : (
+                  <span aria-hidden className="h-[18px] w-10 shrink-0 rounded-full bg-muted" />
+                )}
                 {item.hidden ? (
                   <span className="min-w-0 flex-1">
                     <span aria-hidden className="block select-none truncate blur-[3px]">

@@ -62,6 +62,29 @@ describe('getOverview', () => {
       expect(o.recent.map((r) => r.id)).toEqual([a, b, c, old]);
     }));
 
+  it('bounds the series window at UTC midnight 29 days ago', () =>
+    withTx(async (db) => {
+      const owner = await createUser(db);
+      const project = await createProject(db, owner);
+      const first = await createFeedback(db, project.id);
+      const before = await createFeedback(db, project.id);
+      const ancient = await createFeedback(db, project.id);
+      const start = `((now() at time zone 'utc')::date - 29)::timestamp at time zone 'utc'`;
+      await db.query(`update public.feedback set created_at = ${start} where id = $1`, [first]);
+      await db.query(
+        `update public.feedback set created_at = ${start} - interval '1 microsecond' where id = $1`,
+        [before],
+      );
+      await db.query(
+        `update public.feedback set created_at = now() - interval '400 days' where id = $1`,
+        [ancient],
+      );
+      const o = (await getOverview(deps(db), owner, project.id))!;
+      expect(o.series).toHaveLength(30);
+      expect(o.series[0]).toMatchObject({ bug: 1, idea: 0, general: 0 });
+      expect(o.series.reduce((n, d) => n + d.bug + d.idea + d.general, 0)).toBe(1);
+    }));
+
   it('masks over-quota feedback for free owners but counts it', () =>
     withTx(async (db) => {
       const owner = await createUser(db);
@@ -69,10 +92,17 @@ describe('getOverview', () => {
       await createFeedback(db, project.id, { message: 'secret', overQuota: true });
       const o = (await getOverview(deps(db), owner, project.id))!;
       expect(o.counts.new).toBe(1);
-      expect(o.recent[0]).toMatchObject({ hidden: true, message: '' });
+      expect(o.recent[0]).toEqual({
+        id: expect.any(String),
+        type: null,
+        status: 'new',
+        message: '',
+        created_at: expect.any(String),
+        hidden: true,
+      });
       await grantPro(db, owner);
       const pro = (await getOverview(deps(db), owner, project.id))!;
-      expect(pro.recent[0]).toMatchObject({ hidden: false, message: 'secret' });
+      expect(pro.recent[0]).toMatchObject({ hidden: false, message: 'secret', type: 'bug' });
     }));
 
   it('reports widget seen and connected integrations', () =>
