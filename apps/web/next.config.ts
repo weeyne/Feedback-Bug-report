@@ -25,6 +25,14 @@ const config: NextConfig = {
           { key: 'Access-Control-Allow-Origin', value: '*' },
         ],
       },
+      {
+        // The annotation editor chunk: also loaded with a cross-origin import().
+        source: '/w/annotate.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      },
     ];
   },
 };
