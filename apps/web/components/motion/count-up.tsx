@@ -1,5 +1,6 @@
 'use client';
 
+import { useFormatter } from 'next-intl';
 import { useEffect, useState } from 'react';
 
 function easeOut(t: number): number {
@@ -10,9 +11,11 @@ function easeOut(t: number): number {
  * Counts from 0 up to `value`. The server renders 0 for the animated (aria-hidden) number so
  * hydration never jumps from the final value back to 0; the real value always sits in an sr-only
  * span for screen readers and no-JS readers. Under prefers-reduced-motion the real value is shown
- * directly by CSS (before hydration too) and the animated number is hidden.
+ * directly by CSS (before hydration too) and the animated number is hidden. Numbers are formatted
+ * with the next-intl locale so server and client output always match.
  */
 export function CountUp({ value, durationMs = 400 }: { value: number; durationMs?: number }) {
+  const format = useFormatter();
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
@@ -40,9 +43,9 @@ export function CountUp({ value, durationMs = 400 }: { value: number; durationMs
   return (
     <span data-value={value}>
       <span aria-hidden className="motion-reduce:hidden">
-        {display.toLocaleString()}
+        {format.number(display)}
       </span>
-      <span className="sr-only motion-reduce:not-sr-only">{value.toLocaleString()}</span>
+      <span className="sr-only motion-reduce:not-sr-only">{format.number(value)}</span>
     </span>
   );
 }
