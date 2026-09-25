@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { cn } from 'cn';
@@ -63,7 +63,7 @@ export async function FeedbackDetailPanel({
               })}
             </time>
           </div>
-          <Link
+          <AppLink
             href={closeHref}
             aria-label={t('close')}
             title={t('close')}
@@ -74,7 +74,7 @@ export async function FeedbackDetailPanel({
             )}
           >
             <X aria-hidden />
-          </Link>
+          </AppLink>
         </header>
         {screenshot && <ScreenshotViewer src={screenshot} />}
         <p

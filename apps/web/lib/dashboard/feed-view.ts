@@ -1,6 +1,16 @@
 import type { FeedbackType } from '@bugping/shared';
 import type { FeedbackListItem, FeedbackStatus } from './feedback';
 
+/** Best-effort URL path extraction for the feed's "page" column; malformed or missing URLs yield `null`. */
+export function pagePath(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return null;
+  }
+}
+
 /** The feed row's meta line: `page · browser · email`, skipping missing or blank parts. */
 export function metaLine(item: Pick<FeedbackListItem, 'page' | 'browser' | 'email'>): string {
   return [item.page, item.browser, item.email]

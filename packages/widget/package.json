@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/ui/mount.ts"
+    ".": "./src/ui/mount.ts",
+    "./demo-selectors": "./src/demo-selectors.ts"
   },
   "scripts": {
     "dev": "vite --config vite.dev.config.ts --configLoader runner",

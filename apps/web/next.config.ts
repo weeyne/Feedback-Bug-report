@@ -4,12 +4,18 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const config: NextConfig = {
-  transpilePackages: ['@bugping/shared'],
+  transpilePackages: ['@bugping/shared', '@bugping/widget'],
   serverExternalPackages: ['@electric-sql/pglite'],
   // `pnpm typecheck` (tsc) is the type gate; Next's built-in checker may not support TS 7.
   typescript: { ignoreBuildErrors: true },
   async headers() {
     return [
+      {
+        // The landing demo's store and dashboard: only the landing itself (same origin) may frame
+        // them, so nobody can present them inside another site.
+        source: '/demo/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: "frame-ancestors 'self'" }],
+      },
       {
         source: '/w/widget.js',
         headers: [

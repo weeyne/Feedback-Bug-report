@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { buttonVariants } from '@/components/ui/button';
@@ -42,24 +42,24 @@ export async function PlanCard({ plan, usage }: { plan: PlanKind; usage: ShellUs
             />
           </div>
           <p className="text-muted-foreground">{t('planUsage', { used: usage.used, limit })}</p>
-          <Link
+          <AppLink
             href="/app/billing"
             data-testid="nav-billing"
             className={cn(buttonVariants({ size: 'sm' }), 'w-full font-bold')}
           >
             {t('upgrade')}
-          </Link>
+          </AppLink>
         </>
       ) : (
         <>
           <p className="text-muted-foreground">{t('unlimited')}</p>
-          <Link
+          <AppLink
             href="/app/billing"
             data-testid="nav-billing"
             className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'w-full')}
           >
             {t('manage')}
-          </Link>
+          </AppLink>
         </>
       )}
     </div>

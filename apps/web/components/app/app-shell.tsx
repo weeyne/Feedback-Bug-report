@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { ArrowLeft, LogOut, UserRound } from 'lucide-react';
@@ -16,32 +16,37 @@ interface ShellProps {
   usage: ShellUsage;
   plan: PlanKind;
   newCounts: Record<string, number>;
+  /**
+   * Route the project nav treats as current; defaults to the real `usePathname()`. Only the
+   * landing demo's /demo/dashboard sets it, to render the feed of a fixture project.
+   */
+  pathname?: string;
 }
 
 const footerLink =
   'flex items-center gap-2 rounded-lg px-3 py-1.5 text-muted-foreground transition-colors duration-200 hover:bg-card/70 hover:text-foreground dark:hover:bg-accent/60';
 
-async function Nav({ projects, email, usage, plan, newCounts }: ShellProps) {
+async function Nav({ projects, email, usage, plan, newCounts, pathname }: ShellProps) {
   const t = await getTranslations('nav');
   const tAuth = await getTranslations('auth');
   return (
     <nav className="flex h-full flex-col gap-4 p-4">
       <Logo href="/app" className="px-1 pt-1" />
-      <ProjectNav projects={projects} newCounts={newCounts} />
+      <ProjectNav projects={projects} newCounts={newCounts} pathname={pathname} />
       <div className="mt-auto flex flex-col gap-3">
         <PlanCard plan={plan} usage={usage} />
         <ul className="flex flex-col gap-0.5 text-sm">
           <li>
-            <Link href="/" className={footerLink} data-testid="nav-back-to-site">
+            <AppLink href="/" className={footerLink} data-testid="nav-back-to-site">
               <ArrowLeft className="size-4 shrink-0" aria-hidden />
               {t('backToSite')}
-            </Link>
+            </AppLink>
           </li>
           <li>
-            <Link href="/app/account" className={footerLink} data-testid="nav-account">
+            <AppLink href="/app/account" className={footerLink} data-testid="nav-account">
               <UserRound className="size-4 shrink-0" aria-hidden />
               {t('account')}
-            </Link>
+            </AppLink>
           </li>
         </ul>
         <div className="flex items-center gap-2 border-t border-sidebar-border pt-3">

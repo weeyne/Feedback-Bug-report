@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
@@ -28,12 +28,16 @@ const ITEMS: {
 export function ProjectNav({
   projects,
   newCounts,
+  pathname: pathnameOverride,
 }: {
   projects: ShellProject[];
   newCounts: Record<string, number>;
+  /** Overrides the current route (the landing demo renders a fixture project's feed). */
+  pathname?: string;
 }) {
   const t = useTranslations('nav');
-  const pathname = usePathname();
+  const currentPathname = usePathname();
+  const pathname = pathnameOverride ?? currentPathname;
   const match = /^\/app\/p\/([^/]+)(?:\/([^/]+))?/.exec(pathname);
   const currentProjectId = match?.[1] ?? null;
   const section = match?.[2] ?? 'overview';
@@ -47,7 +51,7 @@ export function ProjectNav({
             const active = section === key;
             return (
               <li key={key}>
-                <Link
+                <AppLink
                   href={
                     key === 'overview'
                       ? `/app/p/${currentProjectId}`
@@ -72,7 +76,7 @@ export function ProjectNav({
                       {newCount}
                     </span>
                   )}
-                </Link>
+                </AppLink>
               </li>
             );
           })}

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { AppLink } from '@/components/app/link-prefetch';
 import { useTranslations } from 'next-intl';
 import { ChevronsUpDown, Plus } from 'lucide-react';
 import {
@@ -40,12 +40,12 @@ export function ProjectSwitcher({
           // The installed shadcn/ui generation targets Base UI, which replaces Radix's `asChild`
           // with a `render` prop: the element passed to `render` supplies the tag/attributes,
           // and this item's own children are rendered inside it.
-          <DropdownMenuItem key={p.id} render={<Link href={`/app/p/${p.id}`} />}>
+          <DropdownMenuItem key={p.id} render={<AppLink href={`/app/p/${p.id}`} />}>
             {p.name}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/app/new" />}>
+        <DropdownMenuItem render={<AppLink href="/app/new" />}>
           <Plus aria-hidden />
           {t('newProject')}
         </DropdownMenuItem>

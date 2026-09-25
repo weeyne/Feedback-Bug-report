@@ -34,7 +34,18 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const locale = await getLocale();
   return (
-    <html lang={locale} className={manrope.variable} suppressHydrationWarning>
+    <html
+      lang={locale}
+      className={manrope.variable}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Before first paint: CSS can hide reveal-on-scroll content only when JS will show it. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }}
+        />
+      </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider>
           <NextIntlClientProvider>{children}</NextIntlClientProvider>

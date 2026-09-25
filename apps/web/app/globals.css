@@ -131,6 +131,11 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+  }
+  /* Anchor targets clear the sticky marketing header (h-16). */
+  section[id] {
+    scroll-margin-top: 5rem;
   }
 }
 
@@ -245,7 +250,27 @@
     animation: bp-slide 0.2s cubic-bezier(0.4, 0, 0.2, 1) backwards;
   }
 }
+/* Scroll reveal (`Reveal`): the element, or with `.reveal-group` each `.reveal-item` child (staggered
+   by `--i`), fades up once `data-shown` is set. Hidden only under `html.js` (set before first paint),
+   so without JS everything is visible; with reduced motion nothing is hidden or animated. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal:not(.reveal-group),
+  .reveal-group .reveal-item {
+    transition:
+      opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition-delay: calc(var(--i, 0) * 80ms);
+  }
+  html.js .reveal:not(.reveal-group):not([data-shown]),
+  html.js .reveal-group:not([data-shown]) .reveal-item {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none;

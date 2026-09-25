@@ -1,42 +1,170 @@
 {
   "meta": {
     "title": "Bugping — bug reports and feedback in Telegram & Discord",
-    "description": "A 9 KB feedback widget with screenshots. Reports land in Telegram or Discord instantly. Free to start."
+    "description": "A ≈15 KB feedback widget with screenshots and markup. Reports land in Telegram or Discord within seconds. Free to start."
   },
   "landing": {
-    "heroTitle": "Bug reports and feedback, straight to Telegram & Discord",
-    "heroBody": "Add one script tag. Visitors send a message with a screenshot and page context; you get it in your chat within seconds.",
     "startFree": "Start free",
-    "howItWorks": "See how it works",
-    "stepsTitle": "How it works",
-    "step1": "Create a project and paste the snippet into your site.",
-    "step2": "Connect Telegram or Discord in one click.",
-    "step3": "Get every report with a screenshot, browser and console errors.",
-    "tryIt": "Try it: the button in the corner is the real widget.",
-    "whyTitle": "Why Bugping",
-    "whySize": "Tiny: about 9 KB gzipped, screenshots load only when needed.",
-    "whyInstant": "Instant alerts where your team already is.",
-    "whyPrivacy": "Private by design: passwords are masked in screenshots, tokens are redacted.",
-    "whyPrice": "Fair price: free to start, $9/month or $49 once for Pro.",
-    "pricingTitle": "Pricing",
-    "planFree": "Free",
-    "planFreeBody": "1 project · 20 reports/month · Telegram & Discord alerts · 30-day screenshots",
-    "planPro": "Pro — $9/month",
-    "planProBody": "Unlimited projects and reports · your own bot · no badge · custom CSS · 1-year screenshots",
-    "planLifetime": "Lifetime — $49",
-    "planLifetimeBody": "Everything in Pro, paid once.",
-    "faqTitle": "FAQ",
-    "faq1q": "Will it slow down my site?",
-    "faq1a": "No. The script loads async and starts when the browser is idle.",
-    "faq2q": "What happens over the Free limit?",
-    "faq2a": "Reports are still saved; upgrade to see them.",
-    "faq3q": "Can I use my own button?",
-    "faq3a": "Yes: hide ours with data-hide-trigger and call Bugping.open().",
     "privacy": "Privacy",
     "terms": "Terms",
     "refund": "Refunds",
-    "choosePlan": "Choose plan",
-    "dashboard": "Dashboard"
+    "hero": {
+      "badgeNew": "New",
+      "badge": "Your own screenshots with markup",
+      "title": "Catch bugs <em>earlier</em> — before your customers leave",
+      "subtitle": "Visitors report a problem in two clicks, with a screenshot they can mark up. You get it in Telegram or Discord within seconds — with the page, browser and console errors attached.",
+      "seeHow": "See how it works",
+      "note": "Free plan, no card needed"
+    },
+    "facts": {
+      "label": "Bugping in numbers",
+      "sizeValue": "≈15 KB",
+      "sizeLabel": "the whole widget, gzipped",
+      "setupValue": "~2 min",
+      "setupLabel": "to install: one script tag",
+      "chatValue": "Telegram & Discord",
+      "chatLabel": "reports arrive in your chat",
+      "freeValue": "$0",
+      "freeLabel": "to start on the Free plan",
+      "worksOn": "Works on any site where you can add a script:"
+    },
+    "features": {
+      "title": "Everything a good bug report needs",
+      "subtitle": "Visitors don’t have to explain the problem in words: the widget collects the context for them.",
+      "shot": {
+        "title": "Screenshot & markup",
+        "body": "One click captures the page. Visitors box the problem, draw with a pen or hide private data — or attach their own image by pasting or dropping it."
+      },
+      "chat": {
+        "title": "Instantly in your chat",
+        "body": "Every report arrives in Telegram or Discord within seconds, with the screenshot and all the details."
+      },
+      "context": {
+        "title": "Full context",
+        "body": "Page URL, browser, OS, screen size, language and recent console errors are attached automatically."
+      },
+      "dashboard": {
+        "title": "Dashboard",
+        "body": "All reports in one place: filter by type, mark them resolved or archive them, open screenshots full size."
+      },
+      "light": {
+        "title": "Lightweight",
+        "body": "≈15 KB gzipped, loaded async when the browser is idle. The screenshot code loads only when it’s needed.",
+        "onDemand": "screenshots · on demand"
+      },
+      "brand": {
+        "title": "Your brand",
+        "body": "Pick the colour, position, button text and language. On Pro, remove the badge and add your own CSS.",
+        "trigger": "Feedback"
+      }
+    },
+    "how": {
+      "title": "Up and running in three steps",
+      "subtitle": "No SDK, no build step: one script tag.",
+      "step1Title": "Create a project",
+      "step1Body": "Sign in with GitHub or email and create a project for your site.",
+      "step2Title": "Add one script tag",
+      "step2Body": "Paste the snippet before '</body>' — your project’s key is on its Install page.",
+      "step3Title": "Connect your chat",
+      "step3Body": "Link Telegram or Discord in Integrations, and reports start arriving."
+    },
+    "audience": {
+      "title": "Who it’s for",
+      "subtitle": "Anyone whose website should work — and who’d rather hear about it when it doesn’t.",
+      "devTitle": "Developers & SaaS",
+      "devBody": "Bug reports with a screenshot and console errors instead of “it doesn’t work”. Call identify() to know which user sent it.",
+      "shopTitle": "Online stores",
+      "shopBody": "Customers tell you about a broken checkout or a wrong price before they leave for a competitor.",
+      "studioTitle": "Web studios & freelancers",
+      "studioBody": "Clients leave comments right on the site, marked up on a screenshot. On Pro, one project per client site, as many as you need."
+    },
+    "author": {
+      "title": "From the author",
+      "body1": "Hi! I built Bugping because users rarely report bugs — they just leave. I wanted reporting to take two clicks and to land where developers already are: in the chat.",
+      "body2": "No heavy scripts, no per-seat pricing, nothing to configure for a week — just a widget that does its job.",
+      "tryWidget": "Missing something or found a bug? The button in the corner of this page is the real Bugping widget — tell me there, I read every report.",
+      "signature": "Bugping developer"
+    },
+    "pricing": {
+      "title": "Simple pricing",
+      "subtitle": "Start free. Upgrade when you need more.",
+      "popular": "Popular",
+      "freeName": "Free",
+      "freePrice": "$0",
+      "freePeriod": "to start",
+      "freeTagline": "For a first project and trying things out.",
+      "free1": "1 project",
+      "free2": "20 reports a month",
+      "free3": "Screenshots with markup",
+      "free4": "Telegram and Discord notifications",
+      "free5": "Screenshots kept for 30 days",
+      "proName": "Pro",
+      "proPrice": "$9",
+      "proPeriod": "/ month",
+      "proTagline": "For live products and client work.",
+      "pro1": "Unlimited projects and reports",
+      "pro2": "Your own Telegram bot",
+      "pro3": "No “Powered by Bugping” badge",
+      "pro4": "Custom CSS",
+      "pro5": "Screenshots kept for 1 year",
+      "proCta": "Get Pro",
+      "lifetimeName": "Lifetime",
+      "lifetimePrice": "$49",
+      "lifetimePeriod": "once",
+      "lifetimeTagline": "Everything in Pro, paid once.",
+      "lifetime1": "Everything in Pro",
+      "lifetime2": "One payment, no subscription",
+      "lifetimeCta": "Buy Lifetime",
+      "note": "Payments are handled by Paddle; tax may apply. Full refund within 14 days of the first payment."
+    },
+    "faq": {
+      "title": "Questions & answers",
+      "subtitle": "Didn’t find yours? Ask through the widget — it goes straight to the author.",
+      "subtitleNoWidget": "Short answers to what people ask most.",
+      "q1": "Will it slow down my site?",
+      "a1": "No. The script is about 15 KB gzipped, loads async and starts when the browser is idle. The screenshot code loads only when it’s needed.",
+      "q2": "What happens over the Free limit?",
+      "a2": "Reports are still saved, nothing is lost. We’ll send you a notice, and the extra reports show up in your dashboard as soon as you upgrade to Pro.",
+      "q3": "Can I use my own button?",
+      "a3": "Yes. Add data-hide-trigger to the script tag to hide our button, then call Bugping.open() from yours.",
+      "q4": "Does it work with my site builder?",
+      "a4": "If you can add a script tag to the page, yes: plain HTML, React, Vue, WordPress, Shopify, Tilda and others. The widget lives in a Shadow DOM, so its styles and yours don’t clash.",
+      "q5": "What does a report include?",
+      "a5": "The message, its type (bug, idea or question), the visitor’s email if they left one, the screenshot with markup, plus the page URL, browser, OS, screen size, language, time zone and recent console errors.",
+      "q6": "Is visitor data safe?",
+      "a6": "Password fields are masked in screenshots, tokens in page URLs are redacted and IP addresses are never stored. Screenshots are deleted automatically after 30 days on Free and after a year on Pro.",
+      "q7": "Can I cancel or get a refund?",
+      "a7": "Yes. Cancel any time — Pro stays active until the end of the paid period. Within 14 days of the first payment you can get a full refund. Payments and refunds are handled by Paddle."
+    },
+    "cta": {
+      "title": "Your first report — today",
+      "body": "Setup takes about two minutes, and the Free plan needs no card."
+    },
+    "demo": {
+      "sceneSite": "Your customer's site",
+      "sceneTelegram": "Your Telegram",
+      "sceneDashboard": "Your Bugping dashboard",
+      "play": "Play demo",
+      "srDescription": "Demo: on an online store, a customer opens the Bugping widget, takes a screenshot, draws a box around the broken Pay button, types “The pay button does nothing” and sends the report. Seconds later it arrives in your Telegram with the screenshot, page, browser and console error, and appears in your Bugping dashboard.",
+      "telegram": {
+        "today": "Today",
+        "message": "Message",
+        "bot": "bot"
+      }
+    },
+    "nav": {
+      "label": "Main",
+      "features": "Features",
+      "how": "How it works",
+      "pricing": "Pricing",
+      "faq": "FAQ",
+      "logIn": "Log in",
+      "menu": "Menu"
+    },
+    "footer": {
+      "label": "Site links",
+      "tagline": "Bug reports and feedback, straight to your chat."
+    }
   },
   "legal": {
     "draft": "Draft — not legal advice.",
@@ -348,5 +476,35 @@
     "confirmMismatch": "The email does not match.",
     "description": "Your sign-in details and interface language.",
     "profile": "Profile"
+  },
+  "demoShop": {
+    "metaTitle": "Nova Shop — Checkout",
+    "brand": "Nova Shop",
+    "navNew": "New in",
+    "navMen": "Men",
+    "navWomen": "Women",
+    "navSale": "Sale",
+    "search": "Search",
+    "cart": "Cart",
+    "crumbHome": "Home",
+    "crumbSneakers": "Sneakers",
+    "crumbCheckout": "Checkout",
+    "badge": "New season",
+    "productTitle": "Nova Runner sneakers",
+    "productBody": "Lightweight everyday runners with a breathable knit upper and a soft cushioned sole.",
+    "colorLabel": "Colour",
+    "colorValue": "Midnight blue",
+    "sizeLabel": "Size (EU)",
+    "sizeGuide": "Size guide",
+    "summaryTitle": "Order summary",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "shippingFree": "Free",
+    "total": "Total",
+    "price": "$129",
+    "oldPrice": "$159",
+    "pay": "Pay $129",
+    "secure": "Secure payment · Free returns within 30 days",
+    "delivery": "Delivery in 2–4 days"
   }
 }
