@@ -23,6 +23,8 @@ interface Ctx {
   occurredAt: string;
 }
 
+export const MAX_WEBHOOK_BYTES = 64 * 1024;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Validated before a timestamp reaches Postgres: a cast error would echo the value in the logs.
 const IsoDateTime = z.iso.datetime({ offset: true });
@@ -102,6 +104,14 @@ async function profileExists(db: Db, userId: string): Promise<boolean> {
     [userId],
   );
   return Boolean(row?.ok);
+}
+
+async function lifetimeRowExists(ctx: Ctx, transactionId: string): Promise<boolean> {
+  const [row] = await ctx.db.query(
+    `select 1 from public.subscriptions where paddle_transaction_id = $1 and plan = 'pro_lifetime'`,
+    [transactionId],
+  );
+  return Boolean(row);
 }
 
 async function monthlyRowExists(db: Db, subscriptionId: string): Promise<boolean> {
@@ -262,7 +272,36 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
 async function onAdjustment(ctx: Ctx, raw: unknown) {
   const adj = Adjustment.parse(raw);
   if (adj.status !== 'approved') return;
-  if (adj.action !== 'chargeback' && adj.action !== 'refund') return;
+  if (
+    adj.action !== 'chargeback' &&
+    adj.action !== 'chargeback_reverse' &&
+    adj.action !== 'refund'
+  ) {
+    return;
+  }
+  if (adj.action === 'chargeback_reverse') {
+    if (adj.subscription_id) {
+      console.warn(
+        '[billing/webhook] chargeback reversed for a cancelled subscription',
+        ctx.eventId,
+        adj.subscription_id,
+      );
+      return;
+    }
+    const restored = await ctx.db.query(
+      `update public.subscriptions set status = 'paid', paddle_occurred_at = $2::timestamptz,
+         updated_at = now()
+       where paddle_transaction_id = $1 and plan = 'pro_lifetime'
+         and (paddle_occurred_at is null or paddle_occurred_at < $2::timestamptz)
+       returning id`,
+      [adj.transaction_id, ctx.occurredAt],
+    );
+    if (restored.length > 0) return;
+    if (!(await lifetimeRowExists(ctx, adj.transaction_id))) {
+      throw new RetryLater([ctx.eventId, 'no Lifetime row for adjustment', adj.transaction_id]);
+    }
+    return;
+  }
   // A refund revokes only when nothing is left of the payment. Paddle's top-level `type` is not
   // reliable for this: a whole-transaction refund made from line items arrives as "partial", and
   // several partial refunds can add up to the full amount.
@@ -283,13 +322,9 @@ async function onAdjustment(ctx: Ctx, raw: unknown) {
     [adj.transaction_id, ctx.occurredAt],
   );
   if (updated.length > 0) return;
-  const [existing] = await ctx.db.query(
-    `select 1 from public.subscriptions where paddle_transaction_id = $1 and plan = 'pro_lifetime'`,
-    [adj.transaction_id],
-  );
   // Zero rows because of the ordering guard: an older event, nothing to do. No row at all: the
   // adjustment arrived before transaction.completed created it, so let Paddle retry.
-  if (!existing) {
+  if (!(await lifetimeRowExists(ctx, adj.transaction_id))) {
     throw new RetryLater([ctx.eventId, 'no Lifetime row for adjustment', adj.transaction_id]);
   }
 }
@@ -297,7 +332,11 @@ async function onAdjustment(ctx: Ctx, raw: unknown) {
 export async function handleBillingWebhook(deps: WebhookDeps, request: Request): Promise<Response> {
   const config = billingConfig(deps.env);
   if (!config) return json({ error: 'not found' }, 404);
+  if (Number(request.headers.get('content-length') ?? 0) > MAX_WEBHOOK_BYTES) {
+    return json({ error: 'payload too large' }, 413);
+  }
   const raw = await request.text();
+  if (raw.length > MAX_WEBHOOK_BYTES) return json({ error: 'payload too large' }, 413);
   const now = (deps.now ?? Date.now)();
   if (
     !verifyPaddleSignature(raw, request.headers.get('paddle-signature'), config.webhookSecret, now)

@@ -8,7 +8,7 @@ import {
 } from '@/test/paddle-fixtures';
 import { PADDLE_ENV, VALID_ENV } from '@/test/fixtures';
 import { parseEnv } from '../env';
-import { handleBillingWebhook } from './webhook';
+import { handleBillingWebhook, MAX_WEBHOOK_BYTES } from './webhook';
 
 const env = parseEnv({ ...VALID_ENV, ...PADDLE_ENV });
 const SECRET = PADDLE_ENV.PADDLE_WEBHOOK_SECRET;
@@ -67,6 +67,92 @@ describe('billing webhook', () => {
       );
       expect(res.status).toBe(404);
     }));
+
+  it('rejects oversized bodies before checking the signature', () =>
+    withTx(async (db) => {
+      const big = {
+        event_id: 'evt_big',
+        event_type: 'x',
+        occurred_at: '2026-09-01T00:00:00Z',
+        data: { pad: 'x'.repeat(MAX_WEBHOOK_BYTES) },
+      };
+      const byLength = await handleBillingWebhook({ db, env, fetch }, signedRequest(big, SECRET));
+      expect(byLength.status).toBe(413);
+      const byHeader = await handleBillingWebhook(
+        { db, env, fetch },
+        new Request('https://bugping.app/api/billing/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers: { 'content-length': String(MAX_WEBHOOK_BYTES + 1) },
+        }),
+      );
+      expect(byHeader.status).toBe(413);
+    }));
+
+  describe('chargeback_reverse', () => {
+    const reverse = (over: {
+      occurredAt: string;
+      transactionId: string;
+      subscriptionId?: string;
+    }) =>
+      adjustmentEvent({ action: 'chargeback_reverse', type: 'full', status: 'approved', ...over });
+
+    it('restores a refunded Lifetime and ignores an older event', () =>
+      withTx(async (db) => {
+        const { send, pro } = setup(db);
+        const user = await createUser(db);
+        await send(
+          transactionCompleted({
+            userId: user,
+            priceId: LIFETIME,
+            transactionId: 'txn_cb',
+            occurredAt: '2026-09-01T00:00:00Z',
+          }),
+        );
+        await send(
+          adjustmentEvent({
+            transactionId: 'txn_cb',
+            action: 'chargeback',
+            type: 'full',
+            status: 'approved',
+            occurredAt: '2026-09-02T00:00:00Z',
+          }),
+        );
+        expect(await pro(user)).toBe(false);
+        await send(reverse({ transactionId: 'txn_cb', occurredAt: '2026-09-01T12:00:00Z' }));
+        expect(await pro(user)).toBe(false);
+        await send(reverse({ transactionId: 'txn_cb', occurredAt: '2026-09-03T00:00:00Z' }));
+        expect(await pro(user)).toBe(true);
+      }));
+
+    it('retries when the Lifetime row does not exist yet', () =>
+      withTx(async (db) => {
+        const { send } = setup(db);
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const res = await send(
+          reverse({ transactionId: 'txn_missing', occurredAt: '2026-09-03T00:00:00Z' }),
+        );
+        expect(res.status).toBe(500);
+        error.mockRestore();
+      }));
+
+    it('only warns for a subscription payment', () =>
+      withTx(async (db) => {
+        const { send, calls } = setup(db);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const res = await send(
+          reverse({
+            transactionId: 'txn_sub',
+            subscriptionId: 'sub_cb',
+            occurredAt: '2026-09-03T00:00:00Z',
+          }),
+        );
+        expect(res.status).toBe(200);
+        expect(calls).toEqual([]);
+        expect(warn.mock.calls.flat().join(' ')).toContain('sub_cb');
+        warn.mockRestore();
+      }));
+  });
 
   it('follows a monthly subscription through its lifecycle', () =>
     withTx(async (db) => {

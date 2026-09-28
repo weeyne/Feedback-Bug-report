@@ -60,7 +60,7 @@ export function transactionCompleted(input: {
 
 export function adjustmentEvent(input: {
   transactionId: string;
-  action: 'refund' | 'chargeback' | 'credit';
+  action: 'refund' | 'chargeback' | 'chargeback_reverse' | 'credit';
   type: 'full' | 'partial';
   status: string;
   occurredAt: string;
