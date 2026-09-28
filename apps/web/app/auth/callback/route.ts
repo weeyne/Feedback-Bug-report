@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { NEXT_COOKIE, safeNext } from '@/lib/auth/next';
 import { attributeReferral } from '@/lib/auth/referral';
 import { createSupabaseServerClient } from '@/lib/auth/supabase-server';
 import { getDeps } from '@/lib/deps';
@@ -22,7 +23,9 @@ export async function GET(request: Request) {
         );
         store.delete('ref');
       }
-      return NextResponse.redirect(new URL('/app', url.origin));
+      const next = safeNext(store.get(NEXT_COOKIE)?.value) ?? '/app';
+      store.delete(NEXT_COOKIE);
+      return NextResponse.redirect(new URL(next, url.origin));
     }
   }
   return NextResponse.redirect(new URL('/login?error=callback', url.origin));
