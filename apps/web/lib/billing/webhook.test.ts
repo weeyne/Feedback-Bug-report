@@ -563,7 +563,7 @@ describe('billing webhook', () => {
 
   it('cancels a past_due duplicate immediately and returns 500 when that fails', () =>
     withTx(async (db) => {
-      const { send, calls } = setup(db);
+      const { send, calls, row } = setup(db);
       const user = await createUser(db);
       await send(
         transactionCompleted({
@@ -588,13 +588,16 @@ describe('billing webhook', () => {
           body: { effective_from: 'immediately' },
         },
       ]);
+      expect(await row('paddle_subscription_id', 'sub_pd_dup')).toMatchObject({
+        cancel_at_period_end: false,
+      });
       const failing = setup(db, { paddleFails: true });
       expect((await failing.send({ ...pastDue, event_id: 'evt_pd_retry' })).status).toBe(500);
     }));
 
   it('cancels a past_due monthly subscription immediately on a Lifetime purchase', () =>
     withTx(async (db) => {
-      const { send, calls } = setup(db);
+      const { send, calls, row } = setup(db);
       const user = await createUser(db);
       await send(
         subscriptionEvent({
@@ -620,6 +623,9 @@ describe('billing webhook', () => {
           body: { effective_from: 'immediately' },
         },
       ]);
+      expect(await row('paddle_subscription_id', 'sub_pd_up')).toMatchObject({
+        cancel_at_period_end: false,
+      });
     }));
 
   it('cancels a monthly subscription immediately on a full refund or chargeback', () =>
@@ -929,8 +935,8 @@ describe('billing webhook', () => {
       expect(await row('paddle_subscription_id', 'sub_other')).toBeUndefined();
     }));
 
-  it('serialises each user: the dispatch runs in a transaction and locks billing:<user>', () =>
-    withTx(async (db) => {
+  describe('per-user lock', () => {
+    function recorder(db: TestDb) {
       const sqls: Array<{ sql: string; params: unknown[]; inTx: boolean }> = [];
       const record = (inner: Db, inTx: boolean): Db => ({
         query: (sql, params = []) => {
@@ -939,10 +945,29 @@ describe('billing webhook', () => {
         },
         transaction: (fn) => inner.transaction((tx) => fn(record(tx, true))),
       });
-      const user = await createUser(db);
-      const res = await handleBillingWebhook(
-        { db: record(db, false), env, fetch },
-        signedRequest(
+      const handle = (event: object) =>
+        handleBillingWebhook({ db: record(db, false), env, fetch }, signedRequest(event, SECRET));
+      return { sqls, handle };
+    }
+
+    function expectLockedBefore(
+      sqls: Array<{ sql: string; params: unknown[]; inTx: boolean }>,
+      user: string,
+      insertSql: string,
+    ) {
+      const lock = sqls.find((s) => s.sql.includes('pg_advisory_xact_lock'));
+      expect(lock).toMatchObject({ params: [`billing:${user}`], inTx: true });
+      const insert = sqls.findIndex((s) => s.sql.includes(insertSql));
+      expect(insert).toBeGreaterThan(-1);
+      expect(sqls.indexOf(lock!)).toBeLessThan(insert);
+      expect(sqls.every((s) => s.inTx)).toBe(true);
+    }
+
+    it('serialises a subscription event: transaction, lock billing:<user>, then the insert', () =>
+      withTx(async (db) => {
+        const { sqls, handle } = recorder(db);
+        const user = await createUser(db);
+        const res = await handle(
           subscriptionEvent({
             userId: user,
             priceId: MONTHLY,
@@ -951,16 +976,27 @@ describe('billing webhook', () => {
             status: 'active',
             occurredAt: '2026-09-01T00:00:00Z',
           }),
-          SECRET,
-        ),
-      );
-      expect(res.status).toBe(200);
-      const lock = sqls.find((s) => s.sql.includes('pg_advisory_xact_lock'));
-      expect(lock).toMatchObject({ params: [`billing:${user}`], inTx: true });
-      const insert = sqls.findIndex((s) => s.sql.includes('insert into public.subscriptions'));
-      expect(sqls.indexOf(lock!)).toBeLessThan(insert);
-      expect(sqls.every((s) => s.inTx)).toBe(true);
-    }));
+        );
+        expect(res.status).toBe(200);
+        expectLockedBefore(sqls, user, 'insert into public.subscriptions');
+      }));
+
+    it('serialises a Lifetime purchase: transaction, lock billing:<user>, then the insert', () =>
+      withTx(async (db) => {
+        const { sqls, handle } = recorder(db);
+        const user = await createUser(db);
+        const res = await handle(
+          transactionCompleted({
+            userId: user,
+            priceId: LIFETIME,
+            transactionId: 'txn_lock',
+            occurredAt: '2026-09-01T00:00:00Z',
+          }),
+        );
+        expect(res.status).toBe(200);
+        expectLockedBefore(sqls, user, `'pro_lifetime', 'paid'`);
+      }));
+  });
 
   it('marks a monthly duplicate cancelled at period end as cancelling', () =>
     withTx(async (db) => {
@@ -1014,5 +1050,40 @@ describe('billing webhook', () => {
       expect(await row('paddle_subscription_id', 'sub_before')).toMatchObject({
         cancel_at_period_end: true,
       });
+    }));
+
+  it('rolls back a Lifetime purchase when cancelling the monthly subscription fails', () =>
+    withTx(async (db) => {
+      const { send: seed } = setup(db);
+      const { send, row } = setup(db, { paddleFails: true });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const user = await createUser(db);
+        await seed(
+          subscriptionEvent({
+            userId: user,
+            priceId: MONTHLY,
+            subscriptionId: 'sub_atomic',
+            type: 'subscription.created',
+            status: 'active',
+            occurredAt: '2026-09-01T00:00:00Z',
+          }),
+        );
+        const res = await send(
+          transactionCompleted({
+            userId: user,
+            priceId: LIFETIME,
+            transactionId: 'txn_atomic',
+            occurredAt: '2026-09-02T00:00:00Z',
+          }),
+        );
+        expect(res.status).toBe(500);
+        expect(await row('paddle_transaction_id', 'txn_atomic')).toBeUndefined();
+        expect(await row('paddle_subscription_id', 'sub_atomic')).toMatchObject({
+          cancel_at_period_end: false,
+        });
+      } finally {
+        errors.mockRestore();
+      }
     }));
 });
