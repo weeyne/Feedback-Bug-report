@@ -1,7 +1,23 @@
-import { describe, expect, it } from 'vitest';
-import { clientIp, corsHeaders, json, preflight, rateLimitIdentity } from './http';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  clientIp,
+  corsHeaders,
+  json,
+  preflight,
+  rateLimitIdentity,
+  resetClientIpWarning,
+} from './http';
 
 describe('http helpers', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    resetClientIpWarning();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('reflects the origin in CORS headers', () => {
     expect(corsHeaders('https://host.example')).toEqual({
       'Access-Control-Allow-Origin': 'https://host.example',
@@ -48,6 +64,14 @@ describe('http helpers', () => {
     expect(clientIp(new Headers({ 'x-client-ip': ' 192.0.2.1, 10.0.0.1' }), 'x-client-ip')).toBe(
       '192.0.2.1',
     );
+  });
+
+  it('warns once when CLIENT_IP_HEADER is configured but missing from the request', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    clientIp(new Headers(), 'cf-connecting-ip');
+    clientIp(new Headers(), 'cf-connecting-ip');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('cf-connecting-ip');
   });
 });
 

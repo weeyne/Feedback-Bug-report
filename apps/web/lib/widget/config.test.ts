@@ -224,4 +224,49 @@ describe('handleConfig', () => {
       expect(await age()).toEqual({ age: expect.any(Number), origin: 'https://b.example' });
       expect((await age()).age).toBeLessThan(5);
     }));
+
+  it('does not write a different origin within the per-project floor of one minute', () =>
+    withTx(async (db) => {
+      const project = await projectWithSettings(db, false);
+      await db.query(
+        `update public.projects set blocked_origin = 'https://a.example', blocked_origin_at = now()
+         where id = $1`,
+        [project.id],
+      );
+      await markOriginBlocked(db, project.id, 'https://b.example');
+      const [row] = await db.query<{ origin: string | null }>(
+        `select blocked_origin as origin from public.projects where id = $1`,
+        [project.id],
+      );
+      expect(row!.origin).toBe('https://a.example');
+    }));
+
+  it('writes a different origin once the one-minute floor has passed', () =>
+    withTx(async (db) => {
+      const project = await projectWithSettings(db, false);
+      await db.query(
+        `update public.projects set blocked_origin = 'https://a.example',
+           blocked_origin_at = now() - interval '2 minutes' where id = $1`,
+        [project.id],
+      );
+      await markOriginBlocked(db, project.id, 'https://b.example');
+      const [row] = await db.query<{ origin: string | null }>(
+        `select blocked_origin as origin from public.projects where id = $1`,
+        [project.id],
+      );
+      expect(row!.origin).toBe('https://b.example');
+    }));
+
+  it('skips an over-long origin without throwing', () =>
+    withTx(async (db) => {
+      const project = await projectWithSettings(db, false);
+      await expect(
+        markOriginBlocked(db, project.id, 'https://example.com/' + 'a'.repeat(2048)),
+      ).resolves.toBeUndefined();
+      const [row] = await db.query<{ origin: string | null }>(
+        `select blocked_origin as origin from public.projects where id = $1`,
+        [project.id],
+      );
+      expect(row!.origin).toBeNull();
+    }));
 });

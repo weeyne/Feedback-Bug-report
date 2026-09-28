@@ -29,6 +29,10 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...VALID_ENV, NEXT_PUBLIC_BUGPING_PROJECT_KEY: 'nope' })).toThrow(
       /NEXT_PUBLIC_BUGPING_PROJECT_KEY/,
     );
+    expect(
+      parseEnv({ ...VALID_ENV, NEXT_PUBLIC_BUGPING_PROJECT_KEY: '' })
+        .NEXT_PUBLIC_BUGPING_PROJECT_KEY,
+    ).toBeUndefined();
   });
 
   it('accepts no Paddle group or a complete one, and rejects a partial one', () => {

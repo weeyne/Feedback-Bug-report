@@ -24,14 +24,31 @@ export function json(
   });
 }
 
+let warnedAboutMissingClientIpHeader = false;
+
 /**
  * The client's IP. With `trustedHeader` (e.g. `cf-connecting-ip` behind Cloudflare) only that header counts;
  * without it, the first x-forwarded-for hop, then x-real-ip — both set by Vercel, spoofable anywhere else.
  */
 export function clientIp(headers: Headers, trustedHeader?: string): string {
-  if (trustedHeader) return headers.get(trustedHeader)?.split(',')[0]?.trim() || 'unknown';
+  if (trustedHeader) {
+    const value = headers.get(trustedHeader)?.split(',')[0]?.trim();
+    if (value) return value;
+    if (!warnedAboutMissingClientIpHeader) {
+      warnedAboutMissingClientIpHeader = true;
+      console.warn(
+        `[http] CLIENT_IP_HEADER "${trustedHeader}" is set but missing from the request; all clients share one rate-limit bucket`,
+      );
+    }
+    return 'unknown';
+  }
   const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   return forwarded || headers.get('x-real-ip')?.trim() || 'unknown';
+}
+
+/** Test-only: resets the one-time missing-header warning between tests. */
+export function resetClientIpWarning(): void {
+  warnedAboutMissingClientIpHeader = false;
 }
 
 /**

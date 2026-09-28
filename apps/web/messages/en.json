@@ -327,7 +327,7 @@
   },
   "blockedOrigin": {
     "title": "The widget is blocked on {origin}",
-    "hint": "Reports from this site were refused {time}: it is not in your allowed websites.",
+    "hint": "Blocked {time}: this site is not in your allowed websites. Allow it only if the site is yours.",
     "allow": "Allow this site",
     "settings": "Settings"
   },
