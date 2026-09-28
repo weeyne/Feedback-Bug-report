@@ -23,6 +23,8 @@ interface Ctx {
   occurredAt: string;
 }
 
+export const MAX_WEBHOOK_BYTES = 64 * 1024;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Validated before a timestamp reaches Postgres: a cast error would echo the value in the logs.
 const IsoDateTime = z.iso.datetime({ offset: true });
@@ -104,6 +106,14 @@ async function profileExists(db: Db, userId: string): Promise<boolean> {
   return Boolean(row?.ok);
 }
 
+async function lifetimeRowExists(ctx: Ctx, transactionId: string): Promise<boolean> {
+  const [row] = await ctx.db.query(
+    `select 1 from public.subscriptions where paddle_transaction_id = $1 and plan = 'pro_lifetime'`,
+    [transactionId],
+  );
+  return Boolean(row);
+}
+
 async function monthlyRowExists(db: Db, subscriptionId: string): Promise<boolean> {
   const [row] = await db.query<{ ok: boolean }>(
     `select exists(select 1 from public.subscriptions
@@ -136,6 +146,37 @@ async function resolveUser(
   throw new RetryLater([ctx.eventId, ctx.eventType, 'unresolved user']);
 }
 
+/** Serialises events for one user until the surrounding transaction ends. */
+async function lockUser(ctx: Ctx, userId: string): Promise<void> {
+  await ctx.db.query('select pg_advisory_xact_lock(hashtext($1))', [`billing:${userId}`]);
+}
+
+/**
+ * A Paddle call failed after this event's own writes: they still commit and the webhook answers
+ * 500, so Paddle retries the event. `logArgs` holds event and Paddle ids and error codes only.
+ */
+interface Retry {
+  logArgs: string[];
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error';
+}
+
+/** Marks a row whose next-period cancel Paddle accepted. */
+async function markCancelling(ctx: Ctx, subscriptionId: string): Promise<void> {
+  await ctx.db.query(
+    'update public.subscriptions set cancel_at_period_end = true, updated_at = now() where paddle_subscription_id = $1',
+    [subscriptionId],
+  );
+}
+
+/** Next-period cancel in Paddle, then mark the row so later events do not treat it as an active duplicate. */
+async function cancelAtPeriodEnd(ctx: Ctx, subscriptionId: string): Promise<void> {
+  await ctx.paddle.cancelSubscription(subscriptionId, 'next_billing_period');
+  await markCancelling(ctx, subscriptionId);
+}
+
 function logDeletedProfile(ctx: Ctx, paddleId: string) {
   console.warn('[billing/webhook] profile deleted', ctx.eventId, ctx.eventType, paddleId);
 }
@@ -157,10 +198,11 @@ async function cancelIfDuplicate(ctx: Ctx, userId: string, subscriptionId: strin
         !row.cancel_at_period_end),
   );
   if (!duplicate) return;
-  await ctx.paddle.cancelSubscription(
-    subscriptionId,
-    self.status === 'past_due' ? 'immediately' : 'next_billing_period',
-  );
+  if (self.status === 'past_due') {
+    await ctx.paddle.cancelSubscription(subscriptionId, 'immediately');
+  } else {
+    await cancelAtPeriodEnd(ctx, subscriptionId);
+  }
 }
 
 async function onSubscription(ctx: Ctx, raw: unknown) {
@@ -179,6 +221,7 @@ async function onSubscription(ctx: Ctx, raw: unknown) {
     subscriptionId: sub.id,
     customerId: sub.customer_id,
   });
+  await lockUser(ctx, userId);
   if (!(await profileExists(ctx.db, userId))) {
     logDeletedProfile(ctx, sub.id);
     // Nobody can use this Pro any more: stop billing for it.
@@ -206,7 +249,7 @@ async function onSubscription(ctx: Ctx, raw: unknown) {
   await cancelIfDuplicate(ctx, userId, sub.id);
 }
 
-async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
+async function onTransactionCompleted(ctx: Ctx, raw: unknown): Promise<Retry | void> {
   const { prices } = probe(raw);
   const lifetime = prices.includes(ctx.config.priceLifetime);
   if (!lifetime && !prices.includes(ctx.config.priceMonthly)) return;
@@ -216,6 +259,7 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
       customUserId: txn.custom_data?.user_id,
       customerId: txn.customer_id,
     });
+    await lockUser(ctx, userId);
     if (!(await profileExists(ctx.db, userId))) return logDeletedProfile(ctx, txn.id);
     await ctx.db.query(
       `insert into public.subscriptions
@@ -229,14 +273,30 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
           or public.subscriptions.paddle_occurred_at < excluded.paddle_occurred_at`,
       [userId, txn.customer_id ?? null, txn.id, ctx.occurredAt],
     );
-    for (const row of await userSubscriptions(ctx.db, userId)) {
-      if (isProMonthly(row) && row.paddle_subscription_id && !row.cancel_at_period_end) {
-        // A past_due subscription cannot be scheduled to cancel; it has nothing left to use.
-        await ctx.paddle.cancelSubscription(
-          row.paddle_subscription_id,
-          row.status === 'past_due' ? 'immediately' : 'next_billing_period',
-        );
+    const rows = await userSubscriptions(ctx.db, userId);
+    // A replay after a refund or chargeback leaves the row unpaid (the ordering guard above): the
+    // purchase no longer grants Pro, so it must not cancel anything.
+    if (!rows.some((row) => row.paddle_transaction_id === txn.id && row.status === 'paid')) return;
+    // The grant commits even when a cancel below fails: a paid Lifetime must not depend on Paddle
+    // accepting the cancel. The webhook then answers 500 and Paddle retries the event; the upsert
+    // above is a no-op on the retry and only the rows not yet marked are cancelled again.
+    const failed: string[] = [];
+    for (const row of rows) {
+      const id = row.paddle_subscription_id;
+      if (!isProMonthly(row) || !id || row.cancel_at_period_end) continue;
+      // A past_due subscription cannot be scheduled to cancel; it has nothing left to use.
+      const when = row.status === 'past_due' ? 'immediately' : 'next_billing_period';
+      try {
+        await ctx.paddle.cancelSubscription(id, when);
+      } catch (error) {
+        // Only the Paddle call is caught: it touches no database state, so the transaction is usable.
+        failed.push(id, describeError(error));
+        continue;
       }
+      if (when === 'next_billing_period') await markCancelling(ctx, id);
+    }
+    if (failed.length > 0) {
+      return { logArgs: [ctx.eventId, ctx.eventType, 'monthly cancel failed', ...failed] };
     }
     return;
   }
@@ -246,6 +306,7 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
       subscriptionId: txn.subscription_id,
       customerId: txn.customer_id,
     });
+    await lockUser(ctx, userId);
     // The subscription events for a deleted profile cancel the subscription.
     if (!(await profileExists(ctx.db, userId))) return logDeletedProfile(ctx, txn.subscription_id);
     // Mapping only: a null timestamp lets any subscription event overwrite this row.
@@ -262,7 +323,36 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
 async function onAdjustment(ctx: Ctx, raw: unknown) {
   const adj = Adjustment.parse(raw);
   if (adj.status !== 'approved') return;
-  if (adj.action !== 'chargeback' && adj.action !== 'refund') return;
+  if (
+    adj.action !== 'chargeback' &&
+    adj.action !== 'chargeback_reverse' &&
+    adj.action !== 'refund'
+  ) {
+    return;
+  }
+  if (adj.action === 'chargeback_reverse') {
+    if (adj.subscription_id) {
+      console.warn(
+        '[billing/webhook] chargeback reversed for a cancelled subscription',
+        ctx.eventId,
+        adj.subscription_id,
+      );
+      return;
+    }
+    const restored = await ctx.db.query(
+      `update public.subscriptions set status = 'paid', paddle_occurred_at = $2::timestamptz,
+         updated_at = now()
+       where paddle_transaction_id = $1 and plan = 'pro_lifetime'
+         and (paddle_occurred_at is null or paddle_occurred_at < $2::timestamptz)
+       returning id`,
+      [adj.transaction_id, ctx.occurredAt],
+    );
+    if (restored.length > 0) return;
+    if (!(await lifetimeRowExists(ctx, adj.transaction_id))) {
+      throw new RetryLater([ctx.eventId, 'no Lifetime row for adjustment', adj.transaction_id]);
+    }
+    return;
+  }
   // A refund revokes only when nothing is left of the payment. Paddle's top-level `type` is not
   // reliable for this: a whole-transaction refund made from line items arrives as "partial", and
   // several partial refunds can add up to the full amount.
@@ -283,13 +373,9 @@ async function onAdjustment(ctx: Ctx, raw: unknown) {
     [adj.transaction_id, ctx.occurredAt],
   );
   if (updated.length > 0) return;
-  const [existing] = await ctx.db.query(
-    `select 1 from public.subscriptions where paddle_transaction_id = $1 and plan = 'pro_lifetime'`,
-    [adj.transaction_id],
-  );
   // Zero rows because of the ordering guard: an older event, nothing to do. No row at all: the
   // adjustment arrived before transaction.completed created it, so let Paddle retry.
-  if (!existing) {
+  if (!(await lifetimeRowExists(ctx, adj.transaction_id))) {
     throw new RetryLater([ctx.eventId, 'no Lifetime row for adjustment', adj.transaction_id]);
   }
 }
@@ -297,7 +383,11 @@ async function onAdjustment(ctx: Ctx, raw: unknown) {
 export async function handleBillingWebhook(deps: WebhookDeps, request: Request): Promise<Response> {
   const config = billingConfig(deps.env);
   if (!config) return json({ error: 'not found' }, 404);
+  if (Number(request.headers.get('content-length') ?? 0) > MAX_WEBHOOK_BYTES) {
+    return json({ error: 'payload too large' }, 413);
+  }
   const raw = await request.text();
+  if (raw.length > MAX_WEBHOOK_BYTES) return json({ error: 'payload too large' }, 413);
   const now = (deps.now ?? Date.now)();
   if (
     !verifyPaddleSignature(raw, request.headers.get('paddle-signature'), config.webhookSecret, now)
@@ -313,21 +403,27 @@ export async function handleBillingWebhook(deps: WebhookDeps, request: Request):
   const parsed = Envelope.safeParse(body);
   if (!parsed.success) return json({ error: 'bad request' }, 400);
   const { event_id, event_type, occurred_at, data } = parsed.data;
-  const ctx: Ctx = {
-    db: deps.db,
-    config,
-    paddle: createPaddleClient(config, deps.fetch),
-    eventId: event_id,
-    eventType: event_type,
-    occurredAt: occurred_at,
-  };
   try {
-    if (event_type.startsWith('subscription.')) {
-      await onSubscription(ctx, data);
-    } else if (event_type === 'transaction.completed') {
-      await onTransactionCompleted(ctx, data);
-    } else if (event_type === 'adjustment.created' || event_type === 'adjustment.updated') {
-      await onAdjustment(ctx, data);
+    const retry = await deps.db.transaction(async (tx): Promise<Retry | void> => {
+      const ctx: Ctx = {
+        db: tx,
+        config,
+        paddle: createPaddleClient(config, deps.fetch),
+        eventId: event_id,
+        eventType: event_type,
+        occurredAt: occurred_at,
+      };
+      if (event_type.startsWith('subscription.')) {
+        await onSubscription(ctx, data);
+      } else if (event_type === 'transaction.completed') {
+        return onTransactionCompleted(ctx, data);
+      } else if (event_type === 'adjustment.created' || event_type === 'adjustment.updated') {
+        await onAdjustment(ctx, data);
+      }
+    });
+    if (retry) {
+      console.error('[billing/webhook] failed', ...retry.logArgs);
+      return json({ error: 'retry' }, 500);
     }
     return json({ ok: true }, 200);
   } catch (error) {
@@ -340,12 +436,7 @@ export async function handleBillingWebhook(deps: WebhookDeps, request: Request):
     } else if (error instanceof ZodError) {
       console.error('[billing/webhook] failed', event_id, event_type, 'invalid payload');
     } else if (error instanceof Error) {
-      console.error(
-        '[billing/webhook] failed',
-        event_id,
-        event_type,
-        `${error.name}: ${error.message}`,
-      );
+      console.error('[billing/webhook] failed', event_id, event_type, describeError(error));
     } else {
       console.error('[billing/webhook] failed', event_id, event_type, 'unknown error');
     }

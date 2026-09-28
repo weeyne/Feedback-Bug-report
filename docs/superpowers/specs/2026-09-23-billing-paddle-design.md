@@ -297,3 +297,57 @@ The real Paddle.js overlay is verified manually in the sandbox.
    - a refund from the sandbox dashboard → Free.
 
 `docs/deploy.md` gains a "Billing (Paddle)" section with these steps and the later switch to live.
+
+## Amendments (2026-09-28)
+
+Made in launch wave 1c and the fixes before it. Where this section and §5–§10 disagree, this section wins.
+
+- **Customer identity (§6 step 4, §8 `openPortal`).** Checkout and the portal no longer use a stored
+  `paddle_customer_id`: it comes from webhook data, which a buyer can influence. `startCheckout` calls
+  `ensureCustomer(session email)` (find or create) and `openPortal` calls `findCustomer(session email)`; the portal
+  session lists only the subscriptions whose stored customer id equals that customer. A user without a Paddle customer
+  for their email gets `billing.noCustomer`. Changing the account email is not synchronised with Paddle (deferred; the
+  app has no email change).
+- **Duplicate and refunded monthly subscriptions (§7).** After each subscription event the webhook cancels the
+  subscription when that subscription is itself Pro-granting and not scheduled to cancel, and the user also has a paid
+  Lifetime or another Pro-granting monthly subscription that is not scheduled to cancel: `next_billing_period`, or
+  `immediately` for a `past_due` one, which Paddle is believed not to allow scheduling (see the sandbox check b in
+  `docs/deploy.md`). A
+  full refund or a chargeback of a monthly payment cancels that subscription `immediately`; Paddle then sends
+  `subscription.canceled`. The Lifetime purchase uses the same rule for the user's existing monthly subscriptions.
+  `cancelSubscription` treats only `subscription_is_canceled_action_invalid` as success; other errors, including
+  `subscription_locked_pending_changes`, throw and the webhook answers 500.
+- **Account deletion (§10).** It refuses (`errors.generic`, nothing deleted) when billing is disabled but the user has a
+  Pro-granting monthly subscription that is not scheduled to cancel, because it could not be cancelled. With billing
+  enabled it cancels those subscriptions `immediately`, as before.
+- **Webhook body cap (§7).** Bodies over 64 KiB are rejected with 413 `payload too large` before the signature is
+  verified: by `Content-Length` when present, then by the length of the text read. Paddle events are a few KB.
+- **Key and environment consistency (§4).** `billingConfig(env)` returns `null` (billing disabled) and logs
+  `[billing] Paddle keys do not match NEXT_PUBLIC_PADDLE_ENV=<env>; billing is disabled` once per process when the
+  API key starts with `pdl_live_` and the environment is `sandbox`, or with `pdl_sdbx_` and it is `production`, or the
+  client token starts with `test_` in `production` or `live_` in `sandbox`. A key with neither prefix is not judged.
+  The log never contains key values. The site keeps working; the billing page shows its disabled state and the webhook
+  answers 404.
+- **One transaction and lock per event (§7).** `handleBillingWebhook` runs the whole event in one database
+  transaction. `subscription.*` and both `transaction.completed` paths take
+  `pg_advisory_xact_lock(hashtext('billing:<userId>'))` right after the user is resolved, so events for one user are
+  processed one at a time; the lock is released at commit or rollback. Errors roll the transaction back and the
+  webhook answers 500, except a failed monthly cancel on a Lifetime purchase: the grant and the cancels that succeeded
+  commit, the webhook still answers 500, and Paddle's retry cancels only the subscriptions not yet marked. Paddle API calls run inside the transaction (a connection is held for up to
+  the 10 s Paddle timeout). `adjustment.*` takes no lock: it writes a single Lifetime row guarded by
+  `paddle_occurred_at`; a monthly refund or chargeback only calls Paddle to cancel the subscription, also without the
+  lock (idempotent, harmless). A Paddle cancel that succeeded is not undone by a later rollback; see the deferred item about a
+  repeated next-period cancel in the follow-ups.
+- **Duplicates marked as cancelling (§7).** After a successful `next_billing_period` cancel (the duplicate rule and the
+  Lifetime purchase) the webhook sets `cancel_at_period_end = true` on that row without touching `paddle_occurred_at`,
+  so a late event for the other subscription no longer sees two active duplicates. An `immediately` cancel changes
+  nothing locally; Paddle's `subscription.canceled` does.
+- **`chargeback_reverse` (§7 adjustments).** An approved adjustment with this action, and no `subscription_id`, sets the
+  `pro_lifetime` row of that transaction back from `refunded` to `paid`, with the same `paddle_occurred_at` ordering
+  guard as refunds; with no such row the webhook answers 500 so Paddle retries, as for refunds. With a
+  `subscription_id` nothing is restored: the subscription was cancelled when the chargeback arrived and cannot be
+  revived, so the webhook logs `[billing/webhook] chargeback reversed for a cancelled subscription` with the event and
+  subscription ids for a manual decision and answers 200.
+- **Refunds (§7 adjustments).** A refund revokes Pro only when nothing of the payment is left: the webhook asks Paddle
+  for the transaction's remaining total instead of trusting the adjustment's `type`. Partial refunds that leave a
+  balance change nothing.

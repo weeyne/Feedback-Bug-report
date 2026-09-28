@@ -101,12 +101,55 @@ The script reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` from `apps/w
    - refunding a Lifetime purchase (full refund, sandbox dashboard) → Free;
    - refunding a monthly first payment (full refund) → the subscription is cancelled immediately → Free.
 
+### Before going live: sandbox checks
+
+Run these in the sandbox once; they answer open items in
+`docs/superpowers/followups/2026-09-23-billing-followups.md`.
+
+**a. Lifetime purchase with an active monthly subscription**
+
+1. In the Paddle sandbox, subscribe to the monthly plan with card `4242 4242 4242 4242`.
+2. On `/app/billing`, use "Switch to Lifetime" and pay with the same card.
+3. Confirm in Paddle that the monthly subscription has a scheduled cancel at the end of the period, and that Bugping
+   shows Pro Lifetime. In the Vercel logs, confirm that `[billing/webhook] failed` does not repeat.
+
+**b. Can a `past_due` subscription be cancelled immediately?**
+
+Buying Lifetime while the monthly subscription is `past_due` is not offered in the UI (the "Switch to Lifetime" button
+only shows for an active subscription), so check the Paddle call directly.
+
+1. Subscribe to the monthly plan as in (a). Customers change the payment method in the Paddle customer portal
+   (Bugping's "Manage" button), not in the vendor dashboard: switch it there to a declining test card from Paddle's
+   testing docs (developer.paddle.com → test cards). To get to `past_due` quickly, trigger the renewal now with
+   `PATCH /subscriptions/{id}` setting `next_billed_at` a few minutes ahead and `proration_billing_mode: "do_not_bill"`
+   (check the exact fields in Paddle's "change billing date" guide).
+2. Wait until Bugping shows the subscription as past due on `/app/billing`.
+3. Cancel it from the Paddle sandbox API (`POST /subscriptions/{id}/cancel` with `effective_from` set to
+   `immediately`) or the dashboard, and record whether Paddle accepts it and, if not, the error code.
+
+If Paddle refuses, the webhook paths that cancel a `past_due` subscription (a duplicate after Lifetime, a refund, a
+deleted profile) keep answering 500 for that event until Paddle stops retrying; record the error code in the follow-up
+(a Lifetime purchase is still granted).
+
+**c. Cancelling twice at period end**
+
+For the deferred follow-up about a repeated next-period cancel. Use a fresh, active subscription (not a cancelled one:
+that returns `subscription_is_canceled_action_invalid`, which is a different answer).
+
+1. Subscribe to the monthly plan as in (a).
+2. Schedule a cancel at period end (`POST /subscriptions/{id}/cancel` with `effective_from` set to
+   `next_billing_period`, or the dashboard).
+3. Request the same cancel again and note the error code Paddle returns. Add it to the follow-up.
+
 ### When webhooks fail
 
 The webhook returns 500 when it cannot process an event yet (for example the database is down, the user cannot be
 resolved, or a refund arrives before its purchase), and Paddle retries it for a while. Logs (`[billing/webhook]`)
 show the event id. Once the cause is fixed, re-send the failed events from Paddle → Developer tools →
 Notifications → the events log of the destination.
+
+`monthly cancel failed <sub id>` in a log line means the Lifetime purchase was granted but that monthly subscription is
+still billing. Paddle retries the event; if it keeps failing, cancel that subscription in the Paddle dashboard.
 
 ### Going live
 
