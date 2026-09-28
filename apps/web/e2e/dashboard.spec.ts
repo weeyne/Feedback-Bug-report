@@ -308,3 +308,9 @@ test.describe('mobile', () => {
     await expect(sheet.getByTestId('theme-toggle')).toBeVisible();
   });
 });
+
+test('project switcher shows a freshly created project without a reload', async ({ page }) => {
+  await login(page);
+  await createProject(page, 'E2E Switcher');
+  await expect(page.getByTestId('project-switcher').first()).toContainText('E2E Switcher');
+});

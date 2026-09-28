@@ -22,6 +22,7 @@ import {
   sendTestAction,
 } from '@/app/app/actions';
 import { EmptyState } from '@/components/app/empty-state';
+import { useVisibleInterval } from '@/components/app/use-visible-interval';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type {
@@ -192,23 +193,23 @@ export function IntegrationsPanel(props: {
   };
 
   useEffect(() => {
-    if (!link) return;
-    pollStarted.current = Date.now();
-    const timer = setInterval(async () => {
+    if (link) pollStarted.current = Date.now();
+  }, [link]);
+
+  useVisibleInterval(
+    async () => {
       const next = await refresh();
       if (next?.find((s) => s.kind === 'telegram_shared')?.connected) {
-        clearInterval(timer);
         setLink(null);
         router.refresh();
       } else if (Date.now() - pollStarted.current > POLL_LIMIT_MS) {
-        clearInterval(timer);
         setLink(null);
         toast.error(t('integrations.linkExpired'));
       }
-    }, POLL_MS);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [link]);
+    },
+    POLL_MS,
+    { enabled: link !== null },
+  );
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, success?: string) =>
     start(async () => {

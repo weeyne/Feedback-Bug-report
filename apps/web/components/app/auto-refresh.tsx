@@ -3,18 +3,16 @@
 import { RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useTransition } from 'react';
+import { useTransition } from 'react';
 import { cn } from 'cn';
+import { useVisibleInterval } from '@/components/app/use-visible-interval';
 import { Button } from '@/components/ui/button';
 
 export function AutoRefresh({ intervalMs }: { intervalMs: number }) {
   const router = useRouter();
   const t = useTranslations('common');
   const [pending, start] = useTransition();
-  useEffect(() => {
-    const timer = setInterval(() => start(() => router.refresh()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs, router]);
+  useVisibleInterval(() => start(() => router.refresh()), intervalMs, { runOnVisible: true });
   return (
     <Button
       variant="ghost"
