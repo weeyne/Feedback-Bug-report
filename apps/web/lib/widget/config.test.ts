@@ -8,6 +8,7 @@ import {
 import { WidgetConfigSchema } from '@bugping/shared';
 import { describe, expect, it } from 'vitest';
 import { handleConfig, markWidgetSeen } from './config';
+import { markOriginBlocked } from './project';
 
 const get = (db: TestDb, key: string) =>
   handleConfig(
@@ -138,4 +139,89 @@ describe('handleConfig', () => {
       });
     });
   });
+
+  describe('allowed origins', () => {
+    async function locked(db: TestDb) {
+      const project = await projectWithSettings(db, false);
+      await db.query(
+        `update public.projects set allowed_origins = '{https://shop.example}' where id = $1`,
+        [project.id],
+      );
+      return project;
+    }
+    const call = (db: TestDb, key: string, origin: string | null) => {
+      const tasks: Array<Promise<void>> = [];
+      const res = handleConfig(
+        {
+          db,
+          env: { NEXT_PUBLIC_APP_URL: 'https://app.example' },
+          after: (t) => void tasks.push(t()),
+        },
+        new Request(`https://bugping.app/api/v1/widget/config?key=${key}`, {
+          headers: origin ? { origin } : {},
+        }),
+      );
+      return { res, settled: async () => Promise.all(tasks) };
+    };
+    const state = async (db: TestDb, id: string) =>
+      (
+        await db.query<{ blocked_origin: string | null; seen: boolean }>(
+          `select blocked_origin, widget_seen_at is not null as seen from public.projects where id = $1`,
+          [id],
+        )
+      )[0];
+
+    it('refuses a disallowed Origin, records it and does not mark the widget seen', () =>
+      withTx(async (db) => {
+        const project = await locked(db);
+        const { res, settled } = call(db, project.public_key, 'https://evil.example');
+        const response = await res;
+        expect(response.status).toBe(403);
+        expect(response.headers.get('cache-control')).toBeNull();
+        await settled();
+        expect(await state(db, project.id)).toEqual({
+          blocked_origin: 'https://evil.example',
+          seen: false,
+        });
+      }));
+
+    it('serves the www variant of an allowed site and marks it seen', () =>
+      withTx(async (db) => {
+        const project = await locked(db);
+        const { res, settled } = call(db, project.public_key, 'https://www.shop.example');
+        expect((await res).status).toBe(200);
+        await settled();
+        expect(await state(db, project.id)).toEqual({ blocked_origin: null, seen: true });
+      }));
+
+    it('serves a request without Origin even when a list is set', () =>
+      withTx(async (db) => {
+        const project = await locked(db);
+        const { res } = call(db, project.public_key, null);
+        expect((await res).status).toBe(200);
+      }));
+  });
+
+  it('rewrites the blocked origin at most once per hour for the same origin', () =>
+    withTx(async (db) => {
+      const project = await projectWithSettings(db, false);
+      await db.query(
+        `update public.projects set blocked_origin = 'https://a.example',
+           blocked_origin_at = now() - interval '10 minutes' where id = $1`,
+        [project.id],
+      );
+      const age = async () =>
+        (
+          await db.query<{ age: number; origin: string }>(
+            `select extract(epoch from now() - blocked_origin_at)::int as age, blocked_origin as origin
+             from public.projects where id = $1`,
+            [project.id],
+          )
+        )[0]!;
+      await markOriginBlocked(db, project.id, 'https://a.example');
+      expect((await age()).age).toBeGreaterThanOrEqual(590);
+      await markOriginBlocked(db, project.id, 'https://b.example');
+      expect(await age()).toEqual({ age: expect.any(Number), origin: 'https://b.example' });
+      expect((await age()).age).toBeLessThan(5);
+    }));
 });

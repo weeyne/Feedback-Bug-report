@@ -11,13 +11,14 @@ import type { Db } from '../db/types';
 import type { Env } from '../env';
 import { clientIp, corsHeaders, json } from '../http';
 import type { Storage } from '../storage';
-import { loadProjectByKey } from './project';
+import { originAllowed, parseOrigin } from './origins';
+import { loadProjectByKey, markOriginBlocked } from './project';
 import { describeAgent } from './user-agent';
 
 export const MAX_BODY_BYTES = 2.5 * 1024 * 1024;
 const RATE_LIMIT = { max: 5, windowSeconds: 60 } as const;
 const PROJECT_RATE_LIMIT = { max: 30, windowSeconds: 60 } as const;
-const MIN_ELAPSED_MS = 2000;
+const MIN_ELAPSED_MS = 800;
 const EXTENSIONS: Record<string, string> = {
   'image/webp': 'webp',
   'image/jpeg': 'jpg',
@@ -136,10 +137,15 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
 
     const project = await loadProjectByKey(deps.db, payload.projectKey);
     if (!project) return json({ error: 'unknown project' }, 404, cors);
-    if (
-      project.allowed_origins.length > 0 &&
-      !(origin && project.allowed_origins.includes(origin))
-    ) {
+    if (!originAllowed(origin, project.allowed_origins)) {
+      const blocked = parseOrigin(origin);
+      if (blocked) {
+        deps.after(() =>
+          markOriginBlocked(deps.db, project.id, blocked).catch((error) =>
+            console.error('[widget/submit] blocked origin', error),
+          ),
+        );
+      }
       return json({ error: 'origin not allowed' }, 403, cors);
     }
     if (payload.website || payload.elapsedMs < MIN_ELAPSED_MS) return json({ id: null }, 200, cors);

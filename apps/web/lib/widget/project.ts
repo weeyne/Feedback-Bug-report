@@ -27,3 +27,13 @@ export async function loadProjectByKey(db: Db, key: string): Promise<ProjectRow 
   );
   return row ?? null;
 }
+
+/** Remembers the last origin the allow-list refused; rewrites at most once per hour for the same origin. */
+export async function markOriginBlocked(db: Db, projectId: string, origin: string): Promise<void> {
+  await db.query(
+    `update public.projects set blocked_origin = $2, blocked_origin_at = now()
+     where id = $1
+       and (blocked_origin is distinct from $2 or blocked_origin_at < now() - interval '1 hour')`,
+    [projectId, origin],
+  );
+}

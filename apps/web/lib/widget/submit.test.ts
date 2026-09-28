@@ -258,6 +258,57 @@ describe('handleSubmit', () => {
       expect(ok.status).toBe(201);
     }));
 
+  it('stores a submission sent 800 ms after the form opened', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      const res = await handleSubmit(
+        deps,
+        request(payload(project.public_key, { elapsedMs: 800 })),
+      );
+      expect(res.status).toBe(201);
+      expect(await feedbackRows(db, project.id)).toHaveLength(1);
+    }));
+
+  it('accepts www and http variants of an allowed origin', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      await db.query(
+        `update public.projects set allowed_origins = '{https://shop.example}' where id = $1`,
+        [project.id],
+      );
+      const www = await handleSubmit(
+        deps,
+        request(payload(project.public_key), { origin: 'https://www.shop.example' }),
+      );
+      expect(www.status).toBe(201);
+      const http = await handleSubmit(
+        deps,
+        request(payload(project.public_key), { origin: 'http://shop.example', ip: '198.51.100.9' }),
+      );
+      expect(http.status).toBe(201);
+    }));
+
+  it('records the refused origin on the project', () =>
+    withTx(async (db) => {
+      const { deps, runAfter } = setup(db);
+      const project = await freeProject(db);
+      await db.query(
+        `update public.projects set allowed_origins = '{https://shop.example}' where id = $1`,
+        [project.id],
+      );
+      const res = await handleSubmit(deps, request(payload(project.public_key)));
+      expect(res.status).toBe(403);
+      await runAfter();
+      const [row] = await db.query<{ blocked_origin: string | null; recorded: boolean }>(
+        `select blocked_origin, blocked_origin_at is not null as recorded
+         from public.projects where id = $1`,
+        [project.id],
+      );
+      expect(row).toEqual({ blocked_origin: 'https://host.example', recorded: true });
+    }));
+
   it('silently drops bot submissions', () =>
     withTx(async (db) => {
       const { deps } = setup(db);
@@ -270,7 +321,7 @@ describe('handleSubmit', () => {
       expect(await honeypot.json()).toEqual({ id: null });
       const fast = await handleSubmit(
         deps,
-        request(payload(project.public_key, { elapsedMs: 1500 })),
+        request(payload(project.public_key, { elapsedMs: 799 })),
       );
       expect(await fast.json()).toEqual({ id: null });
       expect(await feedbackRows(db, project.id)).toEqual([]);
