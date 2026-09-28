@@ -1,42 +1,49 @@
 # Billing follow-ups (after the phase 5 final-review fix wave)
 
-## Before going live
+## Done in wave 1c (2026-09-28)
+- **Narrow the "both duplicates cancelled" race cheaply.** After a successful `next_billing_period` cancel (a
+  duplicate, or the monthly subscriptions cancelled by a Lifetime purchase) the row gets `cancel_at_period_end = true`,
+  so a late event for the other subscription no longer sees two active duplicates.
+- **Per-user advisory lock for concurrent webhooks.** Each event runs in one transaction, and `subscription.*` and
+  `transaction.completed` take `pg_advisory_xact_lock` on `billing:<userId>`, so events for one user are processed one
+  at a time.
+- **`chargeback_reverse`.** An approved reversal restores a `refunded` Lifetime row to `paid`. For a monthly
+  subscription, which was cancelled by the chargeback and cannot be revived, the webhook only logs a warning for a
+  manual decision.
+- **Webhook body size cap.** Bodies over 64 KiB get 413 before the signature check.
+- **Environment consistency check.** `billingConfig` disables billing, with one log line, when the Paddle key or client
+  token prefix names the other environment than `NEXT_PUBLIC_PADDLE_ENV`.
+- **Amend the phase 5 spec.** `2026-09-23-billing-paddle-design.md` has an "Amendments (2026-09-28)" section.
+
+## Deferred
 - **Verify in the Paddle sandbox that a `past_due` subscription can be cancelled `immediately`.** Paddle's
   cancellation guide says a `past_due` subscription cannot be changed. If Paddle refuses, the webhook paths that cancel
   it (a duplicate after Lifetime, a refund, a deleted profile) return 500 until the retries run out, while dunning keeps
-  trying to charge the card. The same applies to account deletion for a `past_due` user. Also record Paddle's error
-  when cancelling a subscription that already has a scheduled cancellation.
-- **Narrow the "both duplicates cancelled" race cheaply.** After a successful `next_billing_period` cancel in
-  `cancelIfDuplicate`, set `cancel_at_period_end = true` on that row (without touching `paddle_occurred_at`), so a
-  late event for the other subscription no longer sees two active duplicates. The advisory lock below closes it fully.
+  trying to charge the card. The same applies to account deletion for a `past_due` user. Reason for deferring: the owner
+  runs this in the sandbox; the steps are in `docs/deploy.md` ("Before going live: past_due check"). The same section
+  records Paddle's error for cancelling a subscription that already has a scheduled cancellation.
+- **A second next-period cancel after a rolled-back transaction.** After a rollback, Paddle's retry may re-send
+  `cancelSubscription(id, 'next_billing_period')` for a subscription that already has a scheduled cancel. Paddle's
+  error code for that (likely `subscription_locked_pending_changes`) is unconfirmed, and `cancelSubscription` throws on
+  it, so the retry answers 500 again. The extra 500 and retry are bounded: they end once Paddle's
+  `subscription.updated` with the scheduled cancel is processed. Hardening if it matters: on that code, GET the
+  subscription and treat `scheduled_change.action === 'cancel'` as done. Do not treat the code itself as success: a
+  scheduled pause returns it too.
 - **Email changes.** Portal access and checkout resolve the Paddle customer from the current session email. A user
   who changes their account email after buying gets `billing.noCustomer`, or a portal without their subscription, and
   a new checkout creates a second Paddle customer. Update the Paddle customer's email when the account email changes.
+  Reason for deferring: the app has no email change today.
 - **Webhook customer-id fallback.** `resolveUser` still falls back to the stored `paddle_customer_id` when
   `custom_data` is absent. An attacker can blank `custom_data` to attribute a subscription they pay for to another
   user's row. This is harmless today (they pay; duplicates are cancelled), but it trusts the same client-influenced id
-  that the checkout and portal no longer trust.
-- **Amend the phase 5 spec** (`2026-09-23-billing-paddle-design.md` §5–§8). Checkout and the portal now always resolve
-  the customer from the verified session email (`findCustomer` / `ensureCustomer`). Duplicate or refunded monthly
-  subscriptions are cancelled from the webhook, and account deletion refuses when billing is disabled but a paid
-  subscription exists.
-- **Environment consistency check.** Nothing checks that the Paddle keys match `NEXT_PUBLIC_PADDLE_ENV`: a live
-  API key (`pdl_live_…`) or client token (`live_…`) with `NEXT_PUBLIC_PADDLE_ENV=sandbox`, or the reverse, only
-  fails at the first Paddle call. `parseEnv` could compare the key prefixes with the environment.
+  that the checkout and portal no longer trust. Reason for deferring: removing the fallback can break legitimate
+  events that arrive without `custom_data`.
 - **Archived Paddle customers.** `GET /customers?email=` returns active customers only. If the customer for a
   user's email is archived in Paddle, `ensureCustomer` finds nothing, the create call returns
   `customer_already_exists`, the second lookup finds nothing again and checkout fails (`billing.checkoutFailed`);
   `findCustomer` returns null and the portal shows `billing.noCustomer`. Unarchiving the customer in Paddle fixes
-  it; the code could also look up `status=archived` and unarchive.
-- **Per-user advisory lock for concurrent webhooks.** Events for one user are processed concurrently. Two monthly
-  subscriptions whose events interleave (or an event for the first subscription that arrives between the
-  cancellation of a duplicate and Paddle's follow-up `subscription.updated`) can make both look like duplicates, so
-  both get cancelled. A `pg_advisory_xact_lock` on the user id around the handler (in a transaction) would
-  serialize them. Until then, such a case needs a manual fix in the Paddle dashboard.
-- **`chargeback_reverse` is not handled.** A reversed chargeback leaves a Lifetime row `refunded` and a monthly
-  subscription cancelled; the customer has paid but has no Pro. Restoring it needs a manual row update today.
-- **Webhook body size cap.** `/api/billing/webhook` reads the whole body before verifying the signature. A cap
-  (Paddle events are a few KB) would stop large unauthenticated bodies from being buffered.
+  it; the code could also look up `status=archived` and unarchive. Reason for deferring: rare, and the manual
+  unarchive in Paddle is enough for now.
 
 ## Can wait
 - **`?checkout=success` state (spec §8) is not implemented.** The overlay checkout never leaves the page, so the

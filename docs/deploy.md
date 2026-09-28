@@ -101,6 +101,28 @@ The script reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` from `apps/w
    - refunding a Lifetime purchase (full refund, sandbox dashboard) → Free;
    - refunding a monthly first payment (full refund) → the subscription is cancelled immediately → Free.
 
+### Before going live: past_due check
+
+Run this in the sandbox once; it answers the open `past_due` item in
+`docs/superpowers/followups/2026-09-23-billing-followups.md`.
+
+1. In the Paddle sandbox, subscribe to the monthly plan with card `4242 4242 4242 4242`.
+2. In the sandbox dashboard, switch the subscription's payment method to a declining test card from Paddle's testing
+   docs (developer.paddle.com → test cards), so the next renewal fails. If the sandbox offers an option to trigger a
+   failed renewal, use that instead.
+3. Wait until Bugping shows the subscription as past due on `/app/billing`.
+4. On the same account, buy Lifetime.
+5. In Paddle, confirm the monthly subscription is `canceled`. In the Vercel logs, confirm that
+   `[billing/webhook] failed` does not repeat for it.
+
+If step 5 fails, Paddle refuses to cancel a `past_due` subscription: the webhook keeps answering 500 for that event
+until Paddle stops retrying. Cancel the subscription in the Paddle dashboard and record the error code from the log.
+
+Second check, for the deferred follow-up about a repeated next-period cancel: cancel the same monthly subscription
+twice at period end, through the Paddle API (`POST /subscriptions/{id}/cancel` with `effective_from` set to
+`next_billing_period`) or the dashboard, and note which error code Paddle returns for the second cancel. Add the code
+to the follow-up.
+
 ### When webhooks fail
 
 The webhook returns 500 when it cannot process an event yet (for example the database is down, the user cannot be
