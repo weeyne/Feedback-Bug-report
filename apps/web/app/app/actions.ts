@@ -23,6 +23,7 @@ import {
 import { createProject, hasFeedback } from '@/lib/dashboard/projects';
 import type { ActionResult } from '@/lib/dashboard/result';
 import {
+  allowBlockedOrigin,
   deleteProject,
   isPro,
   updateProjectSettings,
@@ -66,6 +67,13 @@ export async function updateProjectSettingsAction(
 ): Promise<ActionResult> {
   const user = await requireUser();
   const result = await updateProjectSettings(await getDeps(), user.id, projectId, input);
+  revalidatePath('/app', 'layout');
+  return result;
+}
+
+export async function allowBlockedOriginAction(projectId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  const result = await allowBlockedOrigin(await getDeps(), user.id, projectId);
   revalidatePath('/app', 'layout');
   return result;
 }

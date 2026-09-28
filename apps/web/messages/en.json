@@ -293,7 +293,7 @@
     "newTitle": "Create your project",
     "name": "Project name",
     "siteUrl": "Website (optional)",
-    "siteUrlHint": "Used to restrict where the widget can send feedback from.",
+    "siteUrlHint": "Reports are accepted only from this site (with or without www). Leave empty to accept them from any site.",
     "create": "Create project",
     "nameInvalid": "Enter a name from 1 to 80 characters.",
     "urlInvalid": "Enter a valid website address.",
@@ -323,6 +323,12 @@
     "step3Hint": "Then send a test from the widget: it shows up here right away.",
     "seen": "Widget seen {time}",
     "notSeen": "Not seen yet"
+  },
+  "blockedOrigin": {
+    "title": "The widget is blocked on {origin}",
+    "hint": "Reports from this site were refused {time}: it is not in your allowed websites.",
+    "allow": "Allow this site",
+    "settings": "Settings"
   },
   "feedback": {
     "title": "Feedback",
@@ -373,7 +379,7 @@
     "locale": "Widget language",
     "locale_auto": "Visitor’s browser language",
     "origins": "Allowed websites",
-    "originsHint": "One per line. Leave empty to accept feedback from any site.",
+    "originsHint": "One per line. www and non-www, http and https count as one site. Leave empty to accept feedback from any site.",
     "hideBadge": "Hide “Powered by Bugping”",
     "customCss": "Custom CSS",
     "cssHint": "Target the widget's own classes: .bp-trigger, .bp-panel, .bp-home, .bp-card, .bp-form, .bp-send, .bp-shot.",

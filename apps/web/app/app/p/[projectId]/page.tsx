@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { BlockedOriginNotice } from '@/components/app/blocked-origin-notice';
 import { Checklist } from '@/components/app/overview/checklist';
 import { Connections } from '@/components/app/overview/connections';
 import { FeedbackChart } from '@/components/app/overview/feedback-chart';
@@ -28,6 +29,12 @@ export default async function OverviewPage({ params }: { params: Promise<{ proje
         <h1 className="text-2xl font-extrabold tracking-tight">{t('title')}</h1>
         <p className="truncate text-sm text-muted-foreground">{project.name}</p>
       </header>
+      <BlockedOriginNotice
+        projectId={project.id}
+        blockedOrigin={project.blocked_origin}
+        blockedAt={project.blocked_origin_at}
+        allowedOrigins={project.allowed_origins}
+      />
       <Checklist projectId={projectId} state={overview.checklist} />
       <StatCards counts={overview.counts} usage={overview.usage} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
