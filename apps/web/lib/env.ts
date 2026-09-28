@@ -9,7 +9,7 @@ function optionalWhenEmpty<T extends z.ZodTypeAny>(schema: T) {
 const EnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
-  NEXT_PUBLIC_BUGPING_PROJECT_KEY: z.string().regex(PUBLIC_KEY_PATTERN).optional(),
+  NEXT_PUBLIC_BUGPING_PROJECT_KEY: optionalWhenEmpty(z.string().regex(PUBLIC_KEY_PATTERN)),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//),
   NEXT_PUBLIC_APP_URL: z.url(),
@@ -17,6 +17,8 @@ const EnvSchema = z.object({
     .string()
     .refine((value) => Buffer.from(value, 'base64').length === 32, 'must be 32 bytes, base64'),
   IP_HASH_SALT: z.string().min(16),
+  /** Header holding the client IP behind a proxy that sets it (e.g. `cf-connecting-ip`); unset on Vercel. */
+  CLIENT_IP_HEADER: optionalWhenEmpty(z.string().regex(/^[a-z0-9-]+$/)),
   CRON_SECRET: z.string().min(16),
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/),
   TELEGRAM_BOT_USERNAME: z.string().regex(/^\w{5,32}$/),

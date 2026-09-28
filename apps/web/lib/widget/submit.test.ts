@@ -9,7 +9,7 @@ import { SCREENSHOT_MAX_BYTES } from '@bugping/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '../db/types';
 import { createMemoryStorage } from '../storage';
-import { handleSubmit, rateLimitIdentity, type SubmitDeps } from './submit';
+import { handleSubmit, type SubmitDeps } from './submit';
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
@@ -258,6 +258,57 @@ describe('handleSubmit', () => {
       expect(ok.status).toBe(201);
     }));
 
+  it('stores a submission sent 800 ms after the form opened', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      const res = await handleSubmit(
+        deps,
+        request(payload(project.public_key, { elapsedMs: 800 })),
+      );
+      expect(res.status).toBe(201);
+      expect(await feedbackRows(db, project.id)).toHaveLength(1);
+    }));
+
+  it('accepts www and http variants of an allowed origin', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      await db.query(
+        `update public.projects set allowed_origins = '{https://shop.example}' where id = $1`,
+        [project.id],
+      );
+      const www = await handleSubmit(
+        deps,
+        request(payload(project.public_key), { origin: 'https://www.shop.example' }),
+      );
+      expect(www.status).toBe(201);
+      const http = await handleSubmit(
+        deps,
+        request(payload(project.public_key), { origin: 'http://shop.example', ip: '198.51.100.9' }),
+      );
+      expect(http.status).toBe(201);
+    }));
+
+  it('records the refused origin on the project', () =>
+    withTx(async (db) => {
+      const { deps, runAfter } = setup(db);
+      const project = await freeProject(db);
+      await db.query(
+        `update public.projects set allowed_origins = '{https://shop.example}' where id = $1`,
+        [project.id],
+      );
+      const res = await handleSubmit(deps, request(payload(project.public_key)));
+      expect(res.status).toBe(403);
+      await runAfter();
+      const [row] = await db.query<{ blocked_origin: string | null; recorded: boolean }>(
+        `select blocked_origin, blocked_origin_at is not null as recorded
+         from public.projects where id = $1`,
+        [project.id],
+      );
+      expect(row).toEqual({ blocked_origin: 'https://host.example', recorded: true });
+    }));
+
   it('silently drops bot submissions', () =>
     withTx(async (db) => {
       const { deps } = setup(db);
@@ -270,7 +321,7 @@ describe('handleSubmit', () => {
       expect(await honeypot.json()).toEqual({ id: null });
       const fast = await handleSubmit(
         deps,
-        request(payload(project.public_key, { elapsedMs: 1500 })),
+        request(payload(project.public_key, { elapsedMs: 799 })),
       );
       expect(await fast.json()).toEqual({ id: null });
       expect(await feedbackRows(db, project.id)).toEqual([]);
@@ -489,16 +540,29 @@ describe('handleSubmit', () => {
       expect(storage.files.size).toBe(0);
       error.mockRestore();
     }));
-});
 
-describe('rateLimitIdentity', () => {
-  it('keeps IPv4, unwraps IPv4-mapped IPv6 and reduces IPv6 to its /64', () => {
-    expect(rateLimitIdentity('203.0.113.7')).toBe('203.0.113.7');
-    expect(rateLimitIdentity('::FFFF:203.0.113.7')).toBe('203.0.113.7');
-    expect(rateLimitIdentity('2001:0DB8:0000:0001:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:0:1::/64');
-    expect(rateLimitIdentity('2001:db8::1')).toBe('2001:db8:0:0::/64');
-    expect(rateLimitIdentity('[2001:db8:0:1::5]')).toBe('2001:db8:0:1::/64');
-    expect(rateLimitIdentity('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
-    expect(rateLimitIdentity('unknown')).toBe('unknown');
-  });
+  it('rate limits by the trusted IP header when configured', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const trusted = { ...deps, env: { ...deps.env, CLIENT_IP_HEADER: 'cf-connecting-ip' } };
+      const project = await freeProject(db);
+      for (let i = 0; i < 5; i++) {
+        const res = await handleSubmit(
+          trusted,
+          request(payload(project.public_key), {
+            ip: `203.0.113.${i + 10}`,
+            headers: { 'cf-connecting-ip': '198.51.100.20' },
+          }),
+        );
+        expect(res.status).toBe(201);
+      }
+      const spoofed = await handleSubmit(
+        trusted,
+        request(payload(project.public_key), {
+          ip: '203.0.113.99',
+          headers: { 'cf-connecting-ip': '198.51.100.20' },
+        }),
+      );
+      expect(spoofed.status).toBe(429);
+    }));
 });

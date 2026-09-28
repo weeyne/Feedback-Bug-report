@@ -41,3 +41,12 @@ test('a failed callback alert does not reappear after switching email', async ({
   await expect(page.getByTestId('login-email')).toBeVisible();
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
+
+test('signing in returns to the dashboard page that asked for it', async ({ page }) => {
+  await page.goto('/app/billing');
+  await expect(page).toHaveURL(/\/login$/);
+  const email = `next-${Date.now()}@e2e.dev`;
+  expect((await page.request.post('/api/e2e-test/login', { data: { email } })).ok()).toBe(true);
+  await page.goto('/login');
+  await expect(page).toHaveURL(/\/app\/billing$/);
+});

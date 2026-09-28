@@ -22,6 +22,10 @@ export interface ProjectDetail extends ProjectSummary {
   locale: WidgetLocale;
   /** ISO timestamp of the last widget config request (throttled to hourly), or null if never. */
   widget_seen_at: string | null;
+  /** The last origin the allow-list refused, or null. */
+  blocked_origin: string | null;
+  /** ISO timestamp of that refusal, or null. */
+  blocked_origin_at: string | null;
 }
 
 export function listProjects(deps: DashDeps, userId: string): Promise<ProjectSummary[]> {
@@ -39,18 +43,25 @@ export async function getProject(
 ): Promise<ProjectDetail | null> {
   if (!isUuid(projectId)) return null;
   const [row] = await withUser(deps.db, userId, (tx) =>
-    tx.query<Omit<ProjectDetail, 'widget_seen_at'> & { widget_seen_at: Date | string | null }>(
+    tx.query<
+      Omit<ProjectDetail, 'widget_seen_at' | 'blocked_origin_at'> & {
+        widget_seen_at: Date | string | null;
+        blocked_origin_at: Date | string | null;
+      }
+    >(
       `select id, name, public_key, allowed_origins, primary_color, trigger_text, "position"::text as "position",
-              hide_badge, custom_css, locale::text as locale, widget_seen_at
+              hide_badge, custom_css, locale::text as locale, widget_seen_at, blocked_origin, blocked_origin_at
        from public.projects where id = $1`,
       [projectId],
     ),
   );
   if (!row) return null;
   const seen = row.widget_seen_at;
+  const blockedAt = row.blocked_origin_at;
   return {
     ...row,
     widget_seen_at: seen == null ? null : new Date(seen).toISOString(),
+    blocked_origin_at: blockedAt == null ? null : new Date(blockedAt).toISOString(),
   } as ProjectDetail;
 }
 

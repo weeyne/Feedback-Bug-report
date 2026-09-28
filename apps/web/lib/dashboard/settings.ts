@@ -8,6 +8,7 @@ import {
 } from '@bugping/shared';
 import { z } from 'zod';
 import { withUser } from '../db/with-user';
+import { originAllowed } from '../widget/origins';
 import { utf8ByteLength } from './bytes';
 import { removeScreenshots } from './cleanup';
 import { normalizeOrigin } from './origins';
@@ -105,6 +106,32 @@ export async function updateProjectSettings(
     ),
   );
   return rows.length ? { ok: true } : { ok: false, error: 'errors.notFound' };
+}
+
+/** Adds the project's last refused origin to its allow-list (unless already allowed) and clears the notice. */
+export async function allowBlockedOrigin(
+  deps: DashDeps,
+  userId: string,
+  projectId: string,
+): Promise<ActionResult> {
+  const project = await getProject(deps, userId, projectId);
+  if (!project) return { ok: false, error: 'errors.notFound' };
+  let origins = project.allowed_origins;
+  const blocked = project.blocked_origin;
+  if (blocked && !originAllowed(blocked, origins)) {
+    const next = normalizeOrigins([...origins, blocked]);
+    if (typeof next === 'string') return { ok: false, error: next };
+    origins = next;
+  }
+  await withUser(deps.db, userId, (tx) =>
+    tx.query(
+      `update public.projects
+         set allowed_origins = $2::text[], blocked_origin = null, blocked_origin_at = null
+       where id = $1`,
+      [project.id, origins],
+    ),
+  );
+  return { ok: true };
 }
 
 export async function deleteProject(

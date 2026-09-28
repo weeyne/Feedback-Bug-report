@@ -1,9 +1,11 @@
 import { ArrowLeft } from 'lucide-react';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NEXT_COOKIE, safeNext } from '@/lib/auth/next';
 import { getSessionUser } from '@/lib/auth/session';
 import { LoginCard } from './login-form';
 
@@ -14,7 +16,10 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  if (await getSessionUser()) redirect('/app');
+  if (await getSessionUser()) {
+    // Server components cannot delete cookies; the cookie expires on its own.
+    redirect(safeNext((await cookies()).get(NEXT_COOKIE)?.value) ?? '/app');
+  }
   const t = await getTranslations('auth');
   const params = await searchParams;
   return (

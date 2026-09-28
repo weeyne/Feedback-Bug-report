@@ -73,6 +73,9 @@ export async function Pricing() {
                 <div className="mt-auto pt-8">
                   <Link
                     href={href}
+                    // Public pages must not prefetch /app/*: the proxy writes bp_next for a
+                    // prefetched /app/* link, and it cannot tell a prefetch from a click.
+                    prefetch={href.startsWith('/app') ? false : undefined}
                     data-testid={featured ? 'landing-pricing-cta' : undefined}
                     className={cn(
                       buttonVariants({ size: 'lg', variant: featured ? 'default' : 'outline' }),

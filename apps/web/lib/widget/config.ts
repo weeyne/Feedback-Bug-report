@@ -2,7 +2,8 @@ import { buildBadgeUrl, type WidgetConfig } from '@bugping/shared';
 import type { Db } from '../db/types';
 import type { Env } from '../env';
 import { corsHeaders, json } from '../http';
-import { loadProjectByKey, type ProjectRow } from './project';
+import { originAllowed, parseOrigin } from './origins';
+import { loadProjectByKey, markOriginBlocked, type ProjectRow } from './project';
 
 /** Records that the widget loaded on a site; writes at most once per hour per project. */
 export async function markWidgetSeen(db: Db, projectId: string): Promise<void> {
@@ -33,11 +34,25 @@ export async function handleConfig(
   },
   request: Request,
 ): Promise<Response> {
-  const cors = corsHeaders(request.headers.get('origin'));
+  const origin = request.headers.get('origin');
+  const cors = corsHeaders(origin);
   try {
     const key = new URL(request.url).searchParams.get('key') ?? '';
     const project = await loadProjectByKey(deps.db, key);
     if (!project) return json({ error: 'unknown project' }, 404, cors);
+
+    if (origin !== null && !originAllowed(origin, project.allowed_origins)) {
+      const blocked = parseOrigin(origin);
+      if (blocked) {
+        const record = () =>
+          markOriginBlocked(deps.db, project.id, blocked).catch((error) =>
+            console.error('[widget/config] blocked origin', error),
+          );
+        if (deps.after) deps.after(record);
+        else void record();
+      }
+      return json({ error: 'origin not allowed' }, 403, cors);
+    }
 
     const ping = () =>
       markWidgetSeen(deps.db, project.id).catch((error) =>

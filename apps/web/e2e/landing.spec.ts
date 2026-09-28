@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Frame, type Page } from '@playwright/test';
 
 /**
  * The landing (spec 2026-09-24-landing-redesign §6): sections, anchors, CTAs, theme, the live
@@ -18,12 +18,20 @@ async function expectDarkAfterToggle(page: Page, toggle: ReturnType<Page['getByT
   await expect(html).toHaveClass(/\bdark\b/);
 }
 
-/** Pathnames of every `/api/` request the page or any of its frames makes. */
+/** `/api/` requests made from the demo iframes. The main frame is excluded: with
+ *  NEXT_PUBLIC_BUGPING_PROJECT_KEY set, the landing's own corner widget fetches its config there. */
 function recordApiRequests(page: Page): string[] {
   const hits: string[] = [];
   page.on('request', (request) => {
     const { pathname } = new URL(request.url());
-    if (pathname.startsWith('/api/')) hits.push(pathname);
+    if (!pathname.startsWith('/api/')) return;
+    let frame: Frame | null = null;
+    try {
+      frame = request.frame();
+    } catch {
+      // Service-worker requests have no frame: count them.
+    }
+    if (frame !== page.mainFrame()) hits.push(pathname);
   });
   return hits;
 }
@@ -127,7 +135,9 @@ test.describe('landing', () => {
 });
 
 test.describe('landing demo', () => {
-  test('plays through telegram to the dashboard without any API request', async ({ page }) => {
+  test('plays through telegram to the dashboard without any API request from the demo', async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await warmDemoRoutes(page);
     const apiRequests = recordApiRequests(page);

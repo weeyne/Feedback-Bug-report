@@ -29,6 +29,10 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...VALID_ENV, NEXT_PUBLIC_BUGPING_PROJECT_KEY: 'nope' })).toThrow(
       /NEXT_PUBLIC_BUGPING_PROJECT_KEY/,
     );
+    expect(
+      parseEnv({ ...VALID_ENV, NEXT_PUBLIC_BUGPING_PROJECT_KEY: '' })
+        .NEXT_PUBLIC_BUGPING_PROJECT_KEY,
+    ).toBeUndefined();
   });
 
   it('accepts no Paddle group or a complete one, and rejects a partial one', () => {
@@ -39,6 +43,16 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...VALID_ENV, ...partial })).not.toThrow(/pdl_sdbx/);
     expect(() => parseEnv({ ...VALID_ENV, ...PADDLE_ENV, NEXT_PUBLIC_PADDLE_ENV: 'live' })).toThrow(
       /NEXT_PUBLIC_PADDLE_ENV/,
+    );
+  });
+
+  it('accepts an optional lower-case CLIENT_IP_HEADER', () => {
+    expect(parseEnv({ ...VALID_ENV, CLIENT_IP_HEADER: 'cf-connecting-ip' }).CLIENT_IP_HEADER).toBe(
+      'cf-connecting-ip',
+    );
+    expect(parseEnv({ ...VALID_ENV, CLIENT_IP_HEADER: '' }).CLIENT_IP_HEADER).toBeUndefined();
+    expect(() => parseEnv({ ...VALID_ENV, CLIENT_IP_HEADER: 'CF Connecting IP' })).toThrow(
+      /CLIENT_IP_HEADER/,
     );
   });
 });

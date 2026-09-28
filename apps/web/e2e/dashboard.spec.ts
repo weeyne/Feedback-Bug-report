@@ -249,6 +249,45 @@ test('feed: a fresh project shows the empty state with the install CTA', async (
   await expect(cta).toHaveAttribute('href', `/app/p/${projectId}/install`);
 });
 
+test('a refused site shows a notice that allows it in one click', async ({ page, context }) => {
+  await login(page);
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/app\/new$/);
+  await page.getByTestId('project-name').fill('E2E Blocked');
+  await page.getByTestId('project-site').fill('allowed.example');
+  await page.getByTestId('project-create').click();
+  await expect(page).toHaveURL(/\/app\/p\/[0-9a-f-]+\/install$/);
+  const snippet = await page.getByTestId('install-snippet').textContent();
+  const key = /data-project-id="(pk_[A-Za-z0-9]{16})"/.exec(snippet ?? '')![1]!;
+
+  const host = await context.newPage();
+  await host.goto(`/e2e-host?key=${key}`);
+  await host.locator('[data-bugping] .bp-trigger').click();
+  await host.locator('.bp-card[data-type="general"]').click();
+  await host.locator('.bp-message').fill('E2E: from a refused site');
+  await host.waitForTimeout(900); // bot guard
+  await host.locator('.bp-send').click();
+  await expect(host.locator('.bp-status')).toHaveText("Couldn't send. Try again later.");
+  await host.close();
+
+  const notice = page.getByTestId('blocked-origin-notice');
+  await expect
+    .poll(
+      async () => {
+        await page.reload();
+        return notice.count();
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(1);
+  await expect(notice).toContainText(new URL(page.url()).origin);
+  await page.getByTestId('blocked-origin-allow').click();
+  await expect(notice).toHaveCount(0);
+
+  await submitFeedback(context, key, 'E2E: allowed now');
+  await expect(page.getByTestId('install-received')).toBeVisible({ timeout: 15_000 });
+});
+
 test.describe('mobile', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

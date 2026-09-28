@@ -1,6 +1,7 @@
 import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { NEXT_COOKIE, NEXT_COOKIE_MAX_AGE, safeNext } from '@/lib/auth/next';
 
 const REF_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -49,6 +50,16 @@ export async function proxy(request: NextRequest) {
   if ((pathname === '/app' || pathname.startsWith('/app/')) && !userId) {
     const login = NextResponse.redirect(new URL('/login', request.url));
     for (const cookie of response.cookies.getAll()) login.cookies.set(cookie);
+    const next = safeNext(pathname + request.nextUrl.search);
+    if (next) {
+      login.cookies.set(NEXT_COOKIE, next, {
+        maxAge: NEXT_COOKIE_MAX_AGE,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: request.nextUrl.protocol === 'https:',
+      });
+    }
     return login;
   }
 

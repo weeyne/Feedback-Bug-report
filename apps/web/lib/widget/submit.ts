@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { isIPv4, isIPv6 } from 'node:net';
 import {
   SCREENSHOT_MAX_BYTES,
   SCREENSHOT_MIME_TYPES,
@@ -9,15 +8,16 @@ import {
 import { ENTITLEMENTS } from '../billing/plans';
 import type { Db } from '../db/types';
 import type { Env } from '../env';
-import { clientIp, corsHeaders, json } from '../http';
+import { clientIp, corsHeaders, json, rateLimitIdentity } from '../http';
 import type { Storage } from '../storage';
-import { loadProjectByKey } from './project';
+import { originAllowed, parseOrigin } from './origins';
+import { loadProjectByKey, markOriginBlocked } from './project';
 import { describeAgent } from './user-agent';
 
 export const MAX_BODY_BYTES = 2.5 * 1024 * 1024;
 const RATE_LIMIT = { max: 5, windowSeconds: 60 } as const;
 const PROJECT_RATE_LIMIT = { max: 30, windowSeconds: 60 } as const;
-const MIN_ELAPSED_MS = 2000;
+const MIN_ELAPSED_MS = 800;
 const EXTENSIONS: Record<string, string> = {
   'image/webp': 'webp',
   'image/jpeg': 'jpg',
@@ -27,7 +27,7 @@ const EXTENSIONS: Record<string, string> = {
 export interface SubmitDeps {
   db: Db;
   storage: Storage;
-  env: Pick<Env, 'IP_HASH_SALT'>;
+  env: Pick<Env, 'IP_HASH_SALT' | 'CLIENT_IP_HEADER'>;
   after: (task: () => Promise<void>) => void;
   notify: {
     feedback(feedbackId: string): Promise<void>;
@@ -49,30 +49,6 @@ function stripNul<T>(value: T): T {
     ) as T;
   }
   return value;
-}
-
-/**
- * The rate-limit identity of a client: IPv4 as is, IPv6 reduced to its /64 prefix (one subscriber
- * usually owns a whole /64), IPv4-mapped IPv6 back to plain IPv4.
- */
-export function rateLimitIdentity(ip: string): string {
-  const address = ip.replace(/^\[|\]$/g, '').replace(/%.*$/, '');
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
-  if (mapped && isIPv4(mapped[1]!)) return mapped[1]!;
-  if (!isIPv6(address)) return address;
-  const lower = address.toLowerCase();
-  let groups: string[];
-  if (lower.includes('::')) {
-    const [head = '', tail = ''] = lower.split('::');
-    const headParts = head ? head.split(':') : [];
-    const tailParts = tail ? tail.split(':') : [];
-    const zeros = Array<string>(Math.max(0, 8 - headParts.length - tailParts.length)).fill('0');
-    groups = [...headParts, ...zeros, ...tailParts];
-  } else {
-    groups = lower.split(':');
-  }
-  const prefix = groups.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, ''));
-  return `${prefix.join(':')}::/64`;
 }
 
 export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<Response> {
@@ -117,7 +93,10 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
     }
 
     const ipHash = createHash('sha256')
-      .update(rateLimitIdentity(clientIp(request.headers)) + deps.env.IP_HASH_SALT)
+      .update(
+        rateLimitIdentity(clientIp(request.headers, deps.env.CLIENT_IP_HEADER)) +
+          deps.env.IP_HASH_SALT,
+      )
       .digest('hex');
     const [limit] = await deps.db.query<{ limited: boolean }>(
       'select public.hit_rate_limit($1, $2, $3) as limited',
@@ -136,10 +115,15 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
 
     const project = await loadProjectByKey(deps.db, payload.projectKey);
     if (!project) return json({ error: 'unknown project' }, 404, cors);
-    if (
-      project.allowed_origins.length > 0 &&
-      !(origin && project.allowed_origins.includes(origin))
-    ) {
+    if (!originAllowed(origin, project.allowed_origins)) {
+      const blocked = parseOrigin(origin);
+      if (blocked) {
+        deps.after(() =>
+          markOriginBlocked(deps.db, project.id, blocked).catch((error) =>
+            console.error('[widget/submit] blocked origin', error),
+          ),
+        );
+      }
       return json({ error: 'origin not allowed' }, 403, cors);
     }
     if (payload.website || payload.elapsedMs < MIN_ELAPSED_MS) return json({ id: null }, 200, cors);

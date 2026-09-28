@@ -18,9 +18,13 @@ export default async function SettingsPage({ params }: { params: Promise<{ proje
     getTranslations('settings'),
   ]);
   if (!project) notFound();
-  // `widget_seen_at` is not a setting: leave it out of the key so a fresh "seen" timestamp
-  // never resets the form while the owner is editing it.
-  const { widget_seen_at: _seen, ...settings } = project;
+  // Not settings: leave them out of the key so a fresh "seen"/"blocked" timestamp never resets the form.
+  const {
+    widget_seen_at: _seen,
+    blocked_origin: _blocked,
+    blocked_origin_at: _blockedAt,
+    ...settings
+  } = project;
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 md:p-6">
       <PageHeader title={t('title')} description={t('description')} />

@@ -12,7 +12,7 @@ import { parseEnv } from '../env';
 import { createMemoryStorage, type MemoryStorage } from '../storage';
 import { getProject } from './projects';
 import type { DashDeps } from './result';
-import { deleteProject, updateProjectSettings } from './settings';
+import { allowBlockedOrigin, deleteProject, updateProjectSettings } from './settings';
 
 const valid = {
   name: 'Renamed',
@@ -150,5 +150,69 @@ describe('deleteProject', () => {
       ).toEqual({ ok: true });
       expect(await getProject(deps, owner, project.id)).toBeNull();
       expect(storage.files.size).toBe(0);
+    }));
+});
+
+describe('allowBlockedOrigin', () => {
+  async function blockedProject(db: TestDb, origins: string, blocked: string) {
+    const owner = await createUser(db);
+    const project = await createProject(db, owner);
+    await db.query(
+      `update public.projects set allowed_origins = $2::text[], blocked_origin = $3,
+         blocked_origin_at = now() where id = $1`,
+      [project.id, origins === '' ? [] : origins.split(','), blocked],
+    );
+    return { owner, project };
+  }
+
+  it('adds the blocked origin to the list and clears the notice', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const { owner, project } = await blockedProject(
+        db,
+        'https://shop.example',
+        'https://evil.example',
+      );
+      expect(await allowBlockedOrigin(deps, owner, project.id)).toEqual({ ok: true });
+      const detail = await getProject(deps, owner, project.id);
+      expect(detail?.allowed_origins).toEqual(['https://shop.example', 'https://evil.example']);
+      expect(detail?.blocked_origin).toBeNull();
+      expect(detail?.blocked_origin_at).toBeNull();
+    }));
+
+  it('only clears the notice when the list already allows the origin', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const { owner, project } = await blockedProject(
+        db,
+        'https://shop.example',
+        'https://www.shop.example',
+      );
+      expect(await allowBlockedOrigin(deps, owner, project.id)).toEqual({ ok: true });
+      const detail = await getProject(deps, owner, project.id);
+      expect(detail?.allowed_origins).toEqual(['https://shop.example']);
+      expect(detail?.blocked_origin).toBeNull();
+    }));
+
+  it('refuses when the list is full', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const full = Array.from({ length: 20 }, (_, i) => `https://s${i}.example`).join(',');
+      const { owner, project } = await blockedProject(db, full, 'https://evil.example');
+      expect(await allowBlockedOrigin(deps, owner, project.id)).toEqual({
+        ok: false,
+        error: 'settings.tooManyOrigins',
+      });
+    }));
+
+  it("cannot touch another user's project", () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const { project } = await blockedProject(db, 'https://shop.example', 'https://evil.example');
+      const stranger = await createUser(db);
+      expect(await allowBlockedOrigin(deps, stranger, project.id)).toEqual({
+        ok: false,
+        error: 'errors.notFound',
+      });
     }));
 });

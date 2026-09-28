@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { CSSProperties, ReactNode } from 'react';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
+import { BlockedOriginNotice } from '@/components/app/blocked-origin-notice';
 import { CopyButton } from '@/components/app/copy-button';
 import { FirstFeedbackWatcher } from '@/components/app/first-feedback-watcher';
 import { PageHeader, SectionCard } from '@/components/app/page-header';
@@ -89,6 +90,13 @@ export default async function InstallPage({ params }: { params: Promise<{ projec
             {seenAt ? t('seen', { time: format.relativeTime(new Date(seenAt)) }) : t('notSeen')}
           </p>
         }
+      />
+
+      <BlockedOriginNotice
+        projectId={project.id}
+        blockedOrigin={project.blocked_origin}
+        blockedAt={project.blocked_origin_at}
+        allowedOrigins={project.allowed_origins}
       />
 
       <SectionCard index={0}>

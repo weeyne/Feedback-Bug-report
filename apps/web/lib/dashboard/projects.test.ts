@@ -40,6 +40,8 @@ describe('projects', () => {
       expect(await getProject(deps(db), a, mine.id)).toMatchObject({
         name: 'Mine',
         widget_seen_at: null,
+        blocked_origin: null,
+        blocked_origin_at: null,
       });
       await db.query(
         `update public.projects set widget_seen_at = '2026-09-20T10:00:00Z' where id = $1`,
