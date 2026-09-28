@@ -16,7 +16,7 @@ const SECRET = PADDLE_ENV.PADDLE_WEBHOOK_SECRET;
 const MONTHLY = PADDLE_ENV.PADDLE_PRICE_MONTHLY;
 const LIFETIME = PADDLE_ENV.PADDLE_PRICE_LIFETIME;
 
-function setup(db: TestDb, opts: { paddleFails?: boolean } = {}) {
+function setup(db: TestDb, opts: { paddleFails?: boolean; failCancels?: string[] } = {}) {
   // Write calls (POST) only; transaction reads are recorded separately in `reads`.
   const calls: Array<{ url: string; body: unknown }> = [];
   const reads: string[] = [];
@@ -36,7 +36,8 @@ function setup(db: TestDb, opts: { paddleFails?: boolean } = {}) {
       });
     }
     calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
-    return opts.paddleFails
+    const failsThis = opts.failCancels?.some((id) => url.endsWith(`/subscriptions/${id}/cancel`));
+    return opts.paddleFails || failsThis
       ? Response.json({ error: { code: 'internal_error' } }, { status: 500 })
       : Response.json({ data: { id: 'ok' } });
   }) as typeof fetch;
@@ -275,29 +276,36 @@ describe('billing webhook', () => {
       ]);
     }));
 
-  it('returns 500 when cancelling the monthly subscription fails', () =>
+  it('returns 500 when cancelling the monthly subscription fails, and still grants Lifetime', () =>
     withTx(async (db) => {
-      const { send } = setup(db, { paddleFails: true });
-      const user = await createUser(db);
-      await send(
-        subscriptionEvent({
-          type: 'subscription.created',
-          userId: user,
-          status: 'active',
-          priceId: MONTHLY,
-          subscriptionId: 'sub_fail',
-          occurredAt: '2026-09-01T00:00:00Z',
-        }),
-      );
-      const res = await send(
-        transactionCompleted({
-          userId: user,
-          priceId: LIFETIME,
-          transactionId: 'txn_fail',
-          occurredAt: '2026-09-10T00:00:00Z',
-        }),
-      );
-      expect(res.status).toBe(500);
+      const { send, pro, row } = setup(db, { paddleFails: true });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const user = await createUser(db);
+        await send(
+          subscriptionEvent({
+            type: 'subscription.created',
+            userId: user,
+            status: 'active',
+            priceId: MONTHLY,
+            subscriptionId: 'sub_fail',
+            occurredAt: '2026-09-01T00:00:00Z',
+          }),
+        );
+        const res = await send(
+          transactionCompleted({
+            userId: user,
+            priceId: LIFETIME,
+            transactionId: 'txn_fail',
+            occurredAt: '2026-09-10T00:00:00Z',
+          }),
+        );
+        expect(res.status).toBe(500);
+        expect(await pro(user)).toBe(true);
+        expect(await row('paddle_transaction_id', 'txn_fail')).toMatchObject({ status: 'paid' });
+      } finally {
+        errors.mockRestore();
+      }
     }));
 
   it('revokes Lifetime only once the refunds cover the whole payment, whatever their type', () =>
@@ -450,7 +458,9 @@ describe('billing webhook', () => {
         customerId: 'ctm_orphan',
         occurredAt: '2026-09-01T00:00:00Z',
       });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect((await send(orphan)).status).toBe(500);
+      errors.mockRestore();
       const unknown = { ...orphan, event_type: 'customer.updated' };
       expect((await send(unknown)).status).toBe(200);
       const ghost = subscriptionEvent({
@@ -592,7 +602,12 @@ describe('billing webhook', () => {
         cancel_at_period_end: false,
       });
       const failing = setup(db, { paddleFails: true });
-      expect((await failing.send({ ...pastDue, event_id: 'evt_pd_retry' })).status).toBe(500);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        expect((await failing.send({ ...pastDue, event_id: 'evt_pd_retry' })).status).toBe(500);
+      } finally {
+        errors.mockRestore();
+      }
     }));
 
   it('cancels a past_due monthly subscription immediately on a Lifetime purchase', () =>
@@ -691,16 +706,26 @@ describe('billing webhook', () => {
       expect(unknown.status).toBe(200);
       expect(calls).toHaveLength(2);
       const failing = setup(db, { paddleFails: true });
-      const failed = await failing.send(
-        adjustmentEvent({ ...adjustment, action: 'chargeback', type: 'full', status: 'approved' }),
-      );
-      expect(failed.status).toBe(500);
-      // A refund whose transaction cannot be read is retried (500), and nothing is cancelled.
-      const unreadable = await failing.send(
-        adjustmentEvent({ ...adjustment, action: 'refund', type: 'full', status: 'approved' }),
-      );
-      expect(unreadable.status).toBe(500);
-      expect(failing.calls).toHaveLength(1);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const failed = await failing.send(
+          adjustmentEvent({
+            ...adjustment,
+            action: 'chargeback',
+            type: 'full',
+            status: 'approved',
+          }),
+        );
+        expect(failed.status).toBe(500);
+        // A refund whose transaction cannot be read is retried (500), and nothing is cancelled.
+        const unreadable = await failing.send(
+          adjustmentEvent({ ...adjustment, action: 'refund', type: 'full', status: 'approved' }),
+        );
+        expect(unreadable.status).toBe(500);
+        expect(failing.calls).toHaveLength(1);
+      } finally {
+        errors.mockRestore();
+      }
     }));
 
   it('returns 500 for a revoking adjustment that arrives before its Lifetime row', () =>
@@ -874,7 +899,12 @@ describe('billing webhook', () => {
         }
         expect(calls).toHaveLength(1);
         const failing = setup(db, { paddleFails: true });
-        expect((await failing.send({ ...event, event_id: 'evt_ghost_retry' })).status).toBe(500);
+        const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+          expect((await failing.send({ ...event, event_id: 'evt_ghost_retry' })).status).toBe(500);
+        } finally {
+          errors.mockRestore();
+        }
       } finally {
         warnings.mockRestore();
       }
@@ -1052,10 +1082,10 @@ describe('billing webhook', () => {
       });
     }));
 
-  it('rolls back a Lifetime purchase when cancelling the monthly subscription fails', () =>
+  it('keeps a Lifetime purchase when cancelling the monthly fails, and the retry cancels it', () =>
     withTx(async (db) => {
-      const { send: seed } = setup(db);
-      const { send, row } = setup(db, { paddleFails: true });
+      const { send: seed, row } = setup(db);
+      const failing = setup(db, { paddleFails: true });
       const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
       try {
         const user = await createUser(db);
@@ -1069,21 +1099,145 @@ describe('billing webhook', () => {
             occurredAt: '2026-09-01T00:00:00Z',
           }),
         );
-        const res = await send(
-          transactionCompleted({
-            userId: user,
-            priceId: LIFETIME,
-            transactionId: 'txn_atomic',
-            occurredAt: '2026-09-02T00:00:00Z',
-          }),
-        );
-        expect(res.status).toBe(500);
-        expect(await row('paddle_transaction_id', 'txn_atomic')).toBeUndefined();
+        const purchase = transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_atomic',
+          occurredAt: '2026-09-02T00:00:00Z',
+        });
+        expect((await failing.send(purchase)).status).toBe(500);
+        expect(await row('paddle_transaction_id', 'txn_atomic')).toMatchObject({ status: 'paid' });
+        expect(await failing.pro(user)).toBe(true);
         expect(await row('paddle_subscription_id', 'sub_atomic')).toMatchObject({
           cancel_at_period_end: false,
         });
+        expect(errors).toHaveBeenCalledWith(
+          '[billing/webhook] failed',
+          purchase.event_id,
+          'transaction.completed',
+          'monthly cancel failed',
+          'sub_atomic',
+          expect.stringContaining('PaddleError'),
+        );
+        expect(JSON.stringify(errors.mock.calls)).not.toContain(user);
+
+        const retry = setup(db);
+        expect((await retry.send(purchase)).status).toBe(200);
+        expect(retry.calls).toEqual([
+          {
+            url: 'https://sandbox-api.paddle.com/subscriptions/sub_atomic/cancel',
+            body: { effective_from: 'next_billing_period' },
+          },
+        ]);
+        expect(await row('paddle_subscription_id', 'sub_atomic')).toMatchObject({
+          cancel_at_period_end: true,
+        });
+        const lifetimeRows = await db.query(
+          'select 1 from public.subscriptions where paddle_transaction_id = $1',
+          ['txn_atomic'],
+        );
+        expect(lifetimeRows).toHaveLength(1);
       } finally {
         errors.mockRestore();
       }
+    }));
+
+  it('commits the cancels that succeeded when another monthly cancel fails, and retries only that one', () =>
+    withTx(async (db) => {
+      const { send: seed, row } = setup(db);
+      const failing = setup(db, { failCancels: ['sub_pd'] });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const user = await createUser(db);
+        await seed(
+          subscriptionEvent({
+            userId: user,
+            priceId: MONTHLY,
+            subscriptionId: 'sub_keep',
+            type: 'subscription.created',
+            status: 'active',
+            occurredAt: '2026-09-01T00:00:00Z',
+          }),
+        );
+        // A duplicate that is past_due gets one immediate cancel and stays past_due, unmarked.
+        await seed(
+          subscriptionEvent({
+            userId: user,
+            priceId: MONTHLY,
+            subscriptionId: 'sub_pd',
+            type: 'subscription.past_due',
+            status: 'past_due',
+            occurredAt: '2026-09-02T00:00:00Z',
+          }),
+        );
+        const purchase = transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_partial',
+          occurredAt: '2026-09-03T00:00:00Z',
+        });
+        expect((await failing.send(purchase)).status).toBe(500);
+        expect(await row('paddle_transaction_id', 'txn_partial')).toMatchObject({ status: 'paid' });
+        expect(await row('paddle_subscription_id', 'sub_keep')).toMatchObject({
+          cancel_at_period_end: true,
+        });
+        expect(await row('paddle_subscription_id', 'sub_pd')).toMatchObject({
+          status: 'past_due',
+          cancel_at_period_end: false,
+        });
+
+        const retry = setup(db);
+        expect((await retry.send(purchase)).status).toBe(200);
+        expect(retry.calls).toEqual([
+          {
+            url: 'https://sandbox-api.paddle.com/subscriptions/sub_pd/cancel',
+            body: { effective_from: 'immediately' },
+          },
+        ]);
+      } finally {
+        errors.mockRestore();
+      }
+    }));
+
+  it('does not cancel monthly subscriptions when a replayed Lifetime purchase was refunded', () =>
+    withTx(async (db) => {
+      const { send, calls, remaining, row } = setup(db);
+      const user = await createUser(db);
+      const purchase = transactionCompleted({
+        userId: user,
+        priceId: LIFETIME,
+        transactionId: 'txn_refunded_replay',
+        occurredAt: '2026-09-01T00:00:00Z',
+      });
+      await send(purchase);
+      remaining.set('txn_refunded_replay', '0');
+      await send(
+        adjustmentEvent({
+          transactionId: 'txn_refunded_replay',
+          action: 'refund',
+          type: 'full',
+          status: 'approved',
+          occurredAt: '2026-09-02T00:00:00Z',
+        }),
+      );
+      expect(await row('paddle_transaction_id', 'txn_refunded_replay')).toMatchObject({
+        status: 'refunded',
+      });
+      await send(
+        subscriptionEvent({
+          userId: user,
+          priceId: MONTHLY,
+          subscriptionId: 'sub_after_refund',
+          type: 'subscription.created',
+          status: 'active',
+          occurredAt: '2026-09-03T00:00:00Z',
+        }),
+      );
+      expect(calls).toEqual([]);
+      expect((await send(purchase)).status).toBe(200);
+      expect(calls).toEqual([]);
+      expect(await row('paddle_subscription_id', 'sub_after_refund')).toMatchObject({
+        cancel_at_period_end: false,
+      });
     }));
 });
