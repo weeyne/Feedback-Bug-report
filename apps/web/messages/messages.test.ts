@@ -41,6 +41,7 @@ const dummyValues = {
   origin: 'https://example.com',
   name: 'Jane Doe',
   country: 'Ukraine',
+  digest: '1234567890',
 };
 
 describe('messages', () => {

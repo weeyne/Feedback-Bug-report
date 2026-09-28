@@ -36,7 +36,9 @@ export async function createProjectAction(input: {
   siteUrl?: string;
 }): Promise<ActionResult<{ projectId: string }>> {
   const user = await requireUser();
-  return createProject(await getDeps(), user.id, input);
+  const result = await createProject(await getDeps(), user.id, input);
+  if (result.ok) revalidatePath('/app', 'layout');
+  return result;
 }
 
 export async function hasFeedbackAction(projectId: string): Promise<boolean> {

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/app/app-shell';
 import type { PlanKind } from '@/components/app/plan-card';
+import { TimeZoneSync } from '@/components/app/time-zone-sync';
 import { requireUser } from '@/lib/auth/session';
 import { billingOverview } from '@/lib/billing/checkout';
 import { newCountsByProject, usage } from '@/lib/dashboard/feedback';
@@ -20,8 +21,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const kind: PlanKind =
     billing.state === 'lifetime' ? 'pro_lifetime' : plan.pro ? 'pro_monthly' : 'free';
   return (
-    <AppShell projects={projects} email={user.email} usage={plan} plan={kind} newCounts={newCounts}>
-      {children}
-    </AppShell>
+    <>
+      <TimeZoneSync />
+      <AppShell
+        projects={projects}
+        email={user.email}
+        usage={plan}
+        plan={kind}
+        newCounts={newCounts}
+      >
+        {children}
+      </AppShell>
+    </>
   );
 }

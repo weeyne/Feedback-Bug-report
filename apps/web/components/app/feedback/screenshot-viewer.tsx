@@ -1,10 +1,20 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
+import { stableUrl } from '@/lib/dashboard/stable-url';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
-export function ScreenshotViewer({ src }: { src: string }) {
+// Signed URLs live 300 s; keep the first one while it is safely valid so a refresh does not reload the image.
+const KEEP_MS = 4 * 60_000;
+
+export function ScreenshotViewer({ src: incoming }: { src: string }) {
   const t = useTranslations('feedback');
+  const [sticky, setSticky] = useState(() => ({ src: incoming, since: Date.now() }));
+  useEffect(() => {
+    setSticky((current) => stableUrl(current, incoming, Date.now(), KEEP_MS));
+  }, [incoming]);
+  const { src } = sticky;
   return (
     <Dialog>
       <DialogTrigger className="block w-full cursor-zoom-in overflow-hidden rounded-xl border bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50">

@@ -308,3 +308,39 @@ test.describe('mobile', () => {
     await expect(sheet.getByTestId('theme-toggle')).toBeVisible();
   });
 });
+
+test('project switcher shows a freshly created project without a reload', async ({ page }) => {
+  await login(page);
+  await createProject(page, 'E2E Switcher');
+  await expect(page.getByTestId('project-switcher').first()).toContainText('E2E Switcher');
+});
+
+test.describe('viewer time zone', () => {
+  test.use({ timezoneId: 'Asia/Tokyo' });
+
+  test('the tz cookie follows the browser and dates render in that zone', async ({
+    page,
+    context,
+  }) => {
+    await login(page);
+    const { key, projectId } = await createProject(page, 'E2E Time Zone');
+    await submitFeedback(context, key, 'E2E: what time is it in Tokyo');
+
+    await page.goto(`/app/p/${projectId}/feedback`);
+    await expect
+      .poll(async () => (await context.cookies()).find((c) => c.name === 'tz')?.value)
+      .toBe('Asia/Tokyo');
+
+    await page.getByTestId('feedback-row').filter({ hasText: 'what time is it in Tokyo' }).click();
+    const time = page.getByTestId('feedback-detail').locator('time');
+    const iso = await time.getAttribute('datetime');
+    expect(iso).toBeTruthy();
+    const expected = new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Tokyo',
+    }).format(new Date(iso!));
+    const flat = (s: string) => s.replace(/\s/g, ' ');
+    await expect.poll(async () => flat((await time.textContent()) ?? '')).toBe(flat(expected));
+  });
+});

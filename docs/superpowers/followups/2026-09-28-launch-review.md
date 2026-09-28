@@ -44,19 +44,19 @@ Order of work: wave 1 blocks commercial launch (Paddle live, VPS move); later wa
 - [ ] ✅ **Billing follow-ups marked "before going live"** in `2026-09-23-billing-followups.md` (`past_due`
       cancellation, email changes vs Paddle customer, webhook body cap, advisory lock, key/env consistency).
 
-## Wave 2 — bugs
+## Wave 2 — bugs (done 2026-09-29, branch fix/wave-2-bugs)
 
-- [ ] ✅ **Project switcher is stale after creating a project.** `createProjectAction` (`app/app/actions.ts:33`) has no
+- [x] ✅ **Project switcher is stale after creating a project.** `createProjectAction` (`app/app/actions.ts:33`) has no
       `revalidatePath`; the form does `router.push` (`app/app/new/new-project-form.tsx:25`). Add
       `revalidatePath('/app', 'layout')` like the other actions.
-- [ ] ✅ **Dates render in the server's time zone.** `i18n/request.ts` passes no `timeZone`; only the overview chart
+- [x] ✅ **Dates render in the server's time zone.** `i18n/request.ts` passes no `timeZone`; only the overview chart
       sets `UTC` explicitly. Store the owner's zone (cookie from the browser) and pass it to next-intl.
-- [ ] ✅ **No 404 / error / loading UI.** No `not-found.tsx`, `error.tsx`, `global-error.tsx` or `loading.tsx` in
+- [x] ✅ **No 404 / error / loading UI.** No `not-found.tsx`, `error.tsx`, `global-error.tsx` or `loading.tsx` in
       `apps/web/app`; `components/ui/skeleton.tsx` is unused. Add branded, localized ones and dashboard skeletons.
-- [ ] ✅ **Screenshots re-download every 30 s.** `AutoRefresh` (`components/app/auto-refresh.tsx:15`) refreshes also in
+- [x] ✅ **Screenshots re-download every 30 s.** `AutoRefresh` (`components/app/auto-refresh.tsx:15`) refreshes also in
       background tabs; each refresh mints a new 5-minute signed URL (`lib/dashboard/feedback.ts:261`), so the open
       detail panel re-downloads up to 2 MB. Pause while `document.hidden`; keep a stable URL per report for its TTL.
-- [ ] ✅ **Polls ignore tab visibility** — `first-feedback-watcher.tsx:22` (3 s) and `integrations-panel.tsx:197`
+- [x] ✅ **Polls ignore tab visibility** — `first-feedback-watcher.tsx:22` (3 s) and `integrations-panel.tsx:197`
       (2 s, no in-flight guard). Pause while hidden; skip a tick while a request is in flight.
 
 ## Wave 3 — product

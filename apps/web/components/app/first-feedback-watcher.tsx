@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { hasFeedbackAction } from '@/app/app/actions';
+import { useVisibleInterval } from '@/components/app/use-visible-interval';
 import { buttonVariants } from '@/components/ui/button';
 
 const POLL_MS = 3000;
@@ -17,13 +18,13 @@ export function FirstFeedbackWatcher({
 }) {
   const t = useTranslations('install');
   const [received, setReceived] = useState(initial);
-  useEffect(() => {
-    if (received) return;
-    const timer = setInterval(async () => {
+  useVisibleInterval(
+    async () => {
       if (await hasFeedbackAction(projectId)) setReceived(true);
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [projectId, received]);
+    },
+    POLL_MS,
+    { enabled: !received, runOnVisible: true },
+  );
 
   if (!received) {
     return (
