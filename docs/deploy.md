@@ -118,15 +118,18 @@ Run these in the sandbox once; they answer open items in
 Buying Lifetime while the monthly subscription is `past_due` is not offered in the UI (the "Switch to Lifetime" button
 only shows for an active subscription), so check the Paddle call directly.
 
-1. Subscribe to the monthly plan as in (a), then switch the subscription's payment method in the sandbox dashboard to a
-   declining test card from Paddle's testing docs (developer.paddle.com → test cards), so the next renewal fails. If
-   the sandbox offers an option to trigger a failed renewal, use that instead.
+1. Subscribe to the monthly plan as in (a). Customers change the payment method in the Paddle customer portal
+   (Bugping's "Manage" button), not in the vendor dashboard: switch it there to a declining test card from Paddle's
+   testing docs (developer.paddle.com → test cards). To get to `past_due` quickly, trigger the renewal now with
+   `PATCH /subscriptions/{id}` setting `next_billed_at` a few minutes ahead and `proration_billing_mode: "do_not_bill"`
+   (check the exact fields in Paddle's "change billing date" guide).
 2. Wait until Bugping shows the subscription as past due on `/app/billing`.
 3. Cancel it from the Paddle sandbox API (`POST /subscriptions/{id}/cancel` with `effective_from` set to
    `immediately`) or the dashboard, and record whether Paddle accepts it and, if not, the error code.
 
 If Paddle refuses, the webhook paths that cancel a `past_due` subscription (a duplicate after Lifetime, a refund, a
-deleted profile) keep answering 500 for that event until Paddle stops retrying; record the error code in the follow-up.
+deleted profile) keep answering 500 for that event until Paddle stops retrying; record the error code in the follow-up
+(a Lifetime purchase is still granted).
 
 **c. Cancelling twice at period end**
 
@@ -144,6 +147,9 @@ The webhook returns 500 when it cannot process an event yet (for example the dat
 resolved, or a refund arrives before its purchase), and Paddle retries it for a while. Logs (`[billing/webhook]`)
 show the event id. Once the cause is fixed, re-send the failed events from Paddle → Developer tools →
 Notifications → the events log of the destination.
+
+`monthly cancel failed <sub id>` in a log line means the Lifetime purchase was granted but that monthly subscription is
+still billing. Paddle retries the event; if it keeps failing, cancel that subscription in the Paddle dashboard.
 
 ### Going live
 

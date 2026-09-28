@@ -331,8 +331,9 @@ Made in launch wave 1c and the fixes before it. Where this section and §5–§1
 - **One transaction and lock per event (§7).** `handleBillingWebhook` runs the whole event in one database
   transaction. `subscription.*` and both `transaction.completed` paths take
   `pg_advisory_xact_lock(hashtext('billing:<userId>'))` right after the user is resolved, so events for one user are
-  processed one at a time; the lock is released at commit or rollback. Any error rolls the transaction back and the
-  webhook answers 500, so Paddle retries. Paddle API calls run inside the transaction (a connection is held for up to
+  processed one at a time; the lock is released at commit or rollback. Errors roll the transaction back and the
+  webhook answers 500, except a failed monthly cancel on a Lifetime purchase: the grant and the cancels that succeeded
+  commit, the webhook still answers 500, and Paddle's retry cancels only the subscriptions not yet marked. Paddle API calls run inside the transaction (a connection is held for up to
   the 10 s Paddle timeout). `adjustment.*` takes no lock: it writes a single Lifetime row guarded by
   `paddle_occurred_at`; a monthly refund or chargeback only calls Paddle to cancel the subscription, also without the
   lock (idempotent, harmless). A Paddle cancel that succeeded is not undone by a later rollback; see the deferred item about a

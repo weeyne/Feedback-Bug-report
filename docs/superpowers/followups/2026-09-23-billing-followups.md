@@ -22,13 +22,19 @@
   trying to charge the card. The same applies to account deletion for a `past_due` user. Reason for deferring: the owner
   runs this in the sandbox; the steps are in `docs/deploy.md` ("Before going live: sandbox checks", check b). Check c in the same section
   records Paddle's error for cancelling a subscription that already has a scheduled cancellation.
-- **A second next-period cancel after a rolled-back transaction.** After a rollback, Paddle's retry may re-send
+- **A second next-period cancel after a rolled-back transaction.** This now happens only when a database write fails
+  after Paddle accepted a cancel, or in the duplicate rule (`cancelIfDuplicate`), whose failure rolls back. A failed
+  cancel on a Lifetime purchase commits the grant and the cancels that succeeded, so the retry skips the marked rows.
+  After such a rollback, Paddle's retry may re-send
   `cancelSubscription(id, 'next_billing_period')` for a subscription that already has a scheduled cancel. Paddle's
   error code for that (likely `subscription_locked_pending_changes`) is unconfirmed, and `cancelSubscription` throws on
   it, so the retry answers 500 again. The extra 500 and retry are bounded: they end once Paddle's
   `subscription.updated` with the scheduled cancel is processed. Hardening if it matters: on that code, GET the
-  subscription and treat `scheduled_change.action === 'cancel'` as done. Do not treat the code itself as success: a
-  scheduled pause returns it too.
+  subscription and treat `scheduled_change.action === 'cancel'` as done. Do not treat the code itself as success: it
+  may also be returned for a scheduled pause (unverified; sandbox check c records the real code).
+- **`chargeback_reverse` and a later monthly.** A `chargeback_reverse` that restores Lifetime does not cancel a
+  monthly subscription bought after the chargeback. It is cancelled only at that subscription's next event (possibly
+  after one more charge).
 - **Email changes.** Portal access and checkout resolve the Paddle customer from the current session email. A user
   who changes their account email after buying gets `billing.noCustomer`, or a portal without their subscription, and
   a new checkout creates a second Paddle customer. Update the Paddle customer's email when the account email changes.
