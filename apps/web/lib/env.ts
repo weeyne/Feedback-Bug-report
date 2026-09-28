@@ -17,6 +17,8 @@ const EnvSchema = z.object({
     .string()
     .refine((value) => Buffer.from(value, 'base64').length === 32, 'must be 32 bytes, base64'),
   IP_HASH_SALT: z.string().min(16),
+  /** Header holding the client IP behind a proxy that sets it (e.g. `cf-connecting-ip`); unset on Vercel. */
+  CLIENT_IP_HEADER: optionalWhenEmpty(z.string().regex(/^[a-z0-9-]+$/)),
   CRON_SECRET: z.string().min(16),
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/),
   TELEGRAM_BOT_USERNAME: z.string().regex(/^\w{5,32}$/),

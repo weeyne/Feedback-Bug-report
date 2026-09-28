@@ -1,0 +1,22 @@
+import { expect, test } from '@playwright/test';
+
+test('pages refuse framing and send the security headers', async ({ request }) => {
+  for (const path of ['/', '/login', '/privacy']) {
+    const headers = (await request.get(path)).headers();
+    expect(headers['x-frame-options'], path).toBe('DENY');
+    expect(headers['content-security-policy'], path).toBe(
+      "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+    );
+    expect(headers['x-content-type-options'], path).toBe('nosniff');
+    expect(headers['referrer-policy'], path).toBe('strict-origin-when-cross-origin');
+    expect(headers['strict-transport-security'], path).toBe('max-age=31536000');
+    expect(headers['x-powered-by'], path).toBeUndefined();
+  }
+});
+
+test('the demo frames may only be framed by the landing itself', async ({ request }) => {
+  const headers = (await request.get('/demo/shop')).headers();
+  expect(headers['x-frame-options']).toBeUndefined();
+  expect(headers['content-security-policy']).toBe("frame-ancestors 'self'");
+  expect(headers['x-content-type-options']).toBe('nosniff');
+});

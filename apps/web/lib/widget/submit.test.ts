@@ -9,7 +9,7 @@ import { SCREENSHOT_MAX_BYTES } from '@bugping/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '../db/types';
 import { createMemoryStorage } from '../storage';
-import { handleSubmit, rateLimitIdentity, type SubmitDeps } from './submit';
+import { handleSubmit, type SubmitDeps } from './submit';
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
@@ -540,16 +540,29 @@ describe('handleSubmit', () => {
       expect(storage.files.size).toBe(0);
       error.mockRestore();
     }));
-});
 
-describe('rateLimitIdentity', () => {
-  it('keeps IPv4, unwraps IPv4-mapped IPv6 and reduces IPv6 to its /64', () => {
-    expect(rateLimitIdentity('203.0.113.7')).toBe('203.0.113.7');
-    expect(rateLimitIdentity('::FFFF:203.0.113.7')).toBe('203.0.113.7');
-    expect(rateLimitIdentity('2001:0DB8:0000:0001:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:0:1::/64');
-    expect(rateLimitIdentity('2001:db8::1')).toBe('2001:db8:0:0::/64');
-    expect(rateLimitIdentity('[2001:db8:0:1::5]')).toBe('2001:db8:0:1::/64');
-    expect(rateLimitIdentity('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
-    expect(rateLimitIdentity('unknown')).toBe('unknown');
-  });
+  it('rate limits by the trusted IP header when configured', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const trusted = { ...deps, env: { ...deps.env, CLIENT_IP_HEADER: 'cf-connecting-ip' } };
+      const project = await freeProject(db);
+      for (let i = 0; i < 5; i++) {
+        const res = await handleSubmit(
+          trusted,
+          request(payload(project.public_key), {
+            ip: `203.0.113.${i + 10}`,
+            headers: { 'cf-connecting-ip': '198.51.100.20' },
+          }),
+        );
+        expect(res.status).toBe(201);
+      }
+      const spoofed = await handleSubmit(
+        trusted,
+        request(payload(project.public_key), {
+          ip: '203.0.113.99',
+          headers: { 'cf-connecting-ip': '198.51.100.20' },
+        }),
+      );
+      expect(spoofed.status).toBe(429);
+    }));
 });

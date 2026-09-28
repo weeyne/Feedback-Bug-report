@@ -46,6 +46,9 @@ Never commit secrets: every value below is entered in the Vercel or Supabase das
    - `DATABASE_URL`: the transaction pooler URL (`…pooler.supabase.com:6543/postgres`)
    - `NEXT_PUBLIC_APP_URL`: `https://<domain>` (no trailing slash)
    - `SECRETS_ENCRYPTION_KEY`, `IP_HASH_SALT`, `CRON_SECRET`
+   - `CLIENT_IP_HEADER` (optional): leave unset on Vercel (the client IP comes from `x-forwarded-for`, which Vercel
+     overwrites). Behind Cloudflare on your own server set `cf-connecting-ip`, and let only Cloudflare's IP ranges
+     reach the server — otherwise anyone can send that header and dodge the rate limits.
    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
    - `NEXT_PUBLIC_BUGPING_PROJECT_KEY` (optional): the public key of your own Bugping project, for the landing widget
    - Do NOT set `BUGPING_TEST_MODE`.

@@ -41,4 +41,14 @@ describe('parseEnv', () => {
       /NEXT_PUBLIC_PADDLE_ENV/,
     );
   });
+
+  it('accepts an optional lower-case CLIENT_IP_HEADER', () => {
+    expect(parseEnv({ ...VALID_ENV, CLIENT_IP_HEADER: 'cf-connecting-ip' }).CLIENT_IP_HEADER).toBe(
+      'cf-connecting-ip',
+    );
+    expect(parseEnv({ ...VALID_ENV, CLIENT_IP_HEADER: '' }).CLIENT_IP_HEADER).toBeUndefined();
+    expect(() => parseEnv({ ...VALID_ENV, CLIENT_IP_HEADER: 'CF Connecting IP' })).toThrow(
+      /CLIENT_IP_HEADER/,
+    );
+  });
 });
