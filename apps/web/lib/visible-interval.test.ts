@@ -125,4 +125,58 @@ describe('createVisibleInterval', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(run).not.toHaveBeenCalled();
   });
+
+  describe('throttling around visible-return runs', () => {
+    it('does not refresh on becoming visible when a run started less than one interval ago', async () => {
+      let t = 0;
+      const run = vi.fn();
+      const v = visibility(false);
+      const stop = createVisibleInterval({
+        run,
+        intervalMs: 1000,
+        runOnVisible: true,
+        now: () => t,
+        ...v,
+      });
+      t = 1000;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(run).toHaveBeenCalledTimes(1);
+      t = 1500; // 500 ms after the last run
+      v.set(true);
+      v.set(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(run).toHaveBeenCalledTimes(1);
+      t = 2000; // a full interval since the last run
+      v.set(true);
+      v.set(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(run).toHaveBeenCalledTimes(2);
+      stop();
+    });
+
+    it('skips a timer tick right after a visible-return run', async () => {
+      let t = 0;
+      const run = vi.fn();
+      const v = visibility(true);
+      const stop = createVisibleInterval({
+        run,
+        intervalMs: 1000,
+        runOnVisible: true,
+        now: () => t,
+        ...v,
+      });
+      t = 900;
+      await vi.advanceTimersByTimeAsync(900);
+      v.set(false); // visible-return run at t=900
+      await vi.advanceTimersByTimeAsync(0);
+      expect(run).toHaveBeenCalledTimes(1);
+      t = 1000;
+      await vi.advanceTimersByTimeAsync(100); // tick at 1000, only 100 ms after the run
+      expect(run).toHaveBeenCalledTimes(1);
+      t = 2000;
+      await vi.advanceTimersByTimeAsync(1000); // next tick is a full interval away
+      expect(run).toHaveBeenCalledTimes(2);
+      stop();
+    });
+  });
 });

@@ -3,6 +3,8 @@ export interface StableUrl {
   since: number;
 }
 
+const pathOf = (url: string) => url.split('?')[0];
+
 /** Keeps a signed URL steady while it is still valid, so a re-render does not reload the image. */
 export function stableUrl(
   current: StableUrl | null,
@@ -10,6 +12,8 @@ export function stableUrl(
   now: number,
   keepMs: number,
 ): StableUrl {
-  if (current && now - current.since < keepMs) return current;
+  if (current && now - current.since < keepMs && pathOf(current.src) === pathOf(incoming)) {
+    return current;
+  }
   return { src: incoming, since: now };
 }

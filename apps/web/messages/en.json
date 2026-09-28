@@ -430,6 +430,7 @@
     "rateLimited": "Too many attempts. Wait a minute and try again."
   },
   "status": {
+    "loading": "Loading…",
     "notFoundTitle": "Page not found",
     "notFoundBody": "The page you are looking for does not exist, or you no longer have access to it.",
     "errorTitle": "Something went wrong",

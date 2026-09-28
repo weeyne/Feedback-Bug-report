@@ -12,7 +12,13 @@ export function AutoRefresh({ intervalMs }: { intervalMs: number }) {
   const router = useRouter();
   const t = useTranslations('common');
   const [pending, start] = useTransition();
-  useVisibleInterval(() => start(() => router.refresh()), intervalMs, { runOnVisible: true });
+  useVisibleInterval(
+    () => {
+      if (!pending) start(() => router.refresh());
+    },
+    intervalMs,
+    { runOnVisible: true },
+  );
   return (
     <Button
       variant="ghost"

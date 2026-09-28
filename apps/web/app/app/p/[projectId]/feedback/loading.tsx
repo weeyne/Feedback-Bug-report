@@ -1,10 +1,13 @@
+import { getTranslations } from 'next-intl/server';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Mirrors FeedLayout: header (title, tabs, chips) above the rows, detail column from md up.
-export default function FeedbackLoading() {
+export default async function FeedbackLoading() {
+  const t = await getTranslations('status');
   return (
-    <div className="flex min-h-full" aria-busy="true">
-      <section className="min-w-0 flex-1">
+    <div className="flex min-h-full" role="status" aria-busy="true">
+      <span className="sr-only">{t('loading')}</span>
+      <section aria-hidden className="min-w-0 flex-1">
         <header className="flex flex-col gap-3 border-b px-4 pt-4 pb-3 md:px-6 md:pt-6">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="h-9 w-72 max-w-full rounded-lg" />
@@ -25,7 +28,7 @@ export default function FeedbackLoading() {
           ))}
         </ul>
       </section>
-      <div className="hidden w-[420px] shrink-0 border-l md:block" />
+      <div aria-hidden className="hidden w-[420px] shrink-0 border-l md:block" />
     </div>
   );
 }

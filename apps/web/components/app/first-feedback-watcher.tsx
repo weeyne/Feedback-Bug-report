@@ -23,7 +23,7 @@ export function FirstFeedbackWatcher({
       if (await hasFeedbackAction(projectId)) setReceived(true);
     },
     POLL_MS,
-    { enabled: !received },
+    { enabled: !received, runOnVisible: true },
   );
 
   if (!received) {

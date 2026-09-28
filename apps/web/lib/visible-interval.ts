@@ -3,20 +3,20 @@ export interface VisibleIntervalOptions {
   intervalMs: number;
   isHidden: () => boolean;
   subscribeVisibility: (onChange: () => void) => () => void;
-  setTimer?: typeof setInterval;
-  clearTimer?: typeof clearInterval;
   runOnVisible?: boolean;
+  now?: () => number;
 }
 
 /** Calls `run` every `intervalMs` while visible, never overlapping itself. Returns `stop`. */
 export function createVisibleInterval(opts: VisibleIntervalOptions): () => void {
-  const setTimer = opts.setTimer ?? setInterval;
-  const clearTimer = opts.clearTimer ?? clearInterval;
+  const now = opts.now ?? Date.now;
   let pending = false;
+  let lastRun = -Infinity;
 
-  const attempt = () => {
-    if (pending || opts.isHidden()) return;
+  const attempt = (minGapMs: number) => {
+    if (pending || opts.isHidden() || now() - lastRun < minGapMs) return;
     pending = true;
+    lastRun = now();
     void (async () => {
       try {
         await opts.run();
@@ -28,13 +28,14 @@ export function createVisibleInterval(opts: VisibleIntervalOptions): () => void 
     })();
   };
 
-  const timer = setTimer(attempt, opts.intervalMs);
+  // A tick right after a visible-return run would refresh twice in a row.
+  const timer = setInterval(() => attempt(opts.intervalMs / 2), opts.intervalMs);
   const unsubscribe = opts.subscribeVisibility(() => {
-    if (opts.runOnVisible && !opts.isHidden()) attempt();
+    if (opts.runOnVisible) attempt(opts.intervalMs);
   });
 
   return () => {
-    clearTimer(timer);
+    clearInterval(timer);
     unsubscribe();
   };
 }

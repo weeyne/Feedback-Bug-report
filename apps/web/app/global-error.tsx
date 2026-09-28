@@ -14,6 +14,9 @@ export default function GlobalError({
   }, [error]);
   return (
     <html lang="en">
+      <head>
+        <title>Error · Bugping</title>
+      </head>
       <body
         style={{
           margin: 0,

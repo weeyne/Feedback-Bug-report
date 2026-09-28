@@ -18,8 +18,9 @@ export function StatusPage({
   embedded?: boolean;
   children: ReactNode;
 }) {
+  const Root = embedded ? 'div' : 'main';
   return (
-    <main
+    <Root
       className={cn(
         'flex flex-col items-center justify-center gap-6 p-4 text-center',
         embedded
@@ -42,6 +43,6 @@ export function StatusPage({
         {note && <p className="text-xs text-muted-foreground/80 tabular-nums">{note}</p>}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2">{children}</div>
-    </main>
+    </Root>
   );
 }
