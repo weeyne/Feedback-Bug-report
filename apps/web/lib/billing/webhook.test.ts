@@ -7,6 +7,7 @@ import {
   transactionCompleted,
 } from '@/test/paddle-fixtures';
 import { PADDLE_ENV, VALID_ENV } from '@/test/fixtures';
+import type { Db } from '../db/types';
 import { parseEnv } from '../env';
 import { handleBillingWebhook, MAX_WEBHOOK_BYTES } from './webhook';
 
@@ -926,5 +927,92 @@ describe('billing webhook', () => {
       );
       expect(res.status).toBe(200);
       expect(await row('paddle_subscription_id', 'sub_other')).toBeUndefined();
+    }));
+
+  it('serialises each user: the dispatch runs in a transaction and locks billing:<user>', () =>
+    withTx(async (db) => {
+      const sqls: Array<{ sql: string; params: unknown[]; inTx: boolean }> = [];
+      const record = (inner: Db, inTx: boolean): Db => ({
+        query: (sql, params = []) => {
+          sqls.push({ sql, params, inTx });
+          return inner.query(sql, params);
+        },
+        transaction: (fn) => inner.transaction((tx) => fn(record(tx, true))),
+      });
+      const user = await createUser(db);
+      const res = await handleBillingWebhook(
+        { db: record(db, false), env, fetch },
+        signedRequest(
+          subscriptionEvent({
+            userId: user,
+            priceId: MONTHLY,
+            subscriptionId: 'sub_lock',
+            type: 'subscription.created',
+            status: 'active',
+            occurredAt: '2026-09-01T00:00:00Z',
+          }),
+          SECRET,
+        ),
+      );
+      expect(res.status).toBe(200);
+      const lock = sqls.find((s) => s.sql.includes('pg_advisory_xact_lock'));
+      expect(lock).toMatchObject({ params: [`billing:${user}`], inTx: true });
+      const insert = sqls.findIndex((s) => s.sql.includes('insert into public.subscriptions'));
+      expect(sqls.indexOf(lock!)).toBeLessThan(insert);
+      expect(sqls.every((s) => s.inTx)).toBe(true);
+    }));
+
+  it('marks a monthly duplicate cancelled at period end as cancelling', () =>
+    withTx(async (db) => {
+      const { send, row } = setup(db);
+      const user = await createUser(db);
+      for (const [id, at] of [
+        ['sub_a', '2026-09-01T00:00:00Z'],
+        ['sub_b', '2026-09-02T00:00:00Z'],
+      ] as const) {
+        await send(
+          subscriptionEvent({
+            userId: user,
+            priceId: MONTHLY,
+            subscriptionId: id,
+            type: 'subscription.created',
+            status: 'active',
+            occurredAt: at,
+          }),
+        );
+      }
+      expect(await row('paddle_subscription_id', 'sub_b')).toMatchObject({
+        cancel_at_period_end: true,
+      });
+      expect(await row('paddle_subscription_id', 'sub_a')).toMatchObject({
+        cancel_at_period_end: false,
+      });
+    }));
+
+  it('marks monthly subscriptions as cancelling after a Lifetime purchase', () =>
+    withTx(async (db) => {
+      const { send, row } = setup(db);
+      const user = await createUser(db);
+      await send(
+        subscriptionEvent({
+          userId: user,
+          priceId: MONTHLY,
+          subscriptionId: 'sub_before',
+          type: 'subscription.created',
+          status: 'active',
+          occurredAt: '2026-09-01T00:00:00Z',
+        }),
+      );
+      await send(
+        transactionCompleted({
+          userId: user,
+          priceId: LIFETIME,
+          transactionId: 'txn_life2',
+          occurredAt: '2026-09-02T00:00:00Z',
+        }),
+      );
+      expect(await row('paddle_subscription_id', 'sub_before')).toMatchObject({
+        cancel_at_period_end: true,
+      });
     }));
 });

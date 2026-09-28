@@ -146,6 +146,20 @@ async function resolveUser(
   throw new RetryLater([ctx.eventId, ctx.eventType, 'unresolved user']);
 }
 
+/** Serialises events for one user until the surrounding transaction ends. */
+async function lockUser(ctx: Ctx, userId: string): Promise<void> {
+  await ctx.db.query('select pg_advisory_xact_lock(hashtext($1))', [`billing:${userId}`]);
+}
+
+/** Next-period cancel in Paddle, then mark the row so later events do not treat it as an active duplicate. */
+async function cancelAtPeriodEnd(ctx: Ctx, subscriptionId: string): Promise<void> {
+  await ctx.paddle.cancelSubscription(subscriptionId, 'next_billing_period');
+  await ctx.db.query(
+    'update public.subscriptions set cancel_at_period_end = true, updated_at = now() where paddle_subscription_id = $1',
+    [subscriptionId],
+  );
+}
+
 function logDeletedProfile(ctx: Ctx, paddleId: string) {
   console.warn('[billing/webhook] profile deleted', ctx.eventId, ctx.eventType, paddleId);
 }
@@ -167,10 +181,11 @@ async function cancelIfDuplicate(ctx: Ctx, userId: string, subscriptionId: strin
         !row.cancel_at_period_end),
   );
   if (!duplicate) return;
-  await ctx.paddle.cancelSubscription(
-    subscriptionId,
-    self.status === 'past_due' ? 'immediately' : 'next_billing_period',
-  );
+  if (self.status === 'past_due') {
+    await ctx.paddle.cancelSubscription(subscriptionId, 'immediately');
+  } else {
+    await cancelAtPeriodEnd(ctx, subscriptionId);
+  }
 }
 
 async function onSubscription(ctx: Ctx, raw: unknown) {
@@ -189,6 +204,7 @@ async function onSubscription(ctx: Ctx, raw: unknown) {
     subscriptionId: sub.id,
     customerId: sub.customer_id,
   });
+  await lockUser(ctx, userId);
   if (!(await profileExists(ctx.db, userId))) {
     logDeletedProfile(ctx, sub.id);
     // Nobody can use this Pro any more: stop billing for it.
@@ -226,6 +242,7 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
       customUserId: txn.custom_data?.user_id,
       customerId: txn.customer_id,
     });
+    await lockUser(ctx, userId);
     if (!(await profileExists(ctx.db, userId))) return logDeletedProfile(ctx, txn.id);
     await ctx.db.query(
       `insert into public.subscriptions
@@ -242,10 +259,11 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
     for (const row of await userSubscriptions(ctx.db, userId)) {
       if (isProMonthly(row) && row.paddle_subscription_id && !row.cancel_at_period_end) {
         // A past_due subscription cannot be scheduled to cancel; it has nothing left to use.
-        await ctx.paddle.cancelSubscription(
-          row.paddle_subscription_id,
-          row.status === 'past_due' ? 'immediately' : 'next_billing_period',
-        );
+        if (row.status === 'past_due') {
+          await ctx.paddle.cancelSubscription(row.paddle_subscription_id, 'immediately');
+        } else {
+          await cancelAtPeriodEnd(ctx, row.paddle_subscription_id);
+        }
       }
     }
     return;
@@ -256,6 +274,7 @@ async function onTransactionCompleted(ctx: Ctx, raw: unknown) {
       subscriptionId: txn.subscription_id,
       customerId: txn.customer_id,
     });
+    await lockUser(ctx, userId);
     // The subscription events for a deleted profile cancel the subscription.
     if (!(await profileExists(ctx.db, userId))) return logDeletedProfile(ctx, txn.subscription_id);
     // Mapping only: a null timestamp lets any subscription event overwrite this row.
@@ -352,22 +371,24 @@ export async function handleBillingWebhook(deps: WebhookDeps, request: Request):
   const parsed = Envelope.safeParse(body);
   if (!parsed.success) return json({ error: 'bad request' }, 400);
   const { event_id, event_type, occurred_at, data } = parsed.data;
-  const ctx: Ctx = {
-    db: deps.db,
-    config,
-    paddle: createPaddleClient(config, deps.fetch),
-    eventId: event_id,
-    eventType: event_type,
-    occurredAt: occurred_at,
-  };
   try {
-    if (event_type.startsWith('subscription.')) {
-      await onSubscription(ctx, data);
-    } else if (event_type === 'transaction.completed') {
-      await onTransactionCompleted(ctx, data);
-    } else if (event_type === 'adjustment.created' || event_type === 'adjustment.updated') {
-      await onAdjustment(ctx, data);
-    }
+    await deps.db.transaction(async (tx) => {
+      const ctx: Ctx = {
+        db: tx,
+        config,
+        paddle: createPaddleClient(config, deps.fetch),
+        eventId: event_id,
+        eventType: event_type,
+        occurredAt: occurred_at,
+      };
+      if (event_type.startsWith('subscription.')) {
+        await onSubscription(ctx, data);
+      } else if (event_type === 'transaction.completed') {
+        await onTransactionCompleted(ctx, data);
+      } else if (event_type === 'adjustment.created' || event_type === 'adjustment.updated') {
+        await onAdjustment(ctx, data);
+      }
+    });
     return json({ ok: true }, 200);
   } catch (error) {
     if (error instanceof InvalidTimestamp) {
