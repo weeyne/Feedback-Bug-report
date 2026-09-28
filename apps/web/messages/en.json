@@ -167,25 +167,163 @@
     }
   },
   "legal": {
-    "draft": "Draft — not legal advice.",
-    "privacyTitle": "Privacy Policy",
-    "privacy1": "Bugping stores what a visitor submits through the widget: the message, an optional email and an optional screenshot.",
-    "privacy2": "With each report we store page metadata: URL (tokens in query strings are redacted), browser, OS, screen and viewport size, language, time zone and recent console errors.",
-    "privacy3": "Screenshots are kept for 30 days on Free and 365 days on Pro, then deleted automatically.",
-    "privacy4": "IP addresses are never stored; only a salted hash is used inside short-lived rate-limit keys.",
-    "privacy5": "Reports are delivered to the Telegram or Discord destinations the project owner configures.",
-    "privacy6": "Account owners can delete projects or their whole account at any time; this removes all related data.",
-    "privacy7": "Payments are processed by Paddle.com; we do not see or store card details.",
-    "termsTitle": "Terms of Service",
-    "terms1": "Bugping is provided as is. Do not use it to collect data you are not allowed to collect.",
-    "terms2": "You are responsible for informing your site’s visitors about the widget in your own privacy policy.",
-    "terms3": "Free plan limits may change with notice. Paid plans renew monthly until cancelled; Lifetime is a one-time payment.",
-    "terms4": "We may suspend accounts that abuse the service or its delivery channels.",
-    "terms5": "Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.",
-    "refundTitle": "Refund Policy",
-    "refund1": "You can get a full refund within 14 days of the first payment of a subscription or of a Lifetime purchase.",
-    "refund2": "After that, a monthly subscription can be cancelled at any time and stays active until the end of the paid period.",
-    "refund3": "To request a refund, reply to your Paddle receipt email or contact us. Refunds are processed by Paddle, our Merchant of Record."
+    "updated": "Last updated: {date}",
+    "operatorTitle": "Who we are",
+    "operator": "Bugping is operated by {name}, {country}.",
+    "operatorName": "Dymko Artem Ruslanovych",
+    "operatorCountry": "Ukraine",
+    "contact": "Email",
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "This policy explains what data Bugping collects, why, where it is stored and what rights you have. It covers two groups of people: owners who create a Bugping account, and visitors who send feedback through the widget on an owner’s website.",
+      "sections": {
+        "roles": {
+          "title": "Who is responsible for the data",
+          "p1": "For the account data of owners, Bugping is the controller.",
+          "p2": "For feedback that visitors send through the widget, the owner of the website is the controller. Bugping processes it on the owner’s behalf and only to store it and deliver it to them. Owners must tell their visitors about the widget in their own privacy policy (see our Terms of Service)."
+        },
+        "owners": {
+          "title": "Data about account owners",
+          "li1": "Your email address and, if you sign in with GitHub, your GitHub account id and public profile name.",
+          "li2": "Your projects and their settings, and the Telegram or Discord destinations you connect. Bot tokens and webhook addresses are stored encrypted.",
+          "li3": "Your billing status: plan and subscription dates. Payment details are handled by Paddle; we never see or store card numbers."
+        },
+        "visitors": {
+          "title": "Data in feedback from website visitors",
+          "p1": "What a visitor sends through the widget: the message, an optional email address and an optional screenshot. Before sending, the visitor can review the screenshot, mark it up, hide parts of it or remove it.",
+          "p2": "Technical context attached to each report: page address (tokens in query strings are removed), referrer, browser, operating system, screen and window size, language, time zone and recent console errors from that page.",
+          "p3": "IP addresses are never stored. A salted hash of the IP address is used only inside short-lived rate-limit keys that stop spam."
+        },
+        "purposes": {
+          "title": "Why we use it",
+          "p1": "To provide the service: show reports in the dashboard, deliver them to the channels the owner chose, send sign-in links, apply plan limits and process payments. We do not sell data, show ads or use analytics trackers.",
+          "p2": "Legal bases under the GDPR: the contract with account owners; the owner’s legitimate interest in receiving feedback about their website, for visitor reports; legal obligations, for billing records."
+        },
+        "processors": {
+          "title": "Service providers",
+          "p1": "Bugping relies on these providers:",
+          "li1": "Supabase — database, sign-in (including sign-in emails) and file storage, in London, United Kingdom;",
+          "li2": "Vercel — hosting of the website and its API, in London, United Kingdom;",
+          "li3": "GitHub — sign-in, if you choose it;",
+          "li4": "Telegram and Discord — delivery of reports to the chats and channels the owner connects;",
+          "li5": "Paddle.com — payments and invoicing, as our Merchant of Record."
+        },
+        "location": {
+          "title": "Where data is stored",
+          "p1": "Bugping stores data in London, United Kingdom, which the European Commission recognises as providing adequate data protection. Telegram, Discord, GitHub and Paddle process data under their own policies."
+        },
+        "retention": {
+          "title": "How long we keep it",
+          "li1": "Screenshots: 30 days on the Free plan and 1 year on Pro, then deleted automatically.",
+          "li2": "Messages, visitor emails and technical context: until the owner deletes the report, the project or the account.",
+          "li3": "Account data: until you delete your account. Deleting a project or an account removes all related data.",
+          "li4": "Rate-limit keys: about one day.",
+          "li5": "Billing records: as long as tax law requires. Paddle keeps its own records as the seller."
+        },
+        "cookies": {
+          "title": "Cookies and local storage",
+          "p1": "This website uses only what it needs to work:",
+          "li1": "sign-in cookies (Supabase) keep you signed in;",
+          "li2": "locale remembers the language you picked;",
+          "li3": "bp_next remembers, for 10 minutes, the dashboard page to open after you sign in;",
+          "li4": "ref remembers, for 30 days, which Bugping widget sent you here, if you followed a “Powered by Bugping” link;",
+          "li5": "theme (in local storage) remembers light or dark mode.",
+          "p2": "There are no advertising or analytics cookies. The widget on customers’ websites sets no cookies at all."
+        },
+        "rights": {
+          "title": "Your rights",
+          "p1": "You can ask to access, correct, delete or export your data, to restrict or object to its processing, and to withdraw consent. Account owners can delete projects and their whole account in the dashboard themselves.",
+          "p2": "If you sent feedback through a website’s widget, contact the owner of that website first; we will help them handle your request. You can always write to us at {email}. We answer within 30 days.",
+          "p3": "You may also complain to a data protection authority, such as the one in your EU country or, in Ukraine, the Ukrainian Parliament Commissioner for Human Rights."
+        },
+        "children": {
+          "title": "Children",
+          "p1": "Bugping is not meant for children under 16, and we do not knowingly collect their data."
+        },
+        "changes": {
+          "title": "Changes to this policy",
+          "p1": "We publish changes on this page and update the date above. If a change significantly affects how we use your data, we will tell account owners before it takes effect."
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "intro": "These terms apply to your use of Bugping, the feedback and bug-report widget and dashboard on this website. By creating an account you accept them.",
+      "sections": {
+        "service": {
+          "title": "The service",
+          "p1": "Bugping lets you add a widget to your website so that visitors can send feedback with screenshots. Reports appear in your dashboard and can be delivered to Telegram or Discord."
+        },
+        "account": {
+          "title": "Your account",
+          "li1": "You must be at least 16 years old and able to enter into a contract.",
+          "li2": "Keep your sign-in email and connected accounts secure. You are responsible for what happens in your account."
+        },
+        "use": {
+          "title": "Acceptable use",
+          "p1": "Do not use Bugping to:",
+          "li1": "collect data you are not allowed to collect, or sensitive data such as passwords and payment details;",
+          "li2": "send spam, malware or unlawful content, including through Telegram or Discord;",
+          "li3": "attack, overload or reverse-engineer the service, or get around plan limits."
+        },
+        "visitors": {
+          "title": "Your visitors’ data",
+          "p1": "You are the controller of the feedback your visitors send. You must tell them about the widget in your own privacy policy and have a lawful basis to collect their feedback. We process it only on your behalf, as described in our Privacy Policy."
+        },
+        "plans": {
+          "title": "Plans and payments",
+          "p1": "The Free plan includes one project and 20 reports per month; we may change Free limits with notice. Pro is billed monthly until you cancel it. Lifetime is a one-time payment that keeps Pro features for as long as Bugping operates.",
+          "p2": "Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.",
+          "p3": "Prices are shown in the Pricing section. Paddle calculates and collects taxes at checkout."
+        },
+        "cancel": {
+          "title": "Cancellation",
+          "p1": "You can cancel a subscription at any time in Billing. Pro stays active until the end of the paid period. Refunds follow our Refund Policy."
+        },
+        "availability": {
+          "title": "Availability and changes",
+          "p1": "We work to keep Bugping running, but provide it “as is”, without a guarantee of uninterrupted availability. We may change or remove features. If we shut the service down, we will give account owners at least 30 days’ notice."
+        },
+        "liability": {
+          "title": "Liability",
+          "p1": "To the extent the law allows, we are not liable for indirect losses, lost profits or lost data, and our total liability is limited to what you paid us in the 12 months before the claim."
+        },
+        "termination": {
+          "title": "Suspension and termination",
+          "p1": "We may suspend or close accounts that break these terms or abuse the service or its delivery channels. You can delete your account at any time in the dashboard."
+        },
+        "law": {
+          "title": "Governing law",
+          "p1": "These terms are governed by the law of Ukraine. This does not take away the protection that consumer law in your country gives you."
+        },
+        "changes": {
+          "title": "Changes to these terms",
+          "p1": "We may update these terms; the date above shows the current version. If a change is significant, we will tell account owners before it takes effect."
+        }
+      }
+    },
+    "refund": {
+      "title": "Refund Policy",
+      "intro": "We want you to pay only for Bugping if it works for you.",
+      "sections": {
+        "window": {
+          "title": "Full refund within 14 days",
+          "p1": "You can get a full refund within 14 days of the first payment of a subscription or of a Lifetime purchase, no questions asked."
+        },
+        "after": {
+          "title": "After 14 days",
+          "p1": "A monthly subscription can be cancelled at any time and stays active until the end of the paid period. The current period is not refunded."
+        },
+        "how": {
+          "title": "How to ask for a refund",
+          "p1": "Reply to your Paddle receipt email, or write to us at {email} from the address you paid with. Refunds are processed by Paddle, our Merchant of Record, to the original payment method."
+        },
+        "effect": {
+          "title": "After a refund",
+          "p1": "Your account returns to the Free plan. Your projects and reports stay, and Free limits apply again."
+        }
+      }
+    }
   },
   "common": {
     "save": "Save",
