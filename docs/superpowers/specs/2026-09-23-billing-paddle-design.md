@@ -309,8 +309,10 @@ Made in launch wave 1c and the fixes before it. Where this section and §5–§1
   for their email gets `billing.noCustomer`. Changing the account email is not synchronised with Paddle (deferred; the
   app has no email change).
 - **Duplicate and refunded monthly subscriptions (§7).** After each subscription event the webhook cancels the
-  subscription when the user also has a paid Lifetime or another Pro-granting monthly subscription that is not
-  scheduled to cancel: `next_billing_period`, or `immediately` for a `past_due` one, which Paddle cannot schedule. A
+  subscription when that subscription is itself Pro-granting and not scheduled to cancel, and the user also has a paid
+  Lifetime or another Pro-granting monthly subscription that is not scheduled to cancel: `next_billing_period`, or
+  `immediately` for a `past_due` one, which Paddle is believed not to allow scheduling (see the sandbox check b in
+  `docs/deploy.md`). A
   full refund or a chargeback of a monthly payment cancels that subscription `immediately`; Paddle then sends
   `subscription.canceled`. The Lifetime purchase uses the same rule for the user's existing monthly subscriptions.
   `cancelSubscription` treats only `subscription_is_canceled_action_invalid` as success; other errors, including
@@ -332,7 +334,8 @@ Made in launch wave 1c and the fixes before it. Where this section and §5–§1
   processed one at a time; the lock is released at commit or rollback. Any error rolls the transaction back and the
   webhook answers 500, so Paddle retries. Paddle API calls run inside the transaction (a connection is held for up to
   the 10 s Paddle timeout). `adjustment.*` takes no lock: it writes a single Lifetime row guarded by
-  `paddle_occurred_at`. A Paddle cancel that succeeded is not undone by a later rollback; see the deferred item about a
+  `paddle_occurred_at`; a monthly refund or chargeback only calls Paddle to cancel the subscription, also without the
+  lock (idempotent, harmless). A Paddle cancel that succeeded is not undone by a later rollback; see the deferred item about a
   repeated next-period cancel in the follow-ups.
 - **Duplicates marked as cancelling (§7).** After a successful `next_billing_period` cancel (the duplicate rule and the
   Lifetime purchase) the webhook sets `cancel_at_period_end = true` on that row without touching `paddle_occurred_at`,

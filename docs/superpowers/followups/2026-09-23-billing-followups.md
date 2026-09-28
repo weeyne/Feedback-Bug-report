@@ -20,7 +20,7 @@
   cancellation guide says a `past_due` subscription cannot be changed. If Paddle refuses, the webhook paths that cancel
   it (a duplicate after Lifetime, a refund, a deleted profile) return 500 until the retries run out, while dunning keeps
   trying to charge the card. The same applies to account deletion for a `past_due` user. Reason for deferring: the owner
-  runs this in the sandbox; the steps are in `docs/deploy.md` ("Before going live: past_due check"). The same section
+  runs this in the sandbox; the steps are in `docs/deploy.md` ("Before going live: sandbox checks", check b). Check c in the same section
   records Paddle's error for cancelling a subscription that already has a scheduled cancellation.
 - **A second next-period cancel after a rolled-back transaction.** After a rollback, Paddle's retry may re-send
   `cancelSubscription(id, 'next_billing_period')` for a subscription that already has a scheduled cancel. Paddle's
