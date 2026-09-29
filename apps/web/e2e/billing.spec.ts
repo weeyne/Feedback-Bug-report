@@ -111,3 +111,33 @@ test('the pending portal tab is closed when there is no Paddle customer', async 
   await tab.waitForEvent('close');
   await expect(page.getByText(/No billing account yet|Платёжного аккаунта пока нет/)).toBeVisible();
 });
+
+test('billing highlights Pro as popular and reuses the landing plan wording', async ({ page }) => {
+  await page.request.post('/api/e2e-test/login', {
+    data: { email: `plans-${Date.now()}@e2e.dev` },
+  });
+  await page.goto('/app/billing');
+  const monthly = page.getByTestId('billing-card-monthly');
+  const lifetime = page.getByTestId('billing-card-lifetime');
+  await expect(monthly.getByTestId('billing-popular')).toHaveText('Popular');
+  await expect(lifetime.getByTestId('billing-popular')).toHaveCount(0);
+  await expect(monthly).toHaveClass(/(^|\s)border-primary(\s|$)/);
+  await expect(lifetime).not.toHaveClass(/(^|\s)border-primary(\s|$)/);
+  await expect(monthly).toContainText('Your own Telegram bot');
+  await expect(lifetime).toContainText('One payment, no subscription');
+});
+
+test('checkout names the ad blocker when Paddle.js cannot load', async ({ page }) => {
+  await page.route('**://cdn.paddle.com/**', (route) => route.abort());
+  await page.request.post('/api/e2e-test/login', {
+    data: { email: `blocked-${Date.now()}@e2e.dev` },
+  });
+  await page.goto('/app/billing');
+  // The failure lands asynchronously; retry the click until Paddle.js has been marked as failed.
+  await expect(async () => {
+    await page.getByTestId('billing-upgrade-monthly').click();
+    await expect(page.getByText(/ad blocker may be blocking Paddle/)).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass({ timeout: 15_000 });
+});

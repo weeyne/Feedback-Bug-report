@@ -28,7 +28,12 @@ test.beforeEach(async ({ page }) => {
 });
 
 /** Submits one piece of feedback through the widget on the e2e host page, as a visitor would. */
-async function submitFeedback(context: BrowserContext, key: string, message: string) {
+async function submitFeedback(
+  context: BrowserContext,
+  key: string,
+  message: string,
+  email?: string,
+) {
   const host = await context.newPage();
   await host.goto(`/e2e-host?key=${key}`);
   await host.locator('[data-bugping] .bp-trigger').click();
@@ -37,6 +42,7 @@ async function submitFeedback(context: BrowserContext, key: string, message: str
     timeout: 15_000,
   });
   await host.locator('.bp-message').fill(message);
+  if (email) await host.locator('.bp-email').fill(email);
   await host.waitForTimeout(2100); // bot guard
   await host.locator('.bp-send').click();
   await expect(host.locator('.bp-thanks')).toBeVisible();
@@ -70,7 +76,9 @@ test('onboarding: create a project, receive the first feedback, resolve it', asy
     'E2E: the cart button does nothing',
   );
   await page.getByTestId('feedback-resolve').click();
-  await expect(page.getByTestId('feedback-reopen')).toBeVisible();
+  // The only new report is gone from the list, so the panel closes.
+  await expect(page.getByTestId('feedback-empty')).toBeVisible();
+  await expect(page.getByTestId('feedback-detail')).toBeHidden();
   await page.getByTestId('filter-status-new').click();
   await expect(page.getByTestId('feedback-empty')).toBeVisible();
   await page.getByTestId('filter-status-resolved').click();
@@ -208,13 +216,163 @@ test('overview: recent feedback opens the detail panel; resolving updates the ne
   await expect(page.getByTestId('status-tab-new')).toContainText('1');
 
   await page.getByTestId('feedback-resolve').click();
-  await expect(page.getByTestId('feedback-reopen')).toBeVisible();
+  await expect(page.getByTestId('feedback-detail')).toBeHidden();
   await expect(page.getByTestId('status-tab-new')).not.toContainText('1');
 
   await page.getByTestId('status-tab-resolved').click();
   await expect(page).toHaveURL(/status=resolved/);
   await expect(page.getByTestId('feedback-row')).toHaveCount(1);
   await expect(page.getByTestId('feedback-row')).toContainText('the export button is broken');
+});
+
+test('small text gets a little word spacing but code blocks keep theirs', async ({ page }) => {
+  await login(page);
+  await createProject(page, 'E2E Spacing');
+  const spacing = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).wordSpacing);
+  expect(await spacing('[data-testid="install-snippet"]')).toMatch(/^(normal|0px)$/);
+  expect(await spacing('.text-xs:not(pre, pre *, .font-mono, .font-mono *)')).toBe('0.36px');
+});
+
+test('feedback actions read as actions in Russian and fit a phone', async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  const { key, projectId } = await createProject(page, 'E2E Actions');
+  await submitFeedback(context, key, 'E2E: the label check', 'visitor@example.com');
+  await page.goto('/app/account');
+  await page.getByTestId('locale-switcher').selectOption('ru');
+  await expect(page.getByRole('heading', { name: 'Аккаунт', exact: true })).toBeVisible();
+  await page.goto(`/app/p/${projectId}/feedback`);
+  await page.getByTestId('feedback-row').click();
+  const resolve = page.getByTestId('feedback-resolve');
+  await expect(resolve).toHaveText('Отметить решённым');
+  await resolve.click();
+  await expect(page.getByTestId('feedback-detail')).toBeHidden();
+  await page.goto(`/app/p/${projectId}/feedback?status=resolved`);
+  await page.getByTestId('feedback-row').click();
+  await expect(page.getByTestId('feedback-reopen')).toHaveText('Вернуть в новые');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('triage: resolving or archiving opens the next report; the last one closes the panel', async ({
+  page,
+  context,
+}) => {
+  await login(page);
+  const { key, projectId } = await createProject(page, 'E2E Triage');
+  await submitFeedback(context, key, 'E2E: triage first');
+  await submitFeedback(context, key, 'E2E: triage second');
+
+  await page.goto(`/app/p/${projectId}/feedback`);
+  const rows = page.getByTestId('feedback-row');
+  await expect(rows).toHaveCount(2);
+  // Newest first: "second" is on top, "first" below it.
+  await rows.first().click();
+  await expect(page.getByTestId('feedback-message')).toHaveText('E2E: triage second');
+
+  await page.getByTestId('feedback-resolve').click();
+  await expect(page.getByTestId('feedback-message')).toHaveText('E2E: triage first');
+  await expect(page).toHaveURL(/status=new&f=[0-9a-f-]+$/);
+  await expect(rows).toHaveCount(1);
+
+  await page.getByTestId('feedback-archive').click();
+  await expect(page.getByTestId('feedback-detail')).toBeHidden();
+  await expect(page.getByTestId('feedback-empty')).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]f=/);
+});
+
+test('delete: an in-app dialog confirms first, focuses Cancel, and then opens the next report', async ({
+  page,
+  context,
+}) => {
+  await login(page);
+  const { key, projectId } = await createProject(page, 'E2E Delete');
+  await submitFeedback(context, key, 'E2E: delete first');
+  await submitFeedback(context, key, 'E2E: delete second');
+
+  await page.goto(`/app/p/${projectId}/feedback`);
+  const rows = page.getByTestId('feedback-row');
+  await rows.first().click();
+  await expect(page.getByTestId('feedback-message')).toHaveText('E2E: delete second');
+
+  const dialog = page.getByTestId('feedback-delete-dialog');
+  await page.getByTestId('feedback-delete').click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('This can’t be undone.');
+  await expect(page.getByTestId('feedback-delete-cancel')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(rows).toHaveCount(2);
+
+  await page.getByTestId('feedback-delete').click();
+  await page.getByTestId('feedback-delete-confirm').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('feedback-message')).toHaveText('E2E: delete first');
+  await expect(rows).toHaveCount(1);
+});
+
+test('account and billing keep the last project nav and mark Account as current', async ({
+  page,
+}) => {
+  await login(page);
+  const { projectId } = await createProject(page, 'E2E Account Nav');
+  await page.goto(`/app/p/${projectId}`);
+  const nav = page.locator('aside');
+
+  // Client navigation: the shell remembers the project.
+  await nav.getByTestId('nav-account').click();
+  await expect(page).toHaveURL(/\/app\/account$/);
+  await expect(nav.getByTestId('nav-feedback')).toBeVisible();
+  await expect(nav.getByTestId('project-switcher')).toContainText('E2E Account Nav');
+  await expect(nav.getByTestId('nav-account')).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByTestId('nav-overview')).not.toHaveAttribute('aria-current', 'page');
+
+  // A hard load reads the cookie instead.
+  await page.goto('/app/account');
+  await expect(nav.getByTestId('nav-feedback')).toBeVisible();
+  await page.goto('/app/billing');
+  await expect(nav.getByTestId('nav-feedback')).toBeVisible();
+  await expect(nav.getByTestId('nav-account')).not.toHaveAttribute('aria-current', 'page');
+});
+
+test('settings: unsaved changes show an indicator and warn before leaving the page', async ({
+  page,
+}) => {
+  await login(page);
+  const { projectId } = await createProject(page, 'E2E Dirty');
+  await page.goto(`/app/p/${projectId}/settings`);
+  const indicator = page.getByTestId('settings-unsaved');
+  const warnsOnUnload = () =>
+    page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  await expect(indicator).toBeEmpty();
+  expect(await warnsOnUnload()).toBe(false);
+
+  await page.getByTestId('settings-name').fill('E2E Dirty renamed');
+  await expect(indicator).toHaveText('Unsaved changes');
+  expect(await warnsOnUnload()).toBe(true);
+
+  await page.getByTestId('settings-save').click();
+  await expect(indicator).toBeEmpty();
+  expect(await warnsOnUnload()).toBe(false);
+});
+
+test('integrations: a Free owner gets an upgrade link next to the own-bot inputs', async ({
+  page,
+}) => {
+  await login(page);
+  const { projectId } = await createProject(page, 'E2E Own Bot');
+  await page.goto(`/app/p/${projectId}/integrations`);
+  await expect(page.getByTestId('custom-token')).toBeDisabled();
+  await expect(page.getByTestId('custom-upgrade')).toHaveAttribute('href', '/app/billing');
 });
 
 test('theme: toggling switches the html class and persists across a reload', async ({ page }) => {
@@ -306,6 +464,28 @@ test.describe('mobile', () => {
     await expect(sheet.getByTestId('nav-overview')).toBeVisible();
     await expect(sheet.getByTestId('nav-feedback')).toBeVisible();
     await expect(sheet.getByTestId('theme-toggle')).toBeVisible();
+  });
+
+  test('the mobile menu on Account shows the nav of the project opened by client navigation', async ({
+    page,
+    context,
+  }) => {
+    await login(page);
+    const { projectId } = await createProject(page, 'E2E Mobile Account');
+    // A hard load with no cookie yet: the layout's prop is empty, so only shared state can help.
+    await context.clearCookies({ name: 'bp_project' });
+    await page.goto(`/app/p/${projectId}`);
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const sheet = page.locator('[data-slot="sheet-content"]');
+    await sheet.getByTestId('nav-account').click();
+    await expect(page).toHaveURL(/\/app\/account$/);
+
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await expect(sheet.getByTestId('nav-feedback')).toBeVisible();
+    await expect(sheet.getByTestId('nav-feedback')).toHaveAttribute(
+      'href',
+      new RegExp(`/app/p/${projectId}/feedback`),
+    );
   });
 });
 

@@ -7,7 +7,7 @@ import { FeedLayout } from '@/components/app/feedback/feed-layout';
 import { feedHref } from '@/components/app/feedback/feedback-filters';
 import { FeedbackList } from '@/components/app/feedback/feedback-list';
 import { requireUser } from '@/lib/auth/session';
-import { feedEmptyKind, type FeedEmptyKind } from '@/lib/dashboard/feed-view';
+import { feedEmptyKind, nextSelection, type FeedEmptyKind } from '@/lib/dashboard/feed-view';
 import {
   decodeCursor,
   encodeCursor,
@@ -67,6 +67,14 @@ export default async function FeedbackPage({
     ? await screenshotUrl(deps, user.id, selected.id)
     : null;
 
+  // Once a triage action moves the open report out of this list, the panel moves on to its
+  // neighbour (or closes when it was the last one). A report outside the list stays open.
+  const listIds = items.map((item) => item.id);
+  const afterHref =
+    selected && listIds.includes(selected.id)
+      ? keep({ f: nextSelection(listIds, selected.id) ?? undefined })
+      : undefined;
+
   const shownHidden = status === 'new' && !type && !cursor ? hidden : 0;
   // statusCounts sees exactly the rows `hasFeedback` would (both run as the user under RLS),
   // so their sum answers "does this project have any feedback" without another query.
@@ -114,6 +122,7 @@ export default async function FeedbackPage({
             feedback={selected}
             screenshot={screenshot}
             closeHref={keep({ f: undefined })}
+            afterHref={afterHref}
           />
         )
       }

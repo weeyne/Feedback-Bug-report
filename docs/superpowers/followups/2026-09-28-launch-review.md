@@ -81,23 +81,23 @@ Order of work: wave 1 blocks commercial launch (Paddle live, VPS move); later wa
 
 ## Wave 4 — polish, performance, debt
 
-UI / UX:
-- [ ] ✅ Page widths differ: Overview/Settings `max-w-5xl`, Install/Integrations/Billing `max-w-3xl`, Account
+UI / UX (done 2026-09-29, wave 4a; not taken: lastError texts and bot/notification locale):
+- [x] ✅ Page widths differ: Overview/Settings `max-w-5xl`, Install/Integrations/Billing `max-w-3xl`, Account
       `max-w-2xl`.
-- [ ] ✅ Deleting a report uses native `confirm()` (`components/app/feedback/feedback-actions.tsx:102`); use the in-app
+- [x] ✅ Deleting a report uses native `confirm()` (`components/app/feedback/feedback-actions.tsx:102`); use the in-app
       confirmation like project/account deletion.
-- [ ] ✅ Billing highlights Lifetime (`billing-panel.tsx:134`), the landing highlights Pro ("Popular"); align plan
+- [x] ✅ Billing highlights Lifetime (`billing-panel.tsx:134`), the landing highlights Pro ("Popular"); align plan
       names and wording.
-- [ ] ✅ Russian copy: `overview.notConnected` «Не подключён» vs `integrations.notConnected` «Не подключено»;
+- [x] ✅ Russian copy: `overview.notConnected` «Не подключён» vs `integrations.notConnected` «Не подключено»;
       `feedback.resolve` «Решено» is a state, not an action; «Дашборд» on the landing vs «панель» in integrations.
-- [ ] ✅ Paddle.js blocked by an ad blocker only logs to the console (`use-paddle.ts:27`); tell the user a blocker may
+- [x] ✅ Paddle.js blocked by an ad blocker only logs to the console (`use-paddle.ts:27`); tell the user a blocker may
       be the cause.
-- [ ] ✅ Default launcher text is English `'Feedback'` (DB default, `20260921000200_core_tables.sql:26`); default it
+- [x] ✅ Default launcher text is English `'Feedback'` (DB default, `20260921000200_core_tables.sql:26`); default it
       from the owner's locale.
-- [ ] ✅ Mobile nav `Sheet` has no `SheetTitle` (`components/app/mobile-nav.tsx`).
-- [ ] ◐ Small text spacing: Manrope's space is 0.2 em (2.4 px at 12 px, measured on production). Words stay
+- [x] ✅ Mobile nav `Sheet` has no `SheetTitle` (`components/app/mobile-nav.tsx`).
+- [x] ◐ Small text spacing: Manrope's space is 0.2 em (2.4 px at 12 px, measured on production). Words stay
       readable in Chromium/Windows, but hints look tight; try `word-spacing: 0.03em` on `text-xs`. Not a collapse.
-- [ ] Not re-checked in the browser, taken from the review: `/app/billing` and `/app/account` drop project
+- [x] Not re-checked in the browser, taken from the review: `/app/billing` and `/app/account` drop project
       navigation; the detail panel stays open after Resolve/Archive (no "next report"); "Your own Telegram bot" shows
       disabled inputs without an upgrade link; Settings has one Save button, no unsaved-changes guard, and a 420 px
       empty preview on mobile; integration `lastError` texts and bot/notification texts are English only.

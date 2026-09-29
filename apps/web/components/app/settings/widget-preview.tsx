@@ -1,7 +1,8 @@
 'use client';
 
 import type { WidgetConfig } from '@bugping/shared';
-import { useEffect, useRef } from 'react';
+import { cn } from 'cn';
+import { useEffect, useRef, useState } from 'react';
 
 interface PreviewHandle {
   destroy(): void;
@@ -31,6 +32,7 @@ const REMOUNT_DEBOUNCE_MS = 250;
 export function WidgetPreview({ config }: { config: WidgetConfig }) {
   const ref = useRef<HTMLDivElement>(null);
   const handleRef = useRef<PreviewHandle | null>(null);
+  const [mounted, setMounted] = useState(false);
   const key = JSON.stringify(config);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function WidgetPreview({ config }: { config: WidgetConfig }) {
         .then((mod) => {
           if (cancelled || !ref.current) return;
           handleRef.current = mod.mountWidget(ref.current, config, { preview: true });
+          setMounted(true);
         })
         .catch((error: unknown) => console.error('[preview]', error));
 
@@ -94,7 +97,11 @@ export function WidgetPreview({ config }: { config: WidgetConfig }) {
     <div
       ref={ref}
       data-testid="widget-preview"
-      className="relative min-h-[420px] rounded-lg border bg-muted/40 p-4"
+      className={cn(
+        'relative rounded-lg border bg-muted/40 p-4 md:min-h-[420px]',
+        // Below md the box only takes its height once the widget is in it.
+        mounted && 'min-h-[420px]',
+      )}
     />
   );
 }

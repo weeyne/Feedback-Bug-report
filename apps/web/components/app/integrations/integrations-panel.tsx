@@ -22,6 +22,7 @@ import {
   sendTestAction,
 } from '@/app/app/actions';
 import { EmptyState } from '@/components/app/empty-state';
+import { AppLink } from '@/components/app/link-prefetch';
 import { useVisibleInterval } from '@/components/app/use-visible-interval';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -353,6 +354,15 @@ export function IntegrationsPanel(props: {
             </Button>
           </fieldset>
         </form>
+        {!props.pro && (
+          <AppLink
+            href="/app/billing"
+            data-testid="custom-upgrade"
+            className={cn(buttonVariants({ size: 'sm' }), 'self-start font-semibold')}
+          >
+            {t('integrations.upgrade')}
+          </AppLink>
+        )}
       </IntegrationCard>
 
       <IntegrationCard

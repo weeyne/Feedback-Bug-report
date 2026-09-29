@@ -3,7 +3,7 @@
 import { CUSTOM_CSS_MAX_BYTES, buildBadgeUrl, type WidgetConfig } from '@bugping/shared';
 import { Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { SectionCard } from '@/components/app/page-header';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,12 @@ import type { SettingsInput } from '@/lib/dashboard/settings';
 import { WidgetPreview } from './widget-preview';
 
 const LOCALE_NAMES = { en: 'English', ru: 'Русский', uk: 'Українська', es: 'Español' } as const;
+
+const parseOrigins = (text: string) =>
+  text
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 export function SettingsForm({
   project,
@@ -41,6 +47,17 @@ export function SettingsForm({
     customCss: project.custom_css ?? '',
   });
   const [originsText, setOriginsText] = useState(project.allowed_origins.join('\n'));
+  // What is stored: the initial values, then whatever the last successful save wrote.
+  const [saved, setSaved] = useState(() =>
+    JSON.stringify({ ...form, allowedOrigins: parseOrigins(originsText) }),
+  );
+  const dirty = JSON.stringify({ ...form, allowedOrigins: parseOrigins(originsText) }) !== saved;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
   const set = <K extends keyof SettingsInput>(key: K, value: SettingsInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
   const cssBytes = utf8ByteLength(form.customCss);
@@ -56,13 +73,12 @@ export function SettingsForm({
 
   const save = () =>
     start(async () => {
-      const allowedOrigins = originsText
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const allowedOrigins = parseOrigins(originsText);
       const result = await updateProjectSettingsAction(project.id, { ...form, allowedOrigins });
-      if (result.ok) toast.success(t('settings.saved'));
-      else toast.error(t(result.error));
+      if (result.ok) {
+        setSaved(JSON.stringify({ ...form, allowedOrigins }));
+        toast.success(t('settings.saved'));
+      } else toast.error(t(result.error));
     });
 
   const select =
@@ -119,6 +135,9 @@ export function SettingsForm({
                 onChange={(e) => set('triggerText', e.target.value)}
                 data-testid="settings-trigger"
               />
+              <p className="text-xs text-muted-foreground" data-testid="settings-trigger-hint">
+                {t('settings.triggerHint')}
+              </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -221,7 +240,14 @@ export function SettingsForm({
         </fieldset>
       </SectionCard>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-4">
+        <span
+          role="status"
+          className="text-sm text-muted-foreground"
+          data-testid="settings-unsaved"
+        >
+          {dirty && t('settings.unsaved')}
+        </span>
         <Button
           type="submit"
           size="lg"

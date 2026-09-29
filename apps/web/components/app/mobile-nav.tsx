@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { Menu } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 /** The mobile menu: the sidebar content in a sheet that closes after navigating. */
 export function MobileNav({ label, children }: { label: string; children: ReactNode }) {
@@ -30,6 +30,7 @@ export function MobileNav({ label, children }: { label: string; children: ReactN
         side="left"
         className="w-64 overflow-y-auto border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
       >
+        <SheetTitle className="sr-only">{label}</SheetTitle>
         {children}
       </SheetContent>
     </Sheet>

@@ -42,3 +42,13 @@ export function replyHref(email: string, subject: string): string {
   const to = encodeURIComponent(email).replaceAll('%40', '@');
   return `mailto:${to}?subject=${encodeURIComponent(subject)}`;
 }
+
+/**
+ * The report to open once `currentId` leaves the list: the one below it, else the one above,
+ * else `null` (the list is empty or `currentId` is not in it).
+ */
+export function nextSelection(ids: readonly string[], currentId: string): string | null {
+  const index = ids.indexOf(currentId);
+  if (index === -1) return null;
+  return ids[index + 1] ?? ids[index - 1] ?? null;
+}

@@ -119,6 +119,17 @@ function pasteEvent(items: object[]) {
 }
 
 describe('mountWidget', () => {
+  it('labels the launcher in the visitor language while the trigger text is the default', () => {
+    const { q } = setup({ config: { triggerText: 'Feedback', locale: 'ru' } });
+    expect(q('.bp-trigger')!.getAttribute('aria-label')).toBe('Обратная связь');
+    expect(q('.bp-trigger')!.getAttribute('title')).toBe('Обратная связь');
+  });
+
+  it('keeps a custom trigger text as typed in any locale', () => {
+    const { q } = setup({ config: { triggerText: 'Help us', locale: 'ru' } });
+    expect(q('.bp-trigger')!.getAttribute('aria-label')).toBe('Help us');
+  });
+
   it('renders an isolated host; the launcher is labelled with the trigger text', () => {
     const { handle, q } = setup({ config: { triggerText: '<img src=x onerror=alert(1)>' } });
     expect(handle.host.hasAttribute('data-bugping')).toBe(true);
