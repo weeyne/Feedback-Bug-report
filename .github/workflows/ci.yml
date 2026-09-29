@@ -63,6 +63,6 @@ jobs:
       - run: pnpm db:test
         env:
           DB_TEST_TARGET: supabase
-      - run: pnpm --filter @bugping/web test
+      - run: pnpm --filter @bugping/web test:db
         env:
           DB_TEST_TARGET: supabase
