@@ -1,0 +1,46 @@
+{
+  // oxlint, not ESLint: typescript-eslint refuses TypeScript 7 (it needs the JS compiler API that TS 7 dropped).
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "nextjs", "jsx-a11y", "oxc", "unicorn", "import"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/.turbo/**",
+    "**/playwright-report/**",
+    "**/test-results/**",
+    "**/next-env.d.ts",
+    "apps/web/public/w/**"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "nextjs/no-img-element": "error",
+    "no-var": "error",
+    "typescript/no-explicit-any": "error",
+    // Effect-driven state is deliberate here (hydration-safe mounted flags, rAF count-up, sticky signed URLs).
+    "react/set-state-in-effect": "off",
+    // role="status" / "progressbar" / "img" on divs and svgs is intentional; <output>/<progress> would change styling and semantics.
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "overrides": [
+    {
+      // Loose typing and hand-written markup are fine in tests.
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/test/**"],
+      "rules": { "typescript/no-explicit-any": "off", "nextjs/no-html-link-for-pages": "off" }
+    },
+    {
+      // next/og (satori) renders plain <img>; next/image does not work inside ImageResponse.
+      "files": ["apps/web/app/opengraph-image.tsx", "apps/web/app/apple-icon.tsx"],
+      "rules": { "nextjs/no-img-element": "off" }
+    },
+    {
+      // shadcn primitives take htmlFor/children from the caller.
+      "files": ["apps/web/components/ui/**"],
+      "rules": { "jsx-a11y/label-has-associated-control": "off" }
+    }
+  ]
+}

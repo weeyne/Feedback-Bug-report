@@ -72,7 +72,6 @@ describe('messages', () => {
       // overload resolution can't narrow the values type here; the dummy
       // values above are a superset of every ICU argument name in use.
       // `t.markup` also formats rich-text tags (e.g. `<em>` in landing.hero.title).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       t.markup(key as any, { ...dummyValues, em: (chunks) => chunks });
     }
 

@@ -48,7 +48,10 @@ export default async function FeedbackPage({
     if (type) next.set('type', type);
     next.set('status', status);
     if (query.before) next.set('before', query.before);
-    for (const [k, v] of Object.entries(extra)) v === undefined ? next.delete(k) : next.set(k, v);
+    for (const [k, v] of Object.entries(extra)) {
+      if (v === undefined) next.delete(k);
+      else next.set(k, v);
+    }
     return `${base}?${next.toString()}`;
   };
 

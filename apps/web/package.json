@@ -11,6 +11,7 @@
     "dev": "pnpm --filter @bugping/widget build && pnpm copy-widget && next dev",
     "build": "pnpm copy-widget && next build",
     "start": "next start",
+    "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",

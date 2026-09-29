@@ -61,6 +61,7 @@ export default async function DemoDashboardPage({
     site: requestHeaders.get('sec-fetch-site'),
   });
   const report = decodeDemoReport(trusted, locale);
+  // eslint-disable-next-line react/purity -- async server component, evaluated once per request
   const { item, detail } = toFeedbackDetail(report, { now: new Date(), describe: describeAgent });
   const limit = ENTITLEMENTS.free.monthlySubmissions;
   const usage = { used: 1, limit, pro: false };

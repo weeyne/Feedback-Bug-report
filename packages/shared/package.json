@@ -9,6 +9,7 @@
     "./brand": "./src/brand.ts"
   },
   "scripts": {
+    "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
