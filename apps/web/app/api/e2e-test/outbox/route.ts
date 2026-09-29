@@ -1,13 +1,13 @@
 import { getDeps } from '@/lib/deps';
-import { getEnv } from '@/lib/env';
 import { json } from '@/lib/http';
 import type { TestModeDeps } from '@/lib/test-mode';
+import { testModeEnabled } from '@/lib/test-mode-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 async function testDeps(): Promise<TestModeDeps | null> {
-  if (getEnv().BUGPING_TEST_MODE !== '1') return null;
+  if (!testModeEnabled()) return null;
   return (await getDeps()) as TestModeDeps;
 }
 

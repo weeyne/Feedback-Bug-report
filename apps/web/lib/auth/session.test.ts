@@ -1,10 +1,8 @@
 import { cookies } from 'next/headers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getEnv } from '../env';
 import { getSessionUser, parseE2eUser } from './session';
 import { createSupabaseServerClient } from './supabase-server';
 
-vi.mock('../env', () => ({ getEnv: vi.fn() }));
 vi.mock('./supabase-server', () => ({ createSupabaseServerClient: vi.fn() }));
 vi.mock('next/headers', () => ({ cookies: vi.fn() }));
 
@@ -33,7 +31,7 @@ describe('getSessionUser', () => {
 
   it('trusts the e2e cookie in test mode outside production', async () => {
     vi.stubEnv('NODE_ENV', 'test');
-    vi.mocked(getEnv).mockReturnValue({ BUGPING_TEST_MODE: '1' } as ReturnType<typeof getEnv>);
+    vi.stubEnv('BUGPING_TEST_MODE', '1');
     const raw = JSON.stringify({ id: '8c0e2f36-3c5e-4f63-9d5b-0a4d1b1f6a10', email: 'a@b.co' });
     vi.mocked(cookies).mockResolvedValue({
       get: () => ({ name: 'e2e_user', value: raw }),
@@ -48,7 +46,7 @@ describe('getSessionUser', () => {
 
   it('ignores the e2e cookie in production even when BUGPING_TEST_MODE=1', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.mocked(getEnv).mockReturnValue({ BUGPING_TEST_MODE: '1' } as ReturnType<typeof getEnv>);
+    vi.stubEnv('BUGPING_TEST_MODE', '1');
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getClaims: async () => ({ data: null }) },
     } as unknown as Awaited<ReturnType<typeof createSupabaseServerClient>>);

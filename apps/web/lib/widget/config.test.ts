@@ -84,7 +84,9 @@ describe('handleConfig', () => {
             env: { NEXT_PUBLIC_APP_URL: 'https://app.example' },
             after: (t) => void tasks.push(t()),
           },
-          new Request(`https://bugping.app/api/v1/widget/config?key=${project.public_key}`),
+          new Request(`https://bugping.app/api/v1/widget/config?key=${project.public_key}`, {
+            headers: { origin: 'https://host.example' },
+          }),
         );
         await Promise.all(tasks);
         const [row] = await db.query<{ seen: boolean }>(
@@ -92,6 +94,27 @@ describe('handleConfig', () => {
           [project.id],
         );
         expect(row!.seen).toBe(true);
+      }));
+
+    it('serves a request without Origin but does not mark the project as seen', () =>
+      withTx(async (db) => {
+        const project = await projectWithSettings(db, false);
+        const tasks: Array<Promise<void>> = [];
+        const res = await handleConfig(
+          {
+            db,
+            env: { NEXT_PUBLIC_APP_URL: 'https://app.example' },
+            after: (t) => void tasks.push(t()),
+          },
+          new Request(`https://bugping.app/api/v1/widget/config?key=${project.public_key}`),
+        );
+        expect(res.status).toBe(200);
+        expect(tasks).toHaveLength(0);
+        const [row] = await db.query<{ seen: boolean }>(
+          'select widget_seen_at is not null as seen from public.projects where id = $1',
+          [project.id],
+        );
+        expect(row!.seen).toBe(false);
       }));
 
     it('rewrites at most once per hour', () =>
@@ -133,7 +156,9 @@ describe('handleConfig', () => {
         } as typeof db;
         const res = await handleConfig(
           { db: flaky, env: { NEXT_PUBLIC_APP_URL: 'https://app.example' }, after: failingAfter },
-          new Request(`https://bugping.app/api/v1/widget/config?key=${project.public_key}`),
+          new Request(`https://bugping.app/api/v1/widget/config?key=${project.public_key}`, {
+            headers: { origin: 'https://host.example' },
+          }),
         );
         expect(res.status).toBe(200);
       });

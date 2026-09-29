@@ -25,7 +25,15 @@ declare global {
 }
 
 export function getDeps(): Promise<AppDeps> {
-  return (globalThis.__bugpingDeps ??= buildDeps());
+  if (!globalThis.__bugpingDeps) {
+    const pending = buildDeps();
+    globalThis.__bugpingDeps = pending;
+    // A failed build must not stick for the life of the process: the next call tries again.
+    pending.catch(() => {
+      if (globalThis.__bugpingDeps === pending) globalThis.__bugpingDeps = undefined;
+    });
+  }
+  return globalThis.__bugpingDeps;
 }
 
 async function buildDeps(): Promise<AppDeps> {

@@ -1,3 +1,5 @@
+import { testModeEnabled } from '@/lib/test-mode-guard';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +26,7 @@ const HOST_PAGE = `<!doctype html>
 
 /** E2E only: a host page that embeds the widget. 404 unless test mode is on (never in production). */
 export function GET(): Response {
-  if (process.env.BUGPING_TEST_MODE !== '1' || process.env.NODE_ENV === 'production') {
+  if (!testModeEnabled()) {
     return new Response('Not found', { status: 404 });
   }
   return new Response(HOST_PAGE, {

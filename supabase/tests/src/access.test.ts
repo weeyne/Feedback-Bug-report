@@ -315,13 +315,13 @@ describe('storage and realtime', () => {
       ]);
     }));
 
-  it('publishes feedback changes to realtime', () =>
+  it('publishes no public tables to realtime', () =>
     withTx(async (db) => {
       const rows = await db.query(
         `select tablename from pg_publication_tables
          where pubname = 'supabase_realtime' and schemaname = 'public'`,
       );
-      expect(rows).toEqual([{ tablename: 'feedback' }]);
+      expect(rows).toEqual([]);
     }));
 });
 

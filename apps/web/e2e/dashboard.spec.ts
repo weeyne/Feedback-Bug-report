@@ -176,7 +176,10 @@ test('overview: the widget step completes and the connection shows seen after th
   await expect(page.getByTestId('checklist-widget')).toHaveAttribute('data-done', 'false');
   await expect(page.getByTestId('connection-widget')).toHaveAttribute('data-ok', 'false');
 
-  const config = await page.request.get(`/api/v1/widget/config?key=${key}`);
+  // A browser on the customer's site sends Origin; only such requests count as "widget seen".
+  const config = await page.request.get(`/api/v1/widget/config?key=${key}`, {
+    headers: { origin: 'https://shop.example' },
+  });
   expect(config.ok()).toBe(true);
 
   // markWidgetSeen runs in an `after()` callback that fires once the response is sent, so the
