@@ -20,7 +20,6 @@ export interface AppDeps {
 // invoked from a page). Caching on `globalThis` keeps a single instance across every graph, the
 // same pattern used for database-client singletons that must survive Next.js dev reloads.
 declare global {
-  // eslint-disable-next-line no-var -- `var` is required for global augmentation
   var __bugpingDeps: Promise<AppDeps> | undefined;
 }
 

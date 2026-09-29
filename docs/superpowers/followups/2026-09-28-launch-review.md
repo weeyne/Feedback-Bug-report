@@ -125,14 +125,19 @@ Product backlog:
 - [ ] Decide the downgrade policy for extra projects; team features, search, export, email channel, Slack/Jira.
 
 Tech debt / tests:
-- [ ] ✅ No ESLint (no config, no script, not in CI); 5 files carry `eslint-disable` comments.
-- [ ] ✅ Unused UI components: `badge`, `select`, `separator`, `skeleton`, `tooltip`.
-- [ ] ✅ Every web unit test starts the PGlite harness (`apps/web/test/setup.ts`); split pure unit tests out.
-- [ ] ✅ `adoptStyles()` duplicated in `packages/widget/src/ui/mount.ts:52` and `src/annotate/editor.ts:37`.
-- [ ] ✅ Prices are typed into five message keys per locale (`landing.pricing.proPrice`, `lifetimePrice`,
-      `billing.monthly`, `billing.lifetime`, `billing.switchLifetime`); use one constant.
-- [ ] Web E2E runs only against `next dev`; add a smoke suite against `next build && next start`. No DOM test
-      environment in `apps/web`.
+- [x] ✅ No ESLint (no config, no script, not in CI); 5 files carry `eslint-disable` comments. Wave 4c: oxlint
+      (`.oxlintrc.json`, `pnpm lint`, CI) — typescript-eslint does not support TypeScript 7.
+- [x] ✅ Unused UI components: `badge`, `select`, `separator`, `skeleton`, `tooltip`. Wave 4c: removed all but
+      `skeleton` (used by the loading screens since wave 2).
+- [x] ✅ Every web unit test starts the PGlite harness (`apps/web/test/setup.ts`); split pure unit tests out. Wave 4c:
+      Vitest projects `unit` / `db` (`*.db.test.ts`, `test:db`); web tests 171 s → 55 s locally.
+- [x] ✅ `adoptStyles()` duplicated in `packages/widget/src/ui/mount.ts:52` and `src/annotate/editor.ts:37`.
+      Wave 4c: one `src/ui/adopt-styles.ts`.
+- [x] ✅ Prices are typed into five message keys per locale (`landing.pricing.proPrice`, `lifetimePrice`,
+      `billing.monthly`, `billing.lifetime`, `billing.switchLifetime`); use one constant. Wave 4c: `lib/pricing.ts`.
+- [x] Web E2E runs only against `next dev`; add a smoke suite against `next build && next start`. No DOM test
+      environment in `apps/web`. Wave 4c: `pnpm --filter @bugping/web e2e:smoke` (in the CI `check` job); DOM
+      unit environment still absent.
 
 Landing (stage 4), for the owner:
 - [ ] ✅ Copy was written without the brainstorm's exact wording; compare with the approved texts in

@@ -9,6 +9,7 @@
     "./brand": "./src/brand.ts"
   },
   "scripts": {
+    "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives --deny-warnings .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

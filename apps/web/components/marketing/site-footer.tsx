@@ -42,6 +42,7 @@ export async function SiteFooter() {
           </nav>
         </div>
         <div className="flex flex-col-reverse gap-4 border-t pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          {/* eslint-disable-next-line react/purity -- server component, rendered once per request */}
           <span>© {new Date().getFullYear()} Bugping</span>
           <div className="flex items-center gap-4">
             <LocaleSwitcher publicPage />

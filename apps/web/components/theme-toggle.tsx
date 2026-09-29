@@ -23,6 +23,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   const t = useTranslations('common');
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react/set-state-in-effect -- hydration-safe mounted flag; the server renders a placeholder
   useEffect(() => setMounted(true), []);
   // useId output contains ':' which is invalid inside url(#...); keep only safe characters.
   const maskId = `bp-moon-mask-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;

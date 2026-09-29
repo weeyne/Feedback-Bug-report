@@ -21,6 +21,7 @@ export function CountUp({ value, durationMs = 400 }: { value: number; durationMs
   useEffect(() => {
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduce) {
+      // eslint-disable-next-line react/set-state-in-effect -- reduced motion: show the final value directly
       setDisplay(value);
       return;
     }

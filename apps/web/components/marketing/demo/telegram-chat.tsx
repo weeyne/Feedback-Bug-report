@@ -183,7 +183,7 @@ function Report({ caption, image, time }: Pick<TelegramChatProps, 'caption' | 'i
       )}
     >
       {image && (
-        // eslint-disable-next-line @next/next/no-img-element
+        // eslint-disable-next-line @next/next/no-img-element -- decorative demo image, plain <img>
         <img
           src={image}
           alt=""

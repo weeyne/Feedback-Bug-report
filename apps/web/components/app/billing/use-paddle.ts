@@ -12,6 +12,7 @@ export function usePaddle(opts: {
   const [paddle, setPaddle] = useState<Paddle | null>(null);
   const [failed, setFailed] = useState(false);
   const onCompleted = useRef(opts.onCompleted);
+  // eslint-disable-next-line react/refs -- latest-callback ref: the Paddle event handler must see the newest onCompleted
   onCompleted.current = opts.onCompleted;
   useEffect(() => {
     let cancelled = false;

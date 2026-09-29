@@ -39,6 +39,7 @@ export interface SubmitDeps {
 /** Recursively strips U+0000 and replaces lone surrogates (both rejected by Postgres text/jsonb). */
 function stripNul<T>(value: T): T {
   if (typeof value === 'string') {
+    // eslint-disable-next-line no-control-regex -- matching U+0000 is the point
     return value.replace(/\u0000/g, '').toWellFormed() as unknown as T;
   }
   if (Array.isArray(value)) {

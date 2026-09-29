@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { PRICES } from '@/lib/pricing';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -44,9 +45,9 @@ export function UpgradeButtons() {
         >
           {pricing('popular')}
         </span>
-        {dialog(t('monthly'), 'billing-upgrade-monthly', true)}
+        {dialog(t('monthly', { price: PRICES.proMonthly }), 'billing-upgrade-monthly', true)}
       </div>
-      {dialog(t('lifetime'), 'billing-upgrade-lifetime', false)}
+      {dialog(t('lifetime', { price: PRICES.lifetime }), 'billing-upgrade-lifetime', false)}
     </div>
   );
 }
