@@ -1,17 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { Menu } from 'lucide-react';
 import { cn } from 'cn';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Link as LocalizedLink } from '@/i18n/navigation';
 
-export type NavItem = { href: string; label: string };
+/** A landing anchor, localized to the page's locale (`/ru#pricing`). */
+export type NavItem = { href: ComponentProps<typeof LocalizedLink>['href']; label: string };
 
-/** The landing's mobile menu (below `md`): nav links, the theme toggle and "Log in". */
+/**
+ * The landing's mobile menu (below `md`): nav links, the theme toggle and "Log in" (a plain
+ * `/login` link: the login page has no localized URL).
+ */
 export function LandingMenu({
   items,
   menuLabel,
@@ -22,7 +27,7 @@ export function LandingMenu({
   items: NavItem[];
   menuLabel: string;
   navLabel: string;
-  logIn: NavItem;
+  logIn: { href: string; label: string };
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -46,14 +51,14 @@ export function LandingMenu({
         </div>
         <nav aria-label={navLabel} className="flex flex-col gap-1 px-3 pt-2">
           {items.map((item) => (
-            <Link
-              key={item.href}
+            <LocalizedLink
+              key={item.label}
               href={item.href}
               onClick={close}
               className="rounded-lg px-3 py-2.5 text-base font-medium text-foreground transition-colors duration-200 hover:bg-muted"
             >
               {item.label}
-            </Link>
+            </LocalizedLink>
           ))}
         </nav>
         <div className="mt-auto flex items-center justify-between gap-3 border-t p-4">

@@ -8,6 +8,7 @@ import {
   dashboardSrc,
   SCENE_LABEL_KEY,
   sceneUrl,
+  shopSrc,
 } from './stage-model';
 
 const ORIGIN = 'https://bugping.app';
@@ -52,10 +53,16 @@ describe('scene chrome', () => {
     expect(appHost('not a url')).toBe('not a url');
   });
 
-  it('formats clock time and the dashboard src', () => {
+  it('formats clock time', () => {
     expect(clockTime(new Date(2026, 8, 24, 9, 5))).toBe('09:05');
     expect(clockTime(new Date(2026, 8, 24, 21, 30))).toBe('21:30');
-    expect(dashboardSrc('abc_-1')).toBe('/demo/dashboard?r=abc_-1');
+  });
+
+  it('builds the iframe URLs in the landing locale', () => {
+    expect(dashboardSrc('ru', 'abc_-1')).toBe('/demo/dashboard?r=abc_-1&lang=ru');
+    expect(dashboardSrc('en')).toBe('/demo/dashboard?lang=en');
+    expect(shopSrc('ru')).toBe('/demo/shop?lang=ru');
+    expect(shopSrc('en', { staticFrame: true })).toBe('/demo/shop?static=1&lang=en');
   });
 });
 

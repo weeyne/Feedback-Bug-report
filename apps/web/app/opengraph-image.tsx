@@ -1,10 +1,11 @@
 import { ImageResponse } from 'next/og';
 import { ladybugDetailedSvg } from '@/components/brand/ladybug-svg';
+import { OG_IMAGE_ALT, OG_IMAGE_CONTENT_TYPE, OG_IMAGE_SIZE } from '@/lib/og';
 import en from '@/messages/en.json';
 
-export const alt = 'Bugping';
-export const size = { width: 1200, height: 630 };
-export const contentType = 'image/png';
+export const alt = OG_IMAGE_ALT;
+export const size = OG_IMAGE_SIZE;
+export const contentType = OG_IMAGE_CONTENT_TYPE;
 
 /** Manrope 800 subset for the given text; null when Google Fonts is unreachable (then the default font is used). */
 async function manrope(text: string): Promise<ArrayBuffer | null> {

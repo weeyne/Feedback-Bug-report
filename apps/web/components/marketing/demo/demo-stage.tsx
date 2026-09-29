@@ -39,12 +39,10 @@ import {
   canvasScale,
   classifyStageMessage,
   clockTime,
-  DASHBOARD_PATH,
   dashboardSrc,
   SCENE_LABEL_KEY,
   sceneUrl,
-  SHOP_PATH,
-  SHOP_STATIC_PATH,
+  shopSrc,
 } from './stage-model';
 import { TelegramChat } from './telegram-chat';
 
@@ -279,7 +277,7 @@ function LiveStage({ runtime, locale, host, loop, active, onFallback, onDone }: 
         return new Promise((resolve) => {
           screenshot = report.screenshot;
           onDashboardReady = resolve;
-          const src = dashboardSrc(runtime.encode(report.payload));
+          const src = dashboardSrc(locale, runtime.encode(report.payload));
           setDashboard((current) => ({ key: (current?.key ?? 0) + 1, src }));
         });
       },
@@ -385,7 +383,7 @@ function LiveStage({ runtime, locale, host, loop, active, onFallback, onDone }: 
         <iframe
           key={shopKey}
           ref={shopRef}
-          src={SHOP_PATH}
+          src={shopSrc(locale)}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
           tabIndex={-1}
@@ -519,7 +517,7 @@ function StaticFrames({
     <div data-testid="demo-static" className="grid gap-6 md:grid-cols-2">
       <div className="md:col-span-2">
         <BrowserFrame scene="site" host={host}>
-          {iframe(SHOP_STATIC_PATH, 'Nova Shop', shopRef)}
+          {iframe(shopSrc(locale, { staticFrame: true }), 'Nova Shop', shopRef)}
         </BrowserFrame>
       </div>
       <BrowserFrame scene="telegram" host={host}>
@@ -528,7 +526,7 @@ function StaticFrames({
         )}
       </BrowserFrame>
       <BrowserFrame scene="dashboard" host={host}>
-        {iframe(DASHBOARD_PATH, 'Bugping', dashboardRef)}
+        {iframe(dashboardSrc(locale), 'Bugping', dashboardRef)}
       </BrowserFrame>
     </div>
   );

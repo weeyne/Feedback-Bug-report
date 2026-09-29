@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Audience } from '@/components/marketing/landing/audience';
 import { AuthorNote } from '@/components/marketing/landing/author-note';
 import { Facts } from '@/components/marketing/landing/facts';
@@ -8,7 +9,16 @@ import { Hero } from '@/components/marketing/landing/hero';
 import { HowItWorks } from '@/components/marketing/landing/how-it-works';
 import { Pricing } from '@/components/marketing/landing/pricing';
 import { OwnWidget } from '@/components/marketing/own-widget';
+import { pageLocale, publicPageMetadata } from '@/i18n/public-metadata';
 import { getPublicEnv } from '@/lib/public-env';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  return publicPageMetadata('/', await pageLocale(params));
+}
 
 export default function LandingPage() {
   const { appUrl, bugpingProjectKey } = getPublicEnv();

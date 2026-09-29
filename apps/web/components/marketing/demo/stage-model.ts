@@ -1,3 +1,4 @@
+import type { AppLocale } from '@/i18n/locale';
 import type { DemoScene } from './director';
 import { DEMO_MESSAGE, DEMO_SHOP_URL, isDemoMessage } from './protocol';
 
@@ -51,18 +52,23 @@ export function clockTime(date: Date): string {
 }
 
 /*
- * The demo iframe URLs carry no `?lang=` / `?theme=`: they are same-origin with the landing, so
- * they already render in the landing's locale (next-intl reads the same locale cookie on the
- * server) and theme (next-themes reads the same localStorage key, and its `storage` event
- * listener follows a theme switch on the landing live).
+ * The demo iframe URLs carry the landing's locale as `?lang=`: the landing's locale comes from its
+ * URL (`/ru`), which the demo routes do not have, and a first-time visitor or a crawler has no
+ * locale cookie yet (the proxy validates `lang` and renders the demo page in it). No `?theme=`:
+ * next-themes reads the same localStorage key, and its `storage` event listener follows a theme
+ * switch on the landing live.
  */
 export const SHOP_PATH = '/demo/shop';
-export const SHOP_STATIC_PATH = '/demo/shop?static=1';
 export const DASHBOARD_PATH = '/demo/dashboard';
 
-/** The scene-3 iframe for an encoded report (`encodeDemoReport`). */
-export function dashboardSrc(encodedReport: string): string {
-  return `${DASHBOARD_PATH}?r=${encodedReport}`;
+/** The scene-1 store iframe; `staticFrame` is the reduced-motion still (`?static=1`). */
+export function shopSrc(locale: AppLocale, { staticFrame = false } = {}): string {
+  return `${SHOP_PATH}?${staticFrame ? 'static=1&' : ''}lang=${locale}`;
+}
+
+/** The scene-3 iframe for an encoded report (`encodeDemoReport`), or the fixture report. */
+export function dashboardSrc(locale: AppLocale, encodedReport?: string): string {
+  return `${DASHBOARD_PATH}?${encodedReport ? `r=${encodedReport}&` : ''}lang=${locale}`;
 }
 
 export type StageMessageKind = 'shop-ready' | 'submitted' | 'dashboard-ready';
