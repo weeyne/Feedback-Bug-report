@@ -135,6 +135,9 @@ export function SettingsForm({
                 onChange={(e) => set('triggerText', e.target.value)}
                 data-testid="settings-trigger"
               />
+              <p className="text-xs text-muted-foreground" data-testid="settings-trigger-hint">
+                {t('settings.triggerHint')}
+              </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">

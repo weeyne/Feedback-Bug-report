@@ -1,7 +1,7 @@
 import type { WidgetConfig } from '@bugping/shared';
 import { HEX_COLOR_PATTERN, type FeedbackType } from '@bugping/shared/constants';
 import type { IdentifiedUser } from '../context/metadata';
-import { MESSAGES, resolveLocale } from '../i18n';
+import { MESSAGES, launcherLabel, resolveLocale } from '../i18n';
 import { onAccent, tint } from './color';
 import { createDial, type Dial } from './dial';
 import { h } from './h';
@@ -126,7 +126,7 @@ export function mountWidget(
 
   const launcher = options.hideTrigger
     ? null
-    : createLauncher(config.triggerText, () => {
+    : createLauncher(launcherLabel(config.triggerText, locale), () => {
         if (dial?.isOpen()) {
           dial.close();
           setLauncherExpanded(false);

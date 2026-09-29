@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FEEDBACK_TYPES } from '@bugping/shared/constants';
-import { MESSAGES, resolveLocale } from './i18n';
+import { MESSAGES, launcherLabel, resolveLocale } from './i18n';
 
 describe('resolveLocale', () => {
   it('returns the configured locale when not auto', () => {
@@ -49,5 +49,19 @@ describe('MESSAGES', () => {
         expect(messages.placeholders[type]).toBeTruthy();
       }
     }
+  });
+});
+
+describe('launcherLabel', () => {
+  it('localizes the untouched default per locale', () => {
+    expect(launcherLabel('Feedback', 'en')).toBe('Feedback');
+    expect(launcherLabel('Feedback', 'ru')).toBe('Обратная связь');
+    expect(launcherLabel('Feedback', 'uk')).toBe("Зворотний зв'язок");
+    expect(launcherLabel('Feedback', 'es')).toBe('Comentarios');
+  });
+
+  it('uses a custom text as typed', () => {
+    expect(launcherLabel('Help us', 'ru')).toBe('Help us');
+    expect(launcherLabel('feedback', 'ru')).toBe('feedback');
   });
 });

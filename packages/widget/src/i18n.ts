@@ -24,6 +24,8 @@ export interface Messages {
   cards: Record<FeedbackType, string>;
   cardHints: Record<FeedbackType, string>;
   back: string;
+  /** Launcher label while the project keeps the default trigger text. */
+  launcher: string;
   shot: {
     label: string;
     capture: string;
@@ -75,6 +77,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       general: "We'll reply by email",
     },
     back: 'Back',
+    launcher: 'Feedback',
     shot: {
       label: 'Screenshot',
       capture: 'Capture this page',
@@ -132,6 +135,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       general: 'Ответим на email',
     },
     back: 'Назад',
+    launcher: 'Обратная связь',
     shot: {
       label: 'Скриншот',
       capture: 'Снять страницу',
@@ -189,6 +193,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       general: 'Відповімо на email',
     },
     back: 'Назад',
+    launcher: "Зворотний зв'язок",
     shot: {
       label: 'Скриншот',
       capture: 'Зняти сторінку',
@@ -246,6 +251,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       general: 'Te responderemos por email',
     },
     back: 'Atrás',
+    launcher: 'Comentarios',
     shot: {
       label: 'Captura',
       capture: 'Capturar la página',
@@ -283,4 +289,12 @@ export function resolveLocale(configured: WidgetLocale, languages: readonly stri
     if (SUPPORTED.includes(primary)) return primary;
   }
   return 'en';
+}
+
+/** The dashboard stores this for every project that never customised the label. */
+export const DEFAULT_TRIGGER_TEXT = 'Feedback';
+
+/** The untouched default is shown in the visitor's language; a custom text is used as typed. */
+export function launcherLabel(triggerText: string, locale: Locale): string {
+  return triggerText === DEFAULT_TRIGGER_TEXT ? MESSAGES[locale].launcher : triggerText;
 }

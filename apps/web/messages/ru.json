@@ -524,6 +524,7 @@
     "name": "Название проекта",
     "color": "Цвет акцента",
     "trigger": "Текст кнопки",
+    "triggerHint": "Оставьте “Feedback”, чтобы подпись показывалась на языке посетителя.",
     "position": "Положение",
     "position_bottom-right": "Справа внизу",
     "position_bottom-left": "Слева внизу",

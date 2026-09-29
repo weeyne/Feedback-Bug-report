@@ -524,6 +524,7 @@
     "name": "Project name",
     "color": "Accent color",
     "trigger": "Button text",
+    "triggerHint": "Leave “Feedback” to show a label in each visitor's language.",
     "position": "Position",
     "position_bottom-right": "Bottom right",
     "position_bottom-left": "Bottom left",
