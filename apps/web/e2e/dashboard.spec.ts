@@ -217,6 +217,35 @@ test('overview: recent feedback opens the detail panel; resolving updates the ne
   await expect(page.getByTestId('feedback-row')).toContainText('the export button is broken');
 });
 
+test('feedback actions read as actions in Russian and fit a phone', async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  const { key, projectId } = await createProject(page, 'E2E Actions');
+  await submitFeedback(context, key, 'E2E: the label check');
+  await page.goto('/app/account');
+  await page.getByTestId('locale-switcher').selectOption('ru');
+  await expect(page.getByRole('heading', { name: 'Аккаунт', exact: true })).toBeVisible();
+  await page.goto(`/app/p/${projectId}/feedback`);
+  await page.getByTestId('feedback-row').click();
+  const resolve = page.getByTestId('feedback-resolve');
+  await expect(resolve).toHaveText('Отметить решённым');
+  await resolve.click();
+  await expect(page.getByTestId('feedback-reopen')).toHaveText('Вернуть в новые');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('integrations: a Free owner gets an upgrade link next to the own-bot inputs', async ({
+  page,
+}) => {
+  await login(page);
+  const { projectId } = await createProject(page, 'E2E Own Bot');
+  await page.goto(`/app/p/${projectId}/integrations`);
+  await expect(page.getByTestId('custom-token')).toBeDisabled();
+  await expect(page.getByTestId('custom-upgrade')).toHaveAttribute('href', '/app/billing');
+});
+
 test('theme: toggling switches the html class and persists across a reload', async ({ page }) => {
   await login(page);
   await createProject(page, 'E2E Theme');

@@ -137,6 +137,19 @@
   section[id] {
     scroll-margin-top: 5rem;
   }
+  /* Small type reads tight; monospace keeps its own spacing. */
+  .text-xs,
+  [class~='text-[11px]'],
+  [class~='text-[10px]'] {
+    word-spacing: 0.03em;
+  }
+  code,
+  pre,
+  kbd,
+  samp,
+  .font-mono {
+    word-spacing: normal;
+  }
 }
 
 ::view-transition-old(root),

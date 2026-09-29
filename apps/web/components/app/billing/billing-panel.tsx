@@ -1,10 +1,11 @@
 'use client';
 
-import { Check, Infinity as InfinityIcon } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { cn } from 'cn';
 import { SectionCard } from '@/components/app/page-header';
 import { Button } from '@/components/ui/button';
 import { billingStatusAction, openPortalAction, startCheckoutAction } from '@/app/app/actions';
@@ -14,6 +15,11 @@ import { usePaddle } from './use-paddle';
 
 const POLL_MS = 2000;
 const POLL_LIMIT_MS = 60_000;
+
+const PLAN_CARDS = [
+  { key: 'pro', features: 5, testId: 'billing-card-monthly', featured: true },
+  { key: 'lifetime', features: 2, testId: 'billing-card-lifetime', featured: false },
+] as const;
 
 export function BillingPanel(props: {
   overview: BillingOverview;
@@ -26,7 +32,7 @@ export function BillingPanel(props: {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [activation, setActivation] = useState<'idle' | 'waiting' | 'slow'>('idle');
-  const paddle = usePaddle({
+  const { paddle, failed } = usePaddle({
     environment: props.environment,
     token: props.clientToken,
     onCompleted: () => {
@@ -51,7 +57,8 @@ export function BillingPanel(props: {
 
   const checkout = (plan: 'monthly' | 'lifetime') =>
     start(async () => {
-      if (!paddle) return void toast.error(t('billing.checkoutFailed'));
+      if (!paddle)
+        return void toast.error(t(failed ? 'billing.paddleBlocked' : 'billing.checkoutFailed'));
       const result = await startCheckoutAction(plan);
       if (!result.ok) return void toast.error(t(result.error));
       // The transaction already carries the server-resolved customer.
@@ -102,52 +109,53 @@ export function BillingPanel(props: {
   }
 
   if (overview.state === 'free') {
-    // One message, split into list items; items after the first start lowercase in the source.
-    const features = t('billing.features')
-      .split(' · ')
-      .map((f) => f.charAt(0).toLocaleUpperCase(locale) + f.slice(1));
     return (
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <SectionCard index={1} title={t('billing.monthly')} data-testid="billing-card-monthly">
-            <ul className="flex flex-1 flex-col gap-1.5 text-sm">
-              {features.map((feature) => (
-                <li key={feature} className="flex items-start gap-2">
-                  <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                  <span className="text-muted-foreground">{feature}</span>
-                </li>
-              ))}
-            </ul>
-            <Button
-              size="lg"
-              className="font-semibold"
-              disabled={pending}
-              onClick={() => checkout('monthly')}
-              data-testid="billing-upgrade-monthly"
+          {PLAN_CARDS.map(({ key, features, testId, featured }, i) => (
+            <SectionCard
+              key={key}
+              index={i + 1}
+              title={t(`landing.pricing.${key}Name`)}
+              className={cn('relative', featured && 'border-primary shadow-lg ring-1 ring-primary')}
+              data-testid={testId}
             >
-              {t('billing.buyMonthly')}
-            </Button>
-          </SectionCard>
-          <SectionCard
-            index={2}
-            title={t('billing.lifetime')}
-            className="border-primary/40"
-            data-testid="billing-card-lifetime"
-          >
-            <p className="flex flex-1 items-start gap-2 text-sm text-muted-foreground">
-              <InfinityIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              {t('billing.lifetimeNote')}
-            </p>
-            <Button
-              size="lg"
-              className="font-semibold"
-              disabled={pending}
-              onClick={() => checkout('lifetime')}
-              data-testid="billing-upgrade-lifetime"
-            >
-              {t('billing.buyLifetime')}
-            </Button>
-          </SectionCard>
+              {featured && (
+                <span
+                  className="absolute -top-3 left-5 rounded-full bg-primary px-3 py-0.5 text-xs font-bold text-primary-foreground"
+                  data-testid="billing-popular"
+                >
+                  {t('landing.pricing.popular')}
+                </span>
+              )}
+              <p className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-extrabold tracking-tight">
+                  {t(`landing.pricing.${key}Price`)}
+                </span>
+                <span className="text-muted-foreground">{t(`landing.pricing.${key}Period`)}</span>
+              </p>
+              <ul className="flex flex-1 flex-col gap-1.5 text-sm">
+                {Array.from({ length: features }, (_, n) => (
+                  <li key={n} className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                    <span className="text-muted-foreground">
+                      {t(`landing.pricing.${key}${n + 1}`)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                size="lg"
+                variant={featured ? 'default' : 'outline'}
+                className="font-semibold"
+                disabled={pending}
+                onClick={() => checkout(featured ? 'monthly' : 'lifetime')}
+                data-testid={featured ? 'billing-upgrade-monthly' : 'billing-upgrade-lifetime'}
+              >
+                {t(featured ? 'billing.buyMonthly' : 'billing.buyLifetime')}
+              </Button>
+            </SectionCard>
+          ))}
         </div>
         <p className="text-xs text-muted-foreground">{t('billing.taxNote')}</p>
       </div>

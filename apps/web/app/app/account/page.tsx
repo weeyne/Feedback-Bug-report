@@ -11,7 +11,7 @@ export default async function AccountPage() {
   const user = await requireUser();
   const t = await getTranslations();
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4 md:p-6">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 md:p-6">
       <PageHeader title={t('account.title')} description={t('account.description')} />
       <SectionCard index={0} title={t('account.profile')}>
         <dl className="flex flex-col divide-y text-sm">
