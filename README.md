@@ -24,6 +24,7 @@ pnpm test
 | `pnpm test`                            | All tests, including DB tests on in-process PGlite (no Docker)            |
 | `pnpm db:test`                         | DB tests only (PGlite by default)                                         |
 | `DB_TEST_TARGET=supabase pnpm db:test` | DB tests against a running local Supabase (`pnpm db:start`, needs Docker) |
+| `pnpm lint`                            | Lint all packages with oxlint (config in `.oxlintrc.json`)                |
 | `pnpm format`                          | Format with Prettier                                                      |
 
 ## Database tests
@@ -60,8 +61,10 @@ Next.js app serving the public widget API, notifications, the Telegram webhook a
 
 ```bash
 pnpm --filter @bugping/web dev     # builds the widget, copies it to public/w/, starts next dev (needs apps/web/.env.local)
-pnpm --filter @bugping/web test    # unit + DB tests on PGlite (no Docker, no .env.local needed)
-pnpm --filter @bugping/web e2e     # widget → API → notification E2E in test mode (fake env, in-memory DB)
+pnpm --filter @bugping/web test       # unit + DB tests on PGlite (no Docker, no .env.local needed)
+pnpm --filter @bugping/web test:db    # only the DB-backed tests (*.db.test.ts)
+pnpm --filter @bugping/web e2e        # widget → API → notification E2E in test mode (fake env, in-memory DB)
+pnpm --filter @bugping/web e2e:smoke  # smoke tests against next build + next start (no test mode, no DB)
 ```
 
 Endpoints: `GET /api/v1/widget/config`, `POST /api/v1/widget/submit`, `POST /api/telegram/webhook`,

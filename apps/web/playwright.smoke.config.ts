@@ -18,12 +18,14 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}`, locale: 'en-US' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: process.env.SMOKE_PREBUILT ? START : `${BUILD} && ${START}`,
+    command: process.env.SMOKE_PREBUILT === '1' ? START : `${BUILD} && ${START}`,
     url: `http://localhost:${PORT}/privacy`,
     reuseExistingServer: false,
     timeout: 300_000,
     // Fake values only, and no BUGPING_TEST_MODE.
     env: {
+      // Blank so a local .env.local key does not mount the corner widget (it would call the DB-backed config API).
+      NEXT_PUBLIC_BUGPING_PROJECT_KEY: '',
       NEXT_PUBLIC_SUPABASE_URL: 'http://localhost:54321',
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'e2e-publishable-key-0000000000',
       SUPABASE_SERVICE_ROLE_KEY: 'e2e-service-role-key-000000',
