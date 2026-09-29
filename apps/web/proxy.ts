@@ -1,8 +1,9 @@
 import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { hasLocale } from 'next-intl';
 import createIntlMiddleware from 'next-intl/middleware';
+import { pickLocale } from '@/i18n/locale';
 import { PUBLIC_PATHS } from '@/i18n/public-pages';
 import { routing } from '@/i18n/routing';
 import { NEXT_COOKIE, NEXT_COOKIE_MAX_AGE, safeNext } from '@/lib/auth/next';
@@ -18,6 +19,19 @@ const LOCALE_PREFIX = new RegExp(`^/(?:${routing.locales.join('|')})(?=/|$)`);
 /** `/`, `/install`, … or their `/ru` (and redirect-to-unprefixed `/en`) counterparts. */
 function isPublicPage(pathname: string): boolean {
   return PUBLIC_PAGES.has(pathname.replace(LOCALE_PREFIX, '') || '/');
+}
+
+/**
+ * The request next-intl sees: its Accept-Language is replaced by the app's own pick (`en`/`ru`,
+ * `pickLocale`), so its detection redirect and cookie sync follow the same rule as login and the
+ * dashboard — Russian only when the browser lists `ru`/`ru-*` (its best-fit matcher would send
+ * Ukrainian, Belarusian, Kazakh, … to `/ru`). Built from the request after the session refresh,
+ * so the refreshed cookies are in its headers.
+ */
+function intlRequest(request: NextRequest): NextRequest {
+  const headers = new Headers(request.headers);
+  headers.set('accept-language', pickLocale(undefined, request.headers.get('accept-language')));
+  return new NextRequest(request, { headers });
 }
 
 /**
@@ -103,7 +117,7 @@ export async function proxy(request: NextRequest) {
     // next-intl answers with the locale rewrite (`/install` → `/en/install`) or the one-time
     // detection redirect (`/install` → `/ru/install`, query string kept). It reads the request
     // after the session refresh, so only the refreshed cookies have to be carried over.
-    const localized = intl(request);
+    const localized = intl(intlRequest(request));
     for (const cookie of response.cookies.getAll()) localized.cookies.set(cookie);
     response = localized;
   } else {

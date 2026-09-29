@@ -142,6 +142,59 @@ test.describe('detection responses', () => {
   });
 });
 
+test.describe('Accept-Language rule shared with login and the dashboard', () => {
+  const NON_RUSSIAN = ['uk-UA', 'be-BY,be;q=0.9', 'kk'];
+
+  test('browsers listing no Russian get the English page, no redirect', async ({ request }) => {
+    for (const acceptLanguage of NON_RUSSIAN) {
+      const response = await request.get('/', {
+        headers: { 'accept-language': acceptLanguage },
+        maxRedirects: 0,
+      });
+      expect(response.status(), acceptLanguage).toBe(200);
+      expect(await response.text(), acceptLanguage).toContain('<html lang="en"');
+    }
+  });
+
+  test('a /ru visit from a Ukrainian browser is Russian and stores locale=ru', async ({
+    request,
+  }) => {
+    const response = await request.get('/ru', {
+      headers: { 'accept-language': 'uk-UA' },
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain('<html lang="ru"');
+    expect(response.headers()['set-cookie'] ?? '').toMatch(/locale=ru/);
+  });
+
+  test('a browser listing Russian is still redirected to /ru', async ({ request }) => {
+    for (const acceptLanguage of ['ru-RU', 'uk-UA,ru;q=0.8', 'en;q=0.5,ru;q=0.9']) {
+      const response = await request.get('/', {
+        headers: { 'accept-language': acceptLanguage },
+        maxRedirects: 0,
+      });
+      expect(response.status(), acceptLanguage).toBe(307);
+      expect(new URL(response.headers()['location']!, 'http://x').pathname, acceptLanguage).toBe(
+        '/ru',
+      );
+    }
+  });
+
+  test.describe('in a Ukrainian browser', () => {
+    test.use({ locale: 'uk-UA' });
+
+    test('the landing and login are both English', async ({ page }) => {
+      await page.goto('/');
+      expect(new URL(page.url()).pathname).toBe('/');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+      await page.goto('/login');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    });
+  });
+});
+
 /** The footer (switcher, page links) and the header's theme toggle (a client component). */
 const footer = (page: Page) => page.locator('footer');
 const headerToggle = (page: Page) => page.getByTestId('landing-header').getByTestId('theme-toggle');
@@ -179,6 +232,24 @@ test.describe('locale switcher', () => {
     // The chosen English sticks: an English URL is not redirected to /ru any more.
     await page.goto('/terms');
     expect(new URL(page.url()).pathname).toBe('/terms');
+  });
+
+  test('moves / to /ru and back, keeping the query string and the hash', async ({ page }) => {
+    await page.goto('/?utm_source=e2e#pricing');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(headerToggle(page)).toHaveAccessibleName('Dark theme');
+
+    await footer(page).getByTestId('locale-switcher').selectOption('ru');
+    await expect(page).toHaveURL(/\/ru\?utm_source=e2e#pricing$/);
+    expect(new URL(page.url()).pathname).toBe('/ru');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Узнавайте о багах');
+    await expect(headerToggle(page)).toHaveAccessibleName('Тёмная тема');
+
+    await footer(page).getByTestId('locale-switcher').selectOption('en');
+    await expect(page).toHaveURL(/\/\?utm_source=e2e#pricing$/);
+    expect(new URL(page.url()).pathname).toBe('/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 });
 
