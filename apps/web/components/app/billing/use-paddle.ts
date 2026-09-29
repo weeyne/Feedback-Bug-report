@@ -3,7 +3,7 @@
 import { CheckoutEventNames, initializePaddle, type Paddle } from '@paddle/paddle-js';
 import { useEffect, useRef, useState } from 'react';
 
-/** Loads Paddle.js once; `onCompleted` fires on the `checkout.completed` event. `failed` is set when the script could not load. */
+/** Loads Paddle.js once; `onCompleted` fires on the `checkout.completed` event. `failed` is set only when the script could not load (blocked or offline). */
 export function usePaddle(opts: {
   environment: 'sandbox' | 'production';
   token: string;
@@ -24,8 +24,9 @@ export function usePaddle(opts: {
     })
       .then((instance) => {
         if (cancelled) return;
+        // Initialize errors are swallowed by the SDK (the instance still comes back); a missing
+        // instance is not a blocked script, so neither shows the ad-blocker message.
         if (instance) setPaddle(instance);
-        else setFailed(true);
       })
       .catch((error: unknown) => {
         if (!cancelled) setFailed(true);

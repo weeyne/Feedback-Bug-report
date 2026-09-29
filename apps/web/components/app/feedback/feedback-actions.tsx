@@ -8,14 +8,8 @@ import { toast } from 'sonner';
 import { deleteFeedbackAction, setFeedbackStatusAction } from '@/app/app/actions';
 import { cn } from 'cn';
 import { Button, buttonVariants } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent } from '@/components/ui/alert-dialog';
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { replyHref } from '@/lib/dashboard/feed-view';
 import type { FeedbackStatus } from '@/lib/dashboard/feedback';
 
@@ -37,20 +31,18 @@ export function FeedbackActions({
   const [pending, start] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) =>
+  // Navigating fetches fresh server data itself; only staying on the page needs a refresh.
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, thenGo?: string) =>
     start(async () => {
       const result = await fn();
       if (!result.ok) toast.error(t(result.error ?? 'errors.generic'));
-      else after?.();
-      router.refresh();
+      if (result.ok && thenGo) router.push(thenGo);
+      else router.refresh();
     });
   const setStatus = (next: FeedbackStatus) => () => run(() => setFeedbackStatusAction(id, next));
   // Resolving or archiving takes the report out of the list: move on to the next one.
   const triage = (next: FeedbackStatus) => () =>
-    run(
-      () => setFeedbackStatusAction(id, next),
-      afterHref ? () => router.push(afterHref) : undefined,
-    );
+    run(() => setFeedbackStatusAction(id, next), afterHref);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {status === 'resolved' ? (
@@ -81,7 +73,8 @@ export function FeedbackActions({
           className={cn(buttonVariants({ variant: 'outline' }), 'font-semibold')}
         >
           <Mail aria-hidden />
-          {t('feedback.reply')}
+          {/* Icon-only on the narrowest phones so the action row fits on one line. */}
+          <span className="max-[400px]:sr-only">{t('feedback.reply')}</span>
         </a>
       )}
       {status === 'archived' ? (
@@ -104,7 +97,6 @@ export function FeedbackActions({
           onClick={triage('archived')}
         >
           <Archive aria-hidden />
-          {/* Icon-only on the narrowest phones so the action row fits on one line. */}
           <span className="max-[400px]:sr-only">{t('feedback.archive')}</span>
         </Button>
       )}
@@ -120,12 +112,8 @@ export function FeedbackActions({
       >
         <Trash2 aria-hidden />
       </Button>
-      <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <DialogContent
-          showCloseButton={false}
-          initialFocus={cancelRef}
-          data-testid="feedback-delete-dialog"
-        >
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent initialFocus={cancelRef} data-testid="feedback-delete-dialog">
           <DialogHeader>
             <DialogTitle>{t('feedback.deleteTitle')}</DialogTitle>
             <DialogDescription>{t('feedback.deleteWarning')}</DialogDescription>
@@ -145,17 +133,14 @@ export function FeedbackActions({
               data-testid="feedback-delete-confirm"
               onClick={() => {
                 setConfirmingDelete(false);
-                run(
-                  () => deleteFeedbackAction(id),
-                  () => router.push(afterHref ?? closeHref),
-                );
+                run(() => deleteFeedbackAction(id), afterHref ?? closeHref);
               }}
             >
               {t('common.delete')}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

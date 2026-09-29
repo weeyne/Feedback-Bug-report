@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { navProjectId, rememberedProjectCookie, routeProjectId } from './remembered-project';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  lastOpenedProject,
+  navProjectId,
+  rememberedProjectCookie,
+  routeProjectId,
+} from './remembered-project';
 
 const projectIds = ['p1', 'p2'];
 
@@ -45,5 +50,30 @@ describe('rememberedProjectCookie', () => {
     expect(rememberedProjectCookie('p1')).toBe(
       'bp_project=p1; path=/; max-age=2592000; samesite=lax',
     );
+  });
+
+  it('adds the secure flag on https', () => {
+    expect(rememberedProjectCookie('p1', true)).toBe(
+      'bp_project=p1; path=/; max-age=2592000; samesite=lax; secure',
+    );
+  });
+});
+
+describe('lastOpenedProject', () => {
+  afterEach(() => lastOpenedProject.reset());
+
+  it('is shared by every reader and notifies subscribers only on change', () => {
+    const listener = vi.fn();
+    const unsubscribe = lastOpenedProject.subscribe(listener);
+    expect(lastOpenedProject.get()).toBeNull();
+    lastOpenedProject.set('p1');
+    lastOpenedProject.set('p1');
+    expect(listener).toHaveBeenCalledTimes(1);
+    lastOpenedProject.set('p2');
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(lastOpenedProject.get()).toBe('p2');
+    unsubscribe();
+    lastOpenedProject.set('p1');
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 });

@@ -3,7 +3,7 @@
 import { AppLink } from '@/components/app/link-prefetch';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import {
   Bell,
   Code2,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from 'cn';
 import {
+  lastOpenedProject,
   navProjectId,
   rememberedProjectCookie,
   routeProjectId,
@@ -49,18 +50,23 @@ export function ProjectNav({
   const pathname = pathnameOverride ?? currentPathname;
   const routeId = routeProjectId(pathname);
   const section = /^\/app\/p\/[^/]+\/([^/]+)/.exec(pathname)?.[1] ?? 'overview';
-  // The shell outlives client navigations, so the last project is kept here for the account and
-  // billing pages; the cookie covers a hard load of those.
-  const [lastProjectId, setLastProjectId] = useState(rememberedProjectId ?? null);
+  // The last project is shared across mounts (the mobile sheet remounts on every open and the
+  // layout's cookie prop is not refreshed by client navigation); the cookie covers a hard load.
   const remember = pathnameOverride === undefined;
-  if (remember && routeId && routeId !== lastProjectId) setLastProjectId(routeId);
+  const lastProjectId = useSyncExternalStore(
+    lastOpenedProject.subscribe,
+    () => lastOpenedProject.get() ?? rememberedProjectId ?? null,
+    () => rememberedProjectId ?? null,
+  );
   const currentProjectId = navProjectId({
     pathname,
     remembered: lastProjectId,
     projectIds: projects.map((p) => p.id),
   });
   useEffect(() => {
-    if (remember && routeId) document.cookie = rememberedProjectCookie(routeId);
+    if (!remember || !routeId) return;
+    lastOpenedProject.set(routeId);
+    document.cookie = rememberedProjectCookie(routeId, location.protocol === 'https:');
   }, [remember, routeId]);
   const newCount = currentProjectId ? (newCounts[currentProjectId] ?? 0) : 0;
   return (

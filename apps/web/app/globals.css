@@ -137,17 +137,14 @@
   section[id] {
     scroll-margin-top: 5rem;
   }
-  /* Small type reads tight; monospace keeps its own spacing. */
-  .text-xs,
-  [class~='text-[11px]'],
-  [class~='text-[10px]'] {
+  /* Small type reads tight; code and monospace keep their own spacing (:where keeps it low-specificity). */
+  :where(.text-xs, [class~='text-[11px]'], [class~='text-[10px]']):not(
+    :where(pre, code, kbd, samp, .font-mono, .font-mono *, pre *, code *)
+  ) {
     word-spacing: 0.03em;
   }
-  code,
-  pre,
-  kbd,
-  samp,
-  .font-mono {
+  /* Monospace nested in small text would otherwise inherit its spacing. */
+  :where(pre, code, kbd, samp, .font-mono) {
     word-spacing: normal;
   }
 }

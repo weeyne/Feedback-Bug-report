@@ -28,7 +28,12 @@ test.beforeEach(async ({ page }) => {
 });
 
 /** Submits one piece of feedback through the widget on the e2e host page, as a visitor would. */
-async function submitFeedback(context: BrowserContext, key: string, message: string) {
+async function submitFeedback(
+  context: BrowserContext,
+  key: string,
+  message: string,
+  email?: string,
+) {
   const host = await context.newPage();
   await host.goto(`/e2e-host?key=${key}`);
   await host.locator('[data-bugping] .bp-trigger').click();
@@ -37,6 +42,7 @@ async function submitFeedback(context: BrowserContext, key: string, message: str
     timeout: 15_000,
   });
   await host.locator('.bp-message').fill(message);
+  if (email) await host.locator('.bp-email').fill(email);
   await host.waitForTimeout(2100); // bot guard
   await host.locator('.bp-send').click();
   await expect(host.locator('.bp-thanks')).toBeVisible();
@@ -219,11 +225,23 @@ test('overview: recent feedback opens the detail panel; resolving updates the ne
   await expect(page.getByTestId('feedback-row')).toContainText('the export button is broken');
 });
 
+test('small text gets a little word spacing but code blocks keep theirs', async ({ page }) => {
+  await login(page);
+  await createProject(page, 'E2E Spacing');
+  const spacing = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).wordSpacing);
+  expect(await spacing('[data-testid="install-snippet"]')).toMatch(/^(normal|0px)$/);
+  expect(await spacing('.text-xs:not(pre, pre *, .font-mono, .font-mono *)')).toBe('0.36px');
+});
+
 test('feedback actions read as actions in Russian and fit a phone', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
   const { key, projectId } = await createProject(page, 'E2E Actions');
-  await submitFeedback(context, key, 'E2E: the label check');
+  await submitFeedback(context, key, 'E2E: the label check', 'visitor@example.com');
   await page.goto('/app/account');
   await page.getByTestId('locale-switcher').selectOption('ru');
   await expect(page.getByRole('heading', { name: 'Аккаунт', exact: true })).toBeVisible();
@@ -446,6 +464,28 @@ test.describe('mobile', () => {
     await expect(sheet.getByTestId('nav-overview')).toBeVisible();
     await expect(sheet.getByTestId('nav-feedback')).toBeVisible();
     await expect(sheet.getByTestId('theme-toggle')).toBeVisible();
+  });
+
+  test('the mobile menu on Account shows the nav of the project opened by client navigation', async ({
+    page,
+    context,
+  }) => {
+    await login(page);
+    const { projectId } = await createProject(page, 'E2E Mobile Account');
+    // A hard load with no cookie yet: the layout's prop is empty, so only shared state can help.
+    await context.clearCookies({ name: 'bp_project' });
+    await page.goto(`/app/p/${projectId}`);
+    await page.getByRole('button', { name: 'Menu' }).click();
+    const sheet = page.locator('[data-slot="sheet-content"]');
+    await sheet.getByTestId('nav-account').click();
+    await expect(page).toHaveURL(/\/app\/account$/);
+
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await expect(sheet.getByTestId('nav-feedback')).toBeVisible();
+    await expect(sheet.getByTestId('nav-feedback')).toHaveAttribute(
+      'href',
+      new RegExp(`/app/p/${projectId}/feedback`),
+    );
   });
 });
 
