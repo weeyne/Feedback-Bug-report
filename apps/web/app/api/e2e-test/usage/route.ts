@@ -1,6 +1,6 @@
 import { getDeps } from '@/lib/deps';
-import { getEnv } from '@/lib/env';
 import { json } from '@/lib/http';
+import { testModeEnabled } from '@/lib/test-mode-guard';
 import type { TestModeDeps } from '@/lib/test-mode';
 
 export const runtime = 'nodejs';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** E2E only: sets this month's submission count for the seeded owner. */
 export async function POST(request: Request) {
-  if (getEnv().BUGPING_TEST_MODE !== '1') return json({ error: 'not found' }, 404);
+  if (!testModeEnabled()) return json({ error: 'not found' }, 404);
   const deps = (await getDeps()) as TestModeDeps;
   const { count } = (await request.json()) as { count: number };
   await deps.db.query(

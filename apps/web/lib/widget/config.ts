@@ -54,12 +54,18 @@ export async function handleConfig(
       return json({ error: 'origin not allowed' }, 403, cors);
     }
 
-    const ping = () =>
-      markWidgetSeen(deps.db, project.id).catch((error) =>
-        console.error('[widget/config] seen', error),
-      );
-    if (deps.after) deps.after(ping);
-    else void ping();
+    // Only a browser on a real site sends Origin; a bare request (curl, a server) must not be able
+    // to tick "widget installed" for someone else's public key. Hygiene, not a security boundary
+    // (Origin is easy to forge outside a browser). Browsers omit Origin on same-origin GETs, so a
+    // widget embedded on the Bugping domain itself (the demo shop) never marks its project seen.
+    if (origin !== null) {
+      const ping = () =>
+        markWidgetSeen(deps.db, project.id).catch((error) =>
+          console.error('[widget/config] seen', error),
+        );
+      if (deps.after) deps.after(ping);
+      else void ping();
+    }
 
     return json(toWidgetConfig(project, deps.env.NEXT_PUBLIC_APP_URL), 200, {
       ...cors,

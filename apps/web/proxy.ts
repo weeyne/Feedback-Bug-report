@@ -7,6 +7,7 @@ import { pickLocale } from '@/i18n/locale';
 import { PUBLIC_PATHS } from '@/i18n/public-pages';
 import { routing } from '@/i18n/routing';
 import { NEXT_COOKIE, NEXT_COOKIE_MAX_AGE, safeNext } from '@/lib/auth/next';
+import { testModeEnabled } from '@/lib/test-mode-guard';
 
 const REF_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -60,7 +61,7 @@ interface AuthResult {
 }
 
 async function currentUser(request: NextRequest, response: NextResponse): Promise<AuthResult> {
-  if (process.env.BUGPING_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
+  if (testModeEnabled()) {
     try {
       const userId = JSON.parse(request.cookies.get('e2e_user')?.value ?? 'null')?.id ?? null;
       return { userId, response };

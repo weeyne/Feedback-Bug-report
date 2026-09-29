@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from '@/lib/auth/supabase-server';
 import { getDeps } from '@/lib/deps';
 import { getEnv } from '@/lib/env';
 import { clientIp } from '@/lib/http';
+import { testModeEnabled } from '@/lib/test-mode-guard';
 
 export interface LoginState {
   status: 'idle' | 'sent' | 'error';
@@ -21,7 +22,7 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     .max(254)
     .safeParse(String(formData.get('email') ?? '').trim());
   if (!email.success) return { status: 'error', error: 'auth.emailInvalid' };
-  if (getEnv().BUGPING_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
+  if (testModeEnabled()) {
     return { status: 'sent', email: email.data };
   }
   const env = getEnv();

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { getEnv } from '../env';
+import { testModeEnabled } from '../test-mode-guard';
 import { createSupabaseServerClient } from './supabase-server';
 
 export interface SessionUser {
@@ -24,7 +24,7 @@ export function parseE2eUser(raw: string | undefined): SessionUser | null {
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  if (getEnv().BUGPING_TEST_MODE === '1' && process.env.NODE_ENV !== 'production') {
+  if (testModeEnabled()) {
     return parseE2eUser((await cookies()).get(E2E_USER_COOKIE)?.value);
   }
   const supabase = await createSupabaseServerClient();
