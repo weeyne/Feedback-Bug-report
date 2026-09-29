@@ -151,8 +151,22 @@ export async function deleteProject(
     deps.storage,
     files.map((f) => f.screenshot_path),
   );
+  const [counted] = await deps.db.query<{ n: number }>(
+    `select count(*)::int as n from public.feedback
+     where project_id = $1
+       and date_trunc('month', created_at at time zone 'utc')
+         = date_trunc('month', now() at time zone 'utc')`,
+    [project.id],
+  );
   await withUser(deps.db, userId, (tx) =>
     tx.query('delete from public.projects where id = $1', [project.id]),
   );
+  if (counted?.n) {
+    await deps.db.query(
+      `update public.usage_counters set count = greatest(count - $2::int, 0)
+       where owner_id = $1 and period = date_trunc('month', now() at time zone 'utc')::date`,
+      [userId, counted.n],
+    );
+  }
   return { ok: true };
 }

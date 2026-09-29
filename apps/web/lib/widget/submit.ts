@@ -17,6 +17,7 @@ import { describeAgent } from './user-agent';
 export const MAX_BODY_BYTES = 2.5 * 1024 * 1024;
 const RATE_LIMIT = { max: 5, windowSeconds: 60 } as const;
 const PROJECT_RATE_LIMIT = { max: 30, windowSeconds: 60 } as const;
+const DAILY_IP_LIMIT = { max: 10, windowSeconds: 86_400 } as const;
 const MIN_ELAPSED_MS = 800;
 const EXTENSIONS: Record<string, string> = {
   'image/webp': 'webp',
@@ -27,7 +28,7 @@ const EXTENSIONS: Record<string, string> = {
 export interface SubmitDeps {
   db: Db;
   storage: Storage;
-  env: Pick<Env, 'IP_HASH_SALT' | 'CLIENT_IP_HEADER'>;
+  env: Pick<Env, 'IP_HASH_SALT' | 'CLIENT_IP_HEADER' | 'BUGPING_TEST_MODE'>;
   after: (task: () => Promise<void>) => void;
   notify: {
     feedback(feedbackId: string): Promise<void>;
@@ -112,6 +113,17 @@ export async function handleSubmit(deps: SubmitDeps, request: Request): Promise<
       ],
     );
     if (projectLimit?.limited) return json({ error: 'rate limited' }, 429, cors);
+    if (deps.env.BUGPING_TEST_MODE !== '1') {
+      const [dayLimit] = await deps.db.query<{ limited: boolean }>(
+        'select public.hit_rate_limit($1, $2, $3) as limited',
+        [
+          `submit-day:${payload.projectKey}:${ipHash}`,
+          DAILY_IP_LIMIT.max,
+          DAILY_IP_LIMIT.windowSeconds,
+        ],
+      );
+      if (dayLimit?.limited) return json({ error: 'rate limited' }, 429, cors);
+    }
 
     const project = await loadProjectByKey(deps.db, payload.projectKey);
     if (!project) return json({ error: 'unknown project' }, 404, cors);
