@@ -4,6 +4,10 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 
+// An unknown first segment is "no such route" (the root not-found, with its own metadata), not a
+// `notFound()` thrown from inside this layout.
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
