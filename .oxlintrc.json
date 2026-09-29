@@ -21,8 +21,12 @@
     "nextjs/no-img-element": "error",
     "no-var": "error",
     "typescript/no-explicit-any": "error",
-    // Effect-driven state is deliberate here (hydration-safe mounted flags, rAF count-up, sticky signed URLs).
-    "react/set-state-in-effect": "off",
+    "react/set-state-in-effect": "error",
+    "react/jsx-no-target-blank": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-unsafe-function-type": "error",
     // role="status" / "progressbar" / "img" on divs and svgs is intentional; <output>/<progress> would change styling and semantics.
     "jsx-a11y/prefer-tag-over-role": "off"
   },

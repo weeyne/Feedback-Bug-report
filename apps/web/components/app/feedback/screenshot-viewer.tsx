@@ -12,13 +12,14 @@ export function ScreenshotViewer({ src: incoming }: { src: string }) {
   const t = useTranslations('feedback');
   const [sticky, setSticky] = useState(() => ({ src: incoming, since: Date.now() }));
   useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect -- keeps the first signed URL while it is still valid; derived from the previous state
     setSticky((current) => stableUrl(current, incoming, Date.now(), KEEP_MS));
   }, [incoming]);
   const { src } = sticky;
   return (
     <Dialog>
       <DialogTrigger className="block w-full cursor-zoom-in overflow-hidden rounded-xl border bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL; next/image would need remotePatterns and the optimizer */}
         <img
           src={src}
           alt={t('screenshot')}
@@ -27,7 +28,7 @@ export function ScreenshotViewer({ src: incoming }: { src: string }) {
       </DialogTrigger>
       <DialogContent className="max-w-[95vw] border-none bg-transparent p-0 ring-0 sm:max-w-[95vw]">
         <DialogTitle className="sr-only">{t('screenshot')}</DialogTitle>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL; next/image would need remotePatterns and the optimizer */}
         <img
           src={src}
           alt={t('screenshot')}
