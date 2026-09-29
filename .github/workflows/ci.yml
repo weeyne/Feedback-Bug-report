@@ -24,6 +24,18 @@ jobs:
       - run: pnpm --filter @bugping/widget size
       - run: pnpm --filter @bugping/widget check:bundle
       - run: pnpm --filter @bugping/web build
+      - run: pnpm --filter @bugping/web exec playwright install --with-deps chromium
+      # Reuses the build above: next start on the production output, no second build.
+      - run: pnpm --filter @bugping/web e2e:smoke
+        env:
+          SMOKE_PREBUILT: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: smoke-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
 
   e2e:
     runs-on: ubuntu-latest
