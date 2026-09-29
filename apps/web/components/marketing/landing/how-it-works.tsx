@@ -2,12 +2,9 @@ import type { CSSProperties, ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { CopyButton } from '@/components/app/copy-button';
-import { installSnippet } from '@/lib/widget/snippet';
+import { installSnippet, PLACEHOLDER_KEY } from '@/lib/widget/snippet';
 import { Reveal } from '../reveal';
 import { CARD, CONTAINER, SectionHeading } from './section';
-
-/** The placeholder key shown in the landing's snippet (the real one is on the Install page). */
-export const PLACEHOLDER_KEY = 'pk_your_project_key';
 
 function Step({
   n,

@@ -7,3 +7,6 @@ export function widgetSrc(appUrl: string): string {
 export function installSnippet(appUrl: string, projectKey: string): string {
   return `<script async src="${widgetSrc(appUrl)}" data-project-id="${projectKey}"></script>`;
 }
+
+/** The placeholder key shown where no project exists yet (landing, public install guides). */
+export const PLACEHOLDER_KEY = 'pk_your_project_key';

@@ -42,7 +42,7 @@ describe('SEO routes', () => {
     vi.resetModules();
     const { sitemap } = await load();
     expect(sitemap().map((entry) => entry.url)).toEqual(
-      ['', '/privacy', '/terms', '/refund', '/login'].map(
+      ['', '/install', '/privacy', '/terms', '/refund', '/login'].map(
         (path) => `${VALID_ENV.NEXT_PUBLIC_APP_URL}${path}`,
       ),
     );
@@ -55,7 +55,9 @@ describe('SEO routes', () => {
     const { robots, sitemap } = await load();
     expect(robots().sitemap).toBe('http://localhost:3000/sitemap.xml');
     expect(sitemap().map((entry) => entry.url)).toEqual(
-      ['', '/privacy', '/terms', '/refund', '/login'].map((path) => `http://localhost:3000${path}`),
+      ['', '/install', '/privacy', '/terms', '/refund', '/login'].map(
+        (path) => `http://localhost:3000${path}`,
+      ),
     );
   });
 

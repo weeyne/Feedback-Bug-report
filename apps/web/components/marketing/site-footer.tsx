@@ -8,6 +8,7 @@ export async function SiteFooter() {
   const t = await getTranslations('landing');
   const links = [
     { href: '/#pricing', label: t('nav.pricing') },
+    { href: '/install', label: t('installGuides') },
     { href: '/login', label: t('nav.logIn') },
     { href: '/privacy', label: t('privacy') },
     { href: '/terms', label: t('terms') },
