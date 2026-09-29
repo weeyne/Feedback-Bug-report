@@ -68,7 +68,7 @@ Order of work: wave 1 blocks commercial launch (Paddle live, VPS move); later wa
       (`lib/notify/telegram.ts:23`, `discord.ts:56`, `dispatch.ts:117`); the quota notice goes only through
       integrations (`dispatchQuotaNotice`); the app sends no email at all. Email the owner on disable and on quota
       reached; show a banner in the app. (`landing.faq.a2` already promises a notice.)
-- [ ] ✅ **Free quota can be burned by anyone.** Public key in the page source, `allowed_origins` empty by default,
+- [x] ✅ **Free quota can be burned by anyone.** (A+B done 2026-09-29: refund on delete, 10/day per IP; a per-project daily cap was declined — it would also block real reports) Public key in the page source, `allowed_origins` empty by default,
       limits 5/min per IP and 30/min per project (`lib/widget/submit.ts:18-19`) vs 20 reports/month on Free. Add a
       per-project daily cap; give quota back for reports deleted as spam (the counter is never decremented,
       `consume_quota` in `20260921000300_functions.sql:33`); nudge owners to set allowed origins.

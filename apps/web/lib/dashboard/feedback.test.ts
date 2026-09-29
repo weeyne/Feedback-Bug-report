@@ -6,7 +6,7 @@ import {
   withTx,
   type TestDb,
 } from '@bugping/db-tests/harness';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { VALID_ENV } from '@/test/fixtures';
 import { parseEnv } from '../env';
 import { createMemoryStorage, type MemoryStorage } from '../storage';
@@ -179,6 +179,93 @@ describe('feedback use cases', () => {
       await grantPro(db, owner);
       expect(await usage(deps, owner)).toEqual({ used: 7, limit: null, pro: true });
     }));
+
+  describe('quota refund on delete', () => {
+    const setCounter = (db: TestDb, owner: string, count: number) =>
+      db.query(
+        `insert into public.usage_counters (owner_id, period, count)
+         values ($1, date_trunc('month', now() at time zone 'utc')::date, $2)
+         on conflict (owner_id, period) do update set count = excluded.count`,
+        [owner, count],
+      );
+
+    it('gives one unit back when a current-month report is deleted', () =>
+      withTx(async (db) => {
+        const { deps } = setup(db);
+        const { owner, ids } = await seed(db, 2);
+        await setCounter(db, owner, 5);
+        expect(await deleteFeedback(deps, owner, ids[0]!)).toEqual({ ok: true });
+        expect((await usage(deps, owner)).used).toBe(4);
+      }));
+
+    it('refunds nothing for a report from a previous month', () =>
+      withTx(async (db) => {
+        const { deps } = setup(db);
+        const { owner, ids } = await seed(db, 1);
+        await db.query(
+          `update public.feedback set created_at = now() - interval '40 days' where id = $1`,
+          [ids[0]],
+        );
+        await setCounter(db, owner, 5);
+        expect(await deleteFeedback(deps, owner, ids[0]!)).toEqual({ ok: true });
+        expect((await usage(deps, owner)).used).toBe(5);
+      }));
+
+    it('never lets the counter go below zero', () =>
+      withTx(async (db) => {
+        const { deps } = setup(db);
+        const { owner, ids } = await seed(db, 1);
+        await setCounter(db, owner, 0);
+        expect(await deleteFeedback(deps, owner, ids[0]!)).toEqual({ ok: true });
+        expect((await usage(deps, owner)).used).toBe(0);
+      }));
+
+    it('still removes the screenshot and succeeds when the refund query fails', () =>
+      withTx(async (db) => {
+        const { deps, storage } = setup(db);
+        const { owner, project, ids } = await seed(db, 1);
+        const path = `${project.id}/${ids[0]}.webp`;
+        await storage.upload(path, new Uint8Array([1]), 'image/webp');
+        await db.query('update public.feedback set screenshot_path = $1 where id = $2', [
+          path,
+          ids[0],
+        ]);
+        const failing: DashDeps = {
+          ...deps,
+          db: {
+            ...db,
+            query: (sql, params) =>
+              sql.includes('usage_counters')
+                ? Promise.reject(new Error('refund down'))
+                : db.query(sql, params),
+            transaction: (fn) => db.transaction(fn),
+          } as TestDb,
+        };
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+          expect(await deleteFeedback(failing, owner, ids[0]!)).toEqual({ ok: true });
+          expect(spy).toHaveBeenCalledWith('[dashboard] quota refund', expect.any(Error));
+        } finally {
+          spy.mockRestore();
+        }
+        expect(storage.files.has(path)).toBe(false);
+      }));
+
+    it('refunds nothing when the report belongs to someone else', () =>
+      withTx(async (db) => {
+        const { deps } = setup(db);
+        const { owner, ids } = await seed(db, 1);
+        const stranger = await createUser(db);
+        await setCounter(db, owner, 5);
+        await setCounter(db, stranger, 5);
+        expect(await deleteFeedback(deps, stranger, ids[0]!)).toEqual({
+          ok: false,
+          error: 'errors.notFound',
+        });
+        expect((await usage(deps, owner)).used).toBe(5);
+        expect((await usage(deps, stranger)).used).toBe(5);
+      }));
+  });
 
   it('counts feedback by status, excluding over-quota rows for free owners', () =>
     withTx(async (db) => {

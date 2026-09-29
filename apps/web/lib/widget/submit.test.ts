@@ -342,6 +342,34 @@ describe('handleSubmit', () => {
       expect(otherIp.status).toBe(201);
     }));
 
+  it('caps one IP at 10 submissions per day per project', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const project = await freeProject(db);
+      expect((await handleSubmit(deps, request(payload(project.public_key)))).status).toBe(201);
+      await db.query(`update public.rate_limits set count = 9 where key like 'submit-day:%'`);
+      expect((await handleSubmit(deps, request(payload(project.public_key)))).status).toBe(201);
+      const capped = await handleSubmit(deps, request(payload(project.public_key)));
+      expect(capped.status).toBe(429);
+      expect(await capped.json()).toEqual({ error: 'rate limited' });
+      const otherIp = await handleSubmit(
+        deps,
+        request(payload(project.public_key), { ip: '198.51.100.9' }),
+      );
+      expect(otherIp.status).toBe(201);
+      expect(await feedbackRows(db, project.id)).toHaveLength(3);
+    }));
+
+  it('skips the daily IP limit in test mode', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      deps.env = { ...deps.env, BUGPING_TEST_MODE: '1' };
+      const project = await freeProject(db);
+      expect((await handleSubmit(deps, request(payload(project.public_key)))).status).toBe(201);
+      await db.query(`update public.rate_limits set count = 10 where key like 'submit-day:%'`);
+      expect((await handleSubmit(deps, request(payload(project.public_key)))).status).toBe(201);
+    }));
+
   it('rate limits IPv6 clients per /64 prefix', () =>
     withTx(async (db) => {
       const { deps } = setup(db);

@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { VALID_ENV } from '@/test/fixtures';
 import { parseEnv } from '../env';
 import { createMemoryStorage, type MemoryStorage } from '../storage';
+import { usage } from './feedback';
 import { getProject } from './projects';
 import type { DashDeps } from './result';
 import { allowBlockedOrigin, deleteProject, updateProjectSettings } from './settings';
@@ -150,6 +151,74 @@ describe('deleteProject', () => {
       ).toEqual({ ok: true });
       expect(await getProject(deps, owner, project.id)).toBeNull();
       expect(storage.files.size).toBe(0);
+    }));
+});
+
+describe('deleteProject quota refund', () => {
+  it('gives back one unit per current-month report and none for older ones', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const project = await createProject(db, owner, 'Acme');
+      for (let i = 0; i < 3; i++) await createFeedback(db, project.id);
+      const old = await createFeedback(db, project.id);
+      await db.query(
+        `update public.feedback set created_at = now() - interval '40 days' where id = $1`,
+        [old],
+      );
+      await db.query(
+        `insert into public.usage_counters (owner_id, period, count)
+         values ($1, date_trunc('month', now() at time zone 'utc')::date, 10)`,
+        [owner],
+      );
+      expect(
+        await deleteProject(deps, owner, { projectId: project.id, confirmName: 'Acme' }),
+      ).toEqual({ ok: true });
+      expect((await usage(deps, owner)).used).toBe(7);
+    }));
+
+  it('refunds nothing when the project is already gone by the time of the delete', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const project = await createProject(db, owner, 'Acme');
+      for (let i = 0; i < 3; i++) await createFeedback(db, project.id);
+      await db.query(
+        `insert into public.usage_counters (owner_id, period, count)
+         values ($1, date_trunc('month', now() at time zone 'utc')::date, 10)`,
+        [owner],
+      );
+      const racing: DashDeps = {
+        ...deps,
+        db: {
+          ...db,
+          query: async (sql, params) => {
+            const rows = await db.query(sql, params);
+            if (/count\(\*\)/.test(sql) && sql.includes('public.feedback')) {
+              await db.query('delete from public.projects where id = $1', [project.id]);
+            }
+            return rows;
+          },
+          transaction: (fn) => db.transaction(fn),
+        } as TestDb,
+      };
+      await deleteProject(racing, owner, { projectId: project.id, confirmName: 'Acme' });
+      expect((await usage(deps, owner)).used).toBe(10);
+    }));
+
+  it('never takes the counter below zero', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const project = await createProject(db, owner, 'Acme');
+      for (let i = 0; i < 3; i++) await createFeedback(db, project.id);
+      await db.query(
+        `insert into public.usage_counters (owner_id, period, count)
+         values ($1, date_trunc('month', now() at time zone 'utc')::date, 1)`,
+        [owner],
+      );
+      await deleteProject(deps, owner, { projectId: project.id, confirmName: 'Acme' });
+      expect((await usage(deps, owner)).used).toBe(0);
     }));
 });
 
