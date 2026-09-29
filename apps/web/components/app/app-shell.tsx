@@ -1,11 +1,12 @@
 import { AppLink } from '@/components/app/link-prefetch';
 import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
-import { ArrowLeft, LogOut, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut } from 'lucide-react';
 import { signOut } from '@/app/actions/session';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { MobileNav } from './mobile-nav';
+import { NavAccountLink } from './nav-account-link';
 import { PlanCard, type PlanKind, type ShellUsage } from './plan-card';
 import { ProjectNav } from './project-nav';
 import type { ShellProject } from './project-switcher';
@@ -16,6 +17,8 @@ interface ShellProps {
   usage: ShellUsage;
   plan: PlanKind;
   newCounts: Record<string, number>;
+  /** The last opened project (cookie); its nav stays on the account and billing pages. */
+  rememberedProjectId?: string;
   /**
    * Route the project nav treats as current; defaults to the real `usePathname()`. Only the
    * landing demo's /demo/dashboard sets it, to render the feed of a fixture project.
@@ -26,13 +29,26 @@ interface ShellProps {
 const footerLink =
   'flex items-center gap-2 rounded-lg px-3 py-1.5 text-muted-foreground transition-colors duration-200 hover:bg-card/70 hover:text-foreground dark:hover:bg-accent/60';
 
-async function Nav({ projects, email, usage, plan, newCounts, pathname }: ShellProps) {
+async function Nav({
+  projects,
+  email,
+  usage,
+  plan,
+  newCounts,
+  rememberedProjectId,
+  pathname,
+}: ShellProps) {
   const t = await getTranslations('nav');
   const tAuth = await getTranslations('auth');
   return (
     <nav className="flex h-full flex-col gap-4 p-4">
       <Logo href="/app" className="px-1 pt-1" />
-      <ProjectNav projects={projects} newCounts={newCounts} pathname={pathname} />
+      <ProjectNav
+        projects={projects}
+        newCounts={newCounts}
+        rememberedProjectId={rememberedProjectId}
+        pathname={pathname}
+      />
       <div className="mt-auto flex flex-col gap-3">
         <PlanCard plan={plan} usage={usage} />
         <ul className="flex flex-col gap-0.5 text-sm">
@@ -43,10 +59,7 @@ async function Nav({ projects, email, usage, plan, newCounts, pathname }: ShellP
             </AppLink>
           </li>
           <li>
-            <AppLink href="/app/account" className={footerLink} data-testid="nav-account">
-              <UserRound className="size-4 shrink-0" aria-hidden />
-              {t('account')}
-            </AppLink>
+            <NavAccountLink label={t('account')} className={footerLink} />
           </li>
         </ul>
         <div className="flex items-center gap-2 border-t border-sidebar-border pt-3">

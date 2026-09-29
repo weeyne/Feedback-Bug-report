@@ -3,11 +3,19 @@
 import { Archive, Check, Mail, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { deleteFeedbackAction, setFeedbackStatusAction } from '@/app/app/actions';
 import { cn } from 'cn';
 import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { replyHref } from '@/lib/dashboard/feed-view';
 import type { FeedbackStatus } from '@/lib/dashboard/feedback';
 
@@ -16,15 +24,19 @@ export function FeedbackActions({
   status,
   email,
   closeHref,
+  afterHref,
 }: {
   id: string;
   status: FeedbackStatus;
   email: string | null;
   closeHref: string;
+  afterHref?: string;
 }) {
   const t = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) =>
     start(async () => {
       const result = await fn();
@@ -33,6 +45,12 @@ export function FeedbackActions({
       router.refresh();
     });
   const setStatus = (next: FeedbackStatus) => () => run(() => setFeedbackStatusAction(id, next));
+  // Resolving or archiving takes the report out of the list: move on to the next one.
+  const triage = (next: FeedbackStatus) => () =>
+    run(
+      () => setFeedbackStatusAction(id, next),
+      afterHref ? () => router.push(afterHref) : undefined,
+    );
   return (
     <div className="flex flex-wrap items-center gap-2">
       {status === 'resolved' ? (
@@ -50,7 +68,7 @@ export function FeedbackActions({
           disabled={pending}
           className="font-semibold"
           data-testid="feedback-resolve"
-          onClick={setStatus('resolved')}
+          onClick={triage('resolved')}
         >
           <Check aria-hidden />
           {t('feedback.resolve')}
@@ -83,7 +101,7 @@ export function FeedbackActions({
           disabled={pending}
           className="font-semibold"
           data-testid="feedback-archive"
-          onClick={setStatus('archived')}
+          onClick={triage('archived')}
         >
           <Archive aria-hidden />
           {/* Icon-only on the narrowest phones so the action row fits on one line. */}
@@ -98,16 +116,46 @@ export function FeedbackActions({
         aria-label={t('common.delete')}
         title={t('common.delete')}
         data-testid="feedback-delete"
-        onClick={() => {
-          if (confirm(t('feedback.deleteConfirm')))
-            run(
-              () => deleteFeedbackAction(id),
-              () => router.push(closeHref),
-            );
-        }}
+        onClick={() => setConfirmingDelete(true)}
       >
         <Trash2 aria-hidden />
       </Button>
+      <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <DialogContent
+          showCloseButton={false}
+          initialFocus={cancelRef}
+          data-testid="feedback-delete-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>{t('feedback.deleteTitle')}</DialogTitle>
+            <DialogDescription>{t('feedback.deleteWarning')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              ref={cancelRef}
+              variant="outline"
+              onClick={() => setConfirmingDelete(false)}
+              data-testid="feedback-delete-cancel"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              data-testid="feedback-delete-confirm"
+              onClick={() => {
+                setConfirmingDelete(false);
+                run(
+                  () => deleteFeedbackAction(id),
+                  () => router.push(afterHref ?? closeHref),
+                );
+              }}
+            >
+              {t('common.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { feedEmptyKind, metaLine, replyHref } from './feed-view';
+import { feedEmptyKind, metaLine, nextSelection, replyHref } from './feed-view';
 
 describe('metaLine', () => {
   it('joins page, browser and email with a middle dot', () => {
@@ -44,5 +44,22 @@ describe('replyHref', () => {
 
   it('encodes characters that would add mailto parameters', () => {
     expect(replyHref('a&cc=x@mail.com', 'Hi')).toBe('mailto:a%26cc%3Dx@mail.com?subject=Hi');
+  });
+});
+
+describe('nextSelection', () => {
+  it('opens the report below the current one', () => {
+    expect(nextSelection(['a', 'b', 'c'], 'a')).toBe('b');
+    expect(nextSelection(['a', 'b', 'c'], 'b')).toBe('c');
+  });
+
+  it('falls back to the report above when the current one is last', () => {
+    expect(nextSelection(['a', 'b', 'c'], 'c')).toBe('b');
+  });
+
+  it('is null when the current report is the only one or not in the list', () => {
+    expect(nextSelection(['a'], 'a')).toBeNull();
+    expect(nextSelection([], 'a')).toBeNull();
+    expect(nextSelection(['a', 'b'], 'x')).toBeNull();
   });
 });

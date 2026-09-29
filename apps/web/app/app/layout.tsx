@@ -1,6 +1,8 @@
+import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/app/app-shell';
 import type { PlanKind } from '@/components/app/plan-card';
+import { REMEMBERED_PROJECT_COOKIE } from '@/lib/dashboard/remembered-project';
 import { TimeZoneSync } from '@/components/app/time-zone-sync';
 import { requireUser } from '@/lib/auth/session';
 import { billingOverview } from '@/lib/billing/checkout';
@@ -29,6 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         usage={plan}
         plan={kind}
         newCounts={newCounts}
+        rememberedProjectId={(await cookies()).get(REMEMBERED_PROJECT_COOKIE)?.value}
       >
         {children}
       </AppShell>

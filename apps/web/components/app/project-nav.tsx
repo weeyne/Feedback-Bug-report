@@ -3,6 +3,7 @@
 import { AppLink } from '@/components/app/link-prefetch';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import {
   Bell,
   Code2,
@@ -12,6 +13,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from 'cn';
+import {
+  navProjectId,
+  rememberedProjectCookie,
+  routeProjectId,
+} from '@/lib/dashboard/remembered-project';
 import { ProjectSwitcher, type ShellProject } from './project-switcher';
 
 const ITEMS: {
@@ -28,19 +34,34 @@ const ITEMS: {
 export function ProjectNav({
   projects,
   newCounts,
+  rememberedProjectId,
   pathname: pathnameOverride,
 }: {
   projects: ShellProject[];
   newCounts: Record<string, number>;
+  /** The cookie's last opened project, for a hard load of the account or billing page. */
+  rememberedProjectId?: string;
   /** Overrides the current route (the landing demo renders a fixture project's feed). */
   pathname?: string;
 }) {
   const t = useTranslations('nav');
   const currentPathname = usePathname();
   const pathname = pathnameOverride ?? currentPathname;
-  const match = /^\/app\/p\/([^/]+)(?:\/([^/]+))?/.exec(pathname);
-  const currentProjectId = match?.[1] ?? null;
-  const section = match?.[2] ?? 'overview';
+  const routeId = routeProjectId(pathname);
+  const section = /^\/app\/p\/[^/]+\/([^/]+)/.exec(pathname)?.[1] ?? 'overview';
+  // The shell outlives client navigations, so the last project is kept here for the account and
+  // billing pages; the cookie covers a hard load of those.
+  const [lastProjectId, setLastProjectId] = useState(rememberedProjectId ?? null);
+  const remember = pathnameOverride === undefined;
+  if (remember && routeId && routeId !== lastProjectId) setLastProjectId(routeId);
+  const currentProjectId = navProjectId({
+    pathname,
+    remembered: lastProjectId,
+    projectIds: projects.map((p) => p.id),
+  });
+  useEffect(() => {
+    if (remember && routeId) document.cookie = rememberedProjectCookie(routeId);
+  }, [remember, routeId]);
   const newCount = currentProjectId ? (newCounts[currentProjectId] ?? 0) : 0;
   return (
     <>
@@ -48,7 +69,7 @@ export function ProjectNav({
       {currentProjectId && (
         <ul className="flex flex-col gap-0.5 text-sm">
           {ITEMS.map(({ key, icon: Icon }) => {
-            const active = section === key;
+            const active = routeId !== null && section === key;
             return (
               <li key={key}>
                 <AppLink

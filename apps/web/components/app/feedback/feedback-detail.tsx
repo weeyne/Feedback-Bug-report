@@ -15,10 +15,13 @@ export async function FeedbackDetailPanel({
   feedback,
   screenshot,
   closeHref,
+  afterHref,
 }: {
   feedback: FeedbackDetail;
   screenshot: string | null;
   closeHref: string;
+  /** Where resolving, archiving or deleting leads; omitted, resolve/archive stay on this report. */
+  afterHref?: string;
 }) {
   const t = await getTranslations('feedback');
   const format = await getFormatter();
@@ -113,6 +116,7 @@ export async function FeedbackDetailPanel({
           status={feedback.status}
           email={feedback.email}
           closeHref={closeHref}
+          afterHref={afterHref}
         />
       </div>
     </aside>
