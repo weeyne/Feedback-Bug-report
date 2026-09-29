@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { hasLocale } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
-import { alt as ogAlt, contentType as ogType, size as ogSize } from '@/app/opengraph-image';
+import { OG_IMAGE_ALT, OG_IMAGE_CONTENT_TYPE, OG_IMAGE_SIZE } from '@/lib/og';
 import type { AppLocale } from './locale';
 import { OG_LOCALE, publicAlternates, type PublicPath } from './public-pages';
 import { routing } from './routing';
@@ -37,7 +37,14 @@ export async function publicPageMetadata(
       url: alternates.canonical,
       // A page-level `openGraph` replaces the inherited one, file-based image included; Twitter's
       // card falls back to these images.
-      images: [{ url: '/opengraph-image', alt: ogAlt, type: ogType, ...ogSize }],
+      images: [
+        {
+          url: '/opengraph-image',
+          alt: OG_IMAGE_ALT,
+          type: OG_IMAGE_CONTENT_TYPE,
+          ...OG_IMAGE_SIZE,
+        },
+      ],
     },
   };
 }
