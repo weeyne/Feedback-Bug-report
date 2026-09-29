@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('pages refuse framing and send the security headers', async ({ request }) => {
-  for (const path of ['/', '/login', '/privacy']) {
+  for (const path of ['/', '/login', '/privacy', '/ru', '/ru/privacy']) {
     const headers = (await request.get(path)).headers();
     expect(headers['x-frame-options'], path).toBe('DENY');
     expect(headers['content-security-policy'], path).toBe(

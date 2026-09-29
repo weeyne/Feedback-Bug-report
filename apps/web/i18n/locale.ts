@@ -14,3 +14,19 @@ export function pickLocale(cookie: string | undefined, acceptLanguage: string | 
   }
   return 'en';
 }
+
+/**
+ * The public pages' `[locale]` segment wins when it names a supported locale; every other route
+ * (dashboard, login, demo, 404) keeps the cookie / Accept-Language rule.
+ */
+export function resolveLocale({
+  requested,
+  cookie,
+  acceptLanguage,
+}: {
+  requested: string | undefined;
+  cookie: string | undefined;
+  acceptLanguage: string | null;
+}): AppLocale {
+  return isLocale(requested) ? requested : pickLocale(cookie, acceptLanguage);
+}

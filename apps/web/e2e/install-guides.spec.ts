@@ -38,9 +38,9 @@ test('the public install page lists the five guides with the HTML one open', asy
   );
 });
 
-test('the Russian install page is localized', async ({ page, context, baseURL }) => {
-  await context.addCookies([{ name: 'locale', value: 'ru', url: baseURL! }]);
-  await page.goto('/install');
+test('the Russian install page is localized', async ({ page }) => {
+  await page.goto('/ru/install');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Установка Bugping на ваш сайт');
   await page.getByTestId('install-guide-tilda').locator('summary').click();
   await expect(page.getByTestId('install-guide-tilda')).toContainText('Опубликовать все страницы');

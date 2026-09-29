@@ -16,11 +16,9 @@ for (const doc of ['privacy', 'terms', 'refund'] as const) {
 
 test('the Russian terms keep the operator name and the Paddle reseller clause', async ({
   page,
-  context,
-  baseURL,
 }) => {
-  await context.addCookies([{ name: 'locale', value: 'ru', url: baseURL! }]);
-  await page.goto('/terms');
+  await page.goto('/ru/terms');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
   await expect(page.getByTestId('legal-operator')).toContainText('Димко Артем Русланович');
   await expect(page.getByTestId('legal-terms')).toContainText('Paddle.com является продавцом');
 });

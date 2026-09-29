@@ -1,9 +1,22 @@
 import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import createIntlMiddleware from 'next-intl/middleware';
+import { routing } from '@/i18n/routing';
 import { NEXT_COOKIE, NEXT_COOKIE_MAX_AGE, safeNext } from '@/lib/auth/next';
 
 const REF_MAX_AGE = 60 * 60 * 24 * 30;
+
+const intl = createIntlMiddleware(routing);
+
+/** The pages with localized URLs (`/ru/...`); everything else keeps the cookie rule. */
+const PUBLIC_PAGES = new Set(['/', '/install', '/privacy', '/terms', '/refund']);
+const LOCALE_PREFIX = new RegExp(`^/(?:${routing.locales.join('|')})(?=/|$)`);
+
+/** `/`, `/install`, … or their `/ru` (and redirect-to-unprefixed `/en`) counterparts. */
+function isPublicPage(pathname: string): boolean {
+  return PUBLIC_PAGES.has(pathname.replace(LOCALE_PREFIX, '') || '/');
+}
 
 interface AuthResult {
   userId: string | null;
@@ -44,7 +57,9 @@ async function currentUser(request: NextRequest, response: NextResponse): Promis
 }
 
 export async function proxy(request: NextRequest) {
-  const { userId, response } = await currentUser(request, NextResponse.next({ request }));
+  const auth = await currentUser(request, NextResponse.next({ request }));
+  const { userId } = auth;
+  let response = auth.response;
   const pathname = request.nextUrl.pathname;
 
   if ((pathname === '/app' || pathname.startsWith('/app/')) && !userId) {
@@ -63,6 +78,16 @@ export async function proxy(request: NextRequest) {
     return login;
   }
 
+  if (isPublicPage(pathname)) {
+    // next-intl answers with the locale rewrite (`/install` → `/en/install`) or the one-time
+    // detection redirect (`/install` → `/ru/install`, query string kept). It reads the request
+    // after the session refresh, so only the refreshed cookies have to be carried over.
+    const localized = intl(request);
+    for (const cookie of response.cookies.getAll()) localized.cookies.set(cookie);
+    response = localized;
+  }
+
+  // Also on the detection redirect, so `/?ref=…` from a Russian browser keeps the referral.
   const ref = request.nextUrl.searchParams.get('ref');
   if (ref && PUBLIC_KEY_PATTERN.test(ref)) {
     response.cookies.set('ref', ref, {
