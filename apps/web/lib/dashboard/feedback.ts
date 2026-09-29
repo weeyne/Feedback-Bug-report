@@ -232,21 +232,25 @@ export async function deleteFeedback(
 ): Promise<ActionResult> {
   if (!isUuid(feedbackId)) return { ok: false, error: 'errors.notFound' };
   const rows = await withUser(deps.db, userId, (tx) =>
-    tx.query<{ screenshot_path: string | null; current_month: boolean }>(
+    tx.query<{ screenshot_path: string | null; period: string | null }>(
       `delete from public.feedback where id = $1
        returning screenshot_path,
-         date_trunc('month', created_at at time zone 'utc')
-           = date_trunc('month', now() at time zone 'utc') as current_month`,
+         case when date_trunc('month', created_at at time zone 'utc')
+                 = date_trunc('month', now() at time zone 'utc')
+              then to_char(date_trunc('month', now() at time zone 'utc'), 'YYYY-MM-DD') end as period`,
       [feedbackId],
     ),
   );
   if (!rows.length) return { ok: false, error: 'errors.notFound' };
-  if (rows[0]!.current_month) {
-    await deps.db.query(
-      `update public.usage_counters set count = greatest(count - 1, 0)
-       where owner_id = $1 and period = date_trunc('month', now() at time zone 'utc')::date`,
-      [userId],
-    );
+  const period = rows[0]!.period;
+  if (period) {
+    await deps.db
+      .query(
+        `update public.usage_counters set count = greatest(count - 1, 0)
+         where owner_id = $1 and period = $2::date`,
+        [userId, period],
+      )
+      .catch((e: unknown) => console.error('[dashboard] quota refund', e));
   }
   const path = rows[0]!.screenshot_path;
   if (path)

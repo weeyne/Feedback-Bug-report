@@ -151,21 +151,23 @@ export async function deleteProject(
     deps.storage,
     files.map((f) => f.screenshot_path),
   );
-  const [counted] = await deps.db.query<{ n: number }>(
-    `select count(*)::int as n from public.feedback
+  const [counted] = await deps.db.query<{ n: number; period: string }>(
+    `select count(*)::int as n,
+            to_char(date_trunc('month', now() at time zone 'utc'), 'YYYY-MM-DD') as period
+     from public.feedback
      where project_id = $1
        and date_trunc('month', created_at at time zone 'utc')
          = date_trunc('month', now() at time zone 'utc')`,
     [project.id],
   );
-  await withUser(deps.db, userId, (tx) =>
-    tx.query('delete from public.projects where id = $1', [project.id]),
+  const deleted = await withUser(deps.db, userId, (tx) =>
+    tx.query('delete from public.projects where id = $1 returning id', [project.id]),
   );
-  if (counted?.n) {
+  if (deleted.length && counted?.n) {
     await deps.db.query(
       `update public.usage_counters set count = greatest(count - $2::int, 0)
-       where owner_id = $1 and period = date_trunc('month', now() at time zone 'utc')::date`,
-      [userId, counted.n],
+       where owner_id = $1 and period = $3::date`,
+      [userId, counted.n, counted.period],
     );
   }
   return { ok: true };

@@ -177,6 +177,35 @@ describe('deleteProject quota refund', () => {
       expect((await usage(deps, owner)).used).toBe(7);
     }));
 
+  it('refunds nothing when the project is already gone by the time of the delete', () =>
+    withTx(async (db) => {
+      const { deps } = setup(db);
+      const owner = await createUser(db);
+      const project = await createProject(db, owner, 'Acme');
+      for (let i = 0; i < 3; i++) await createFeedback(db, project.id);
+      await db.query(
+        `insert into public.usage_counters (owner_id, period, count)
+         values ($1, date_trunc('month', now() at time zone 'utc')::date, 10)`,
+        [owner],
+      );
+      const racing: DashDeps = {
+        ...deps,
+        db: {
+          ...db,
+          query: async (sql, params) => {
+            const rows = await db.query(sql, params);
+            if (/count\(\*\)/.test(sql) && sql.includes('public.feedback')) {
+              await db.query('delete from public.projects where id = $1', [project.id]);
+            }
+            return rows;
+          },
+          transaction: (fn) => db.transaction(fn),
+        } as TestDb,
+      };
+      await deleteProject(racing, owner, { projectId: project.id, confirmName: 'Acme' });
+      expect((await usage(deps, owner)).used).toBe(10);
+    }));
+
   it('never takes the counter below zero', () =>
     withTx(async (db) => {
       const { deps } = setup(db);
