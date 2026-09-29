@@ -1,7 +1,9 @@
 import { PUBLIC_KEY_PATTERN } from '@bugping/shared';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { hasLocale } from 'next-intl';
 import createIntlMiddleware from 'next-intl/middleware';
+import { PUBLIC_PATHS } from '@/i18n/public-pages';
 import { routing } from '@/i18n/routing';
 import { NEXT_COOKIE, NEXT_COOKIE_MAX_AGE, safeNext } from '@/lib/auth/next';
 
@@ -10,12 +12,31 @@ const REF_MAX_AGE = 60 * 60 * 24 * 30;
 const intl = createIntlMiddleware(routing);
 
 /** The pages with localized URLs (`/ru/...`); everything else keeps the cookie rule. */
-const PUBLIC_PAGES = new Set(['/', '/install', '/privacy', '/terms', '/refund']);
+const PUBLIC_PAGES = new Set<string>(PUBLIC_PATHS);
 const LOCALE_PREFIX = new RegExp(`^/(?:${routing.locales.join('|')})(?=/|$)`);
 
 /** `/`, `/install`, … or their `/ru` (and redirect-to-unprefixed `/en`) counterparts. */
 function isPublicPage(pathname: string): boolean {
   return PUBLIC_PAGES.has(pathname.replace(LOCALE_PREFIX, '') || '/');
+}
+
+/**
+ * The request header next-intl's `requestLocale` reads (`X-NEXT-INTL-LOCALE`; its middleware sets
+ * it for the public pages). Not exported by next-intl.
+ */
+const INTL_LOCALE_HEADER = 'x-next-intl-locale';
+
+/**
+ * The landing demo's iframes (`/demo/shop`, `/demo/dashboard`) render in the landing's locale,
+ * passed as `?lang=`: the whole document (root layout's `<html lang>` and client messages
+ * included) resolves it through next-intl's request locale. An unknown value is ignored (the
+ * cookie / Accept-Language rule applies).
+ */
+function demoLocale(request: NextRequest): string | null {
+  const { pathname, searchParams } = request.nextUrl;
+  if (pathname !== '/demo' && !pathname.startsWith('/demo/')) return null;
+  const lang = searchParams.get('lang');
+  return hasLocale(routing.locales, lang) ? lang : null;
 }
 
 interface AuthResult {
@@ -85,6 +106,18 @@ export async function proxy(request: NextRequest) {
     const localized = intl(request);
     for (const cookie of response.cookies.getAll()) localized.cookies.set(cookie);
     response = localized;
+  } else {
+    // Only the proxy decides a request locale: a client-sent header is dropped, a valid demo
+    // `?lang=` sets it.
+    const lang = demoLocale(request);
+    if (lang || request.headers.has(INTL_LOCALE_HEADER)) {
+      const headers = new Headers(request.headers);
+      if (lang) headers.set(INTL_LOCALE_HEADER, lang);
+      else headers.delete(INTL_LOCALE_HEADER);
+      const forwarded = NextResponse.next({ request: { headers } });
+      for (const cookie of response.cookies.getAll()) forwarded.cookies.set(cookie);
+      response = forwarded;
+    }
   }
 
   // Also on the detection redirect, so `/?ref=…` from a Russian browser keeps the referral.

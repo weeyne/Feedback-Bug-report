@@ -16,4 +16,6 @@ export const routing = defineRouting({
     sameSite: 'lax',
   },
   localeDetection: true,
+  // The pages' metadata (`publicAlternates`) is the single source of hreflang links.
+  alternateLinks: false,
 });

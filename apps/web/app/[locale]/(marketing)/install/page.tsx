@@ -4,12 +4,21 @@ import { getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { PlatformGuides } from '@/components/install/platform-guides';
 import { buttonVariants } from '@/components/ui/button';
+import { pageLocale, publicPageMetadata } from '@/i18n/public-metadata';
 import { getPublicEnv } from '@/lib/public-env';
 import { installSnippet, PLACEHOLDER_KEY, widgetSrc } from '@/lib/widget/snippet';
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('installGuide');
-  return { title: t('title'), description: t('metaDescription') };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const locale = await pageLocale(params);
+  const t = await getTranslations({ locale, namespace: 'installGuide' });
+  return publicPageMetadata('/install', locale, {
+    title: t('title'),
+    description: t('metaDescription'),
+  });
 }
 
 export default async function Page() {

@@ -14,6 +14,20 @@ function blankEverythingExceptAppUrl() {
   }
 }
 
+/** Each public page, English then Russian (`''` is the landing). */
+const PAGE_URLS = [
+  '',
+  '/ru',
+  '/install',
+  '/ru/install',
+  '/privacy',
+  '/ru/privacy',
+  '/terms',
+  '/ru/terms',
+  '/refund',
+  '/ru/refund',
+];
+
 async function load() {
   return {
     robots: (await import('./robots')).default,
@@ -36,16 +50,27 @@ describe('SEO routes', () => {
     expect(result.sitemap).toBe(`${VALID_ENV.NEXT_PUBLIC_APP_URL}/sitemap.xml`);
   });
 
-  it('sitemap lists the public pages, needing only NEXT_PUBLIC_APP_URL', async () => {
+  it('sitemap lists the public pages in both locales, needing only NEXT_PUBLIC_APP_URL', async () => {
     blankEverythingExceptAppUrl();
     vi.stubEnv('NEXT_PUBLIC_APP_URL', VALID_ENV.NEXT_PUBLIC_APP_URL);
     vi.resetModules();
     const { sitemap } = await load();
-    expect(sitemap().map((entry) => entry.url)).toEqual(
-      ['', '/install', '/privacy', '/terms', '/refund', '/login'].map(
-        (path) => `${VALID_ENV.NEXT_PUBLIC_APP_URL}${path}`,
-      ),
+    const base = VALID_ENV.NEXT_PUBLIC_APP_URL;
+    const entries = sitemap();
+    expect(entries.map((entry) => entry.url)).toEqual(
+      [...PAGE_URLS, '/login'].map((path) => `${base}${path}`),
     );
+    expect(entries.find((entry) => entry.url === `${base}/ru/install`)?.alternates).toEqual({
+      languages: {
+        en: `${base}/install`,
+        ru: `${base}/ru/install`,
+        'x-default': `${base}/install`,
+      },
+    });
+    expect(entries.find((entry) => entry.url === base)?.alternates).toEqual({
+      languages: { en: base, ru: `${base}/ru`, 'x-default': base },
+    });
+    expect(entries.at(-1)).not.toHaveProperty('alternates');
   });
 
   it('falls back to http://localhost:3000 when NEXT_PUBLIC_APP_URL is unset, with nothing else set either', async () => {
@@ -55,9 +80,7 @@ describe('SEO routes', () => {
     const { robots, sitemap } = await load();
     expect(robots().sitemap).toBe('http://localhost:3000/sitemap.xml');
     expect(sitemap().map((entry) => entry.url)).toEqual(
-      ['', '/install', '/privacy', '/terms', '/refund', '/login'].map(
-        (path) => `http://localhost:3000${path}`,
-      ),
+      [...PAGE_URLS, '/login'].map((path) => `http://localhost:3000${path}`),
     );
   });
 

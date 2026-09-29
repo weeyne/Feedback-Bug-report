@@ -1,37 +1,44 @@
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { buttonVariants } from '@/components/ui/button';
+import { getPathname, Link as LocalizedLink } from '@/i18n/navigation';
 import { HeaderShell } from './header-shell';
 import { LandingMenu } from './landing-menu';
 
-/** Anchors are absolute (`/#…`) so they also work from the legal pages that share the layout. */
+/**
+ * Anchors on the landing (`/#…`, `/ru#…` on Russian pages), so they also work from the legal
+ * pages that share the layout.
+ */
 const NAV = [
-  { href: '/#features', key: 'features' },
-  { href: '/#how', key: 'how' },
-  { href: '/#pricing', key: 'pricing' },
-  { href: '/#faq', key: 'faq' },
+  { hash: 'features', key: 'features' },
+  { hash: 'how', key: 'how' },
+  { hash: 'pricing', key: 'pricing' },
+  { hash: 'faq', key: 'faq' },
 ] as const;
 
 export async function SiteHeader() {
-  const t = await getTranslations('landing');
-  const items = NAV.map(({ href, key }) => ({ href, label: t(`nav.${key}`) }));
+  const [t, locale] = await Promise.all([getTranslations('landing'), getLocale()]);
+  const items = NAV.map(({ hash, key }) => ({
+    href: { pathname: '/', hash },
+    label: t(`nav.${key}`),
+  }));
   const logIn = { href: '/login', label: t('nav.logIn') };
   return (
     <HeaderShell>
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <Logo href="/" />
+        <Logo href={getPathname({ href: '/', locale })} />
         <nav aria-label={t('nav.label')} className="ml-6 hidden items-center gap-1 md:flex">
           {items.map((item) => (
-            <Link
-              key={item.href}
+            <LocalizedLink
+              key={item.href.hash}
               href={item.href}
               className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground"
             >
               {item.label}
-            </Link>
+            </LocalizedLink>
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
