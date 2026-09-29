@@ -103,11 +103,13 @@ UI / UX (done 2026-09-29, wave 4a; not taken: lastError texts and bot/notificati
       empty preview on mobile; integration `lastError` texts and bot/notification texts are English only.
 
 Security / privacy:
-- [ ] ✅ The config endpoint answers any origin and sets `widget_seen_at` (`lib/widget/config.ts:43`).
-- [ ] ✅ `feedback` is in `supabase_realtime` (`20260921000400_access.sql:91`) with no subscriber; drop it.
-- [ ] ✅ E2E routes use different guards: `/api/e2e-test/*` checks only `BUGPING_TEST_MODE`, `/e2e-host` also
-      `NODE_ENV`. One helper everywhere.
-- [ ] ◐ `getDeps()` caches a rejected promise (`lib/deps.ts:28`). Only env parsing can reject there (no DB connect
+- [x] ✅ The config endpoint answers any origin and sets `widget_seen_at` (`lib/widget/config.ts:43`). Wave 4b:
+      the allow-list check landed in 1a; now only a request with `Origin` marks the widget seen.
+- [x] ✅ `feedback` is in `supabase_realtime` (`20260921000400_access.sql:91`) with no subscriber; drop it (wave 4b,
+      migration `20260929000100_drop_feedback_realtime.sql`).
+- [x] ✅ E2E routes use different guards: `/api/e2e-test/*` checks only `BUGPING_TEST_MODE`, `/e2e-host` also
+      `NODE_ENV`. One helper everywhere (wave 4b: `lib/test-mode-guard.ts`).
+- [x] ◐ `getDeps()` caches a rejected promise (`lib/deps.ts:28`). Only env parsing can reject there (no DB connect
       at start), so it is not a transient-error trap; clear the cache on rejection anyway.
 
 Performance / cost:
