@@ -3,29 +3,15 @@ import type { CSSProperties, ReactNode } from 'react';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { BlockedOriginNotice } from '@/components/app/blocked-origin-notice';
-import { CopyButton } from '@/components/app/copy-button';
 import { FirstFeedbackWatcher } from '@/components/app/first-feedback-watcher';
 import { PageHeader, SectionCard } from '@/components/app/page-header';
+import { CodeBlock } from '@/components/install/code-block';
+import { PlatformGuides } from '@/components/install/platform-guides';
 import { requireUser } from '@/lib/auth/session';
 import { hasFeedback } from '@/lib/dashboard/projects';
 import { getRequestProject } from '@/lib/dashboard/request-project';
 import { getDeps } from '@/lib/deps';
 import { installSnippet, widgetSrc } from '@/lib/widget/snippet';
-
-/** Code sample in a dark block (dark in both themes on purpose) with a copy button. */
-function CodeBlock({ code, label, testId }: { code: string; label: string; testId?: string }) {
-  return (
-    <div className="min-w-0 overflow-hidden rounded-lg bg-zinc-950 font-mono text-zinc-100">
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 py-1 pr-1 pl-3">
-        <span className="text-[11px] tracking-wide text-zinc-400 uppercase">{label}</span>
-        <CopyButton text={code} />
-      </div>
-      <pre className="overflow-x-auto p-3 text-xs leading-relaxed" data-testid={testId}>
-        {code}
-      </pre>
-    </div>
-  );
-}
 
 function Step({ n, title, children }: { n: number; title: ReactNode; children: ReactNode }) {
   return (
@@ -54,8 +40,9 @@ export default async function InstallPage({ params }: { params: Promise<{ projec
   const deps = await getDeps();
   const project = await getRequestProject(user.id, projectId);
   if (!project) notFound();
-  const [t, format, received] = await Promise.all([
+  const [t, guides, format, received] = await Promise.all([
     getTranslations('install'),
+    getTranslations('installGuide'),
     getFormatter(),
     hasFeedback(deps, user.id, project.id),
   ]);
@@ -114,8 +101,8 @@ export default async function InstallPage({ params }: { params: Promise<{ projec
         </ol>
       </SectionCard>
 
-      <SectionCard index={1} title={t('nextjsTitle')} description={t('nextjsHint')}>
-        <CodeBlock code={nextSnippet} label="Next.js" />
+      <SectionCard index={1} title={guides('sectionTitle')}>
+        <PlatformGuides snippet={snippet} nextSnippet={nextSnippet} />
       </SectionCard>
       <SectionCard index={2} title={t('customTitle')} description={t('customHint')}>
         <CodeBlock

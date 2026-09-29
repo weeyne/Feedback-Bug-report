@@ -164,7 +164,8 @@
     "footer": {
       "label": "Site links",
       "tagline": "Bug reports and feedback, straight to your chat."
-    }
+    },
+    "installGuides": "Install guides"
   },
   "legal": {
     "updated": "Last updated: {date}",
@@ -456,8 +457,6 @@
   },
   "install": {
     "title": "Install the widget",
-    "nextjsTitle": "Next.js / React",
-    "nextjsHint": "Use next/script with strategy \"afterInteractive\" in your root layout.",
     "customTitle": "Your own button",
     "customHint": "Add data-hide-trigger, then call Bugping.open() to open the choice screen, or Bugping.open('bug') to open the bug form directly.",
     "identifyTitle": "Identify signed-in users",
@@ -663,5 +662,46 @@
     "pay": "Pay $129",
     "secure": "Secure payment · Free returns within 30 days",
     "delivery": "Delivery in 2–4 days"
+  },
+  "installGuide": {
+    "title": "Install Bugping on your site",
+    "metaDescription": "How to add the Bugping feedback widget to any website, WordPress, Shopify, Tilda or Next.js.",
+    "intro": "Bugping works on any site where you can add a script tag. Pick your platform and follow the steps — it takes about two minutes.",
+    "keyNote": "This example uses a placeholder key. After you sign up, the Install page shows the snippet with your project's real key.",
+    "cta": "Start free",
+    "sectionTitle": "Where to paste the code",
+    "allowedHint": "If you limited reports to your website in Settings, also add the address you actually use — for example your-store.myshopify.com or project123.tilda.ws — or leave the list empty to accept reports from any site.",
+    "html": {
+      "title": "Any website (HTML)",
+      "step1": "Open the HTML template that every page of your site uses.",
+      "step2": "Paste the code right before the closing '</body>' tag.",
+      "step3": "Publish the change and open your site: the widget button appears in the corner."
+    },
+    "wordpress": {
+      "title": "WordPress",
+      "step1": "In your WordPress admin, open Plugins → Add New, search for “WPCode” and install and activate “WPCode – Insert Headers and Footers”.",
+      "step2": "Open Code Snippets → Header & Footer.",
+      "step3": "Paste the code into the Footer box and click Save Changes.",
+      "note": "Prefer a plugin to editing theme files: theme updates overwrite them, and block themes have no header.php."
+    },
+    "shopify": {
+      "title": "Shopify",
+      "step1": "In your Shopify admin, open Online Store → Themes.",
+      "step2": "Next to your current theme, open the … menu and choose Edit code.",
+      "step3": "Open layout/theme.liquid, paste the code right before '</body>' and click Save.",
+      "note": "Shopify doesn’t allow custom scripts on checkout pages, so the widget shows on your store pages but not in checkout."
+    },
+    "tilda": {
+      "title": "Tilda",
+      "step1": "Open Site Settings → More.",
+      "step2": "Find the HTML code for the HEAD section, click Edit, paste the code and save.",
+      "step3": "Click Publish all pages so every page gets the widget.",
+      "note": "Adding your own code on Tilda may require a paid plan. Menu names can differ slightly between Tilda versions."
+    },
+    "nextjs": {
+      "title": "Next.js",
+      "step1": "Add the Script component to your root layout (app/layout.tsx or pages/_app.tsx).",
+      "step2": "Deploy: the widget loads after the page becomes interactive."
+    }
   }
 }

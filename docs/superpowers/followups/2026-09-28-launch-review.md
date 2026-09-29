@@ -74,7 +74,7 @@ Order of work: wave 1 blocks commercial launch (Paddle live, VPS move); later wa
       `consume_quota` in `20260921000300_functions.sql:33`); nudge owners to set allowed origins.
 - [ ] ✅ **Russian audience invisible to search engines.** Locale only from cookie/`Accept-Language`
       (`i18n/locale.ts`); no `/ru` URLs, no `hreflang`, one sitemap entry per page. Add locale URLs + `hreflang`.
-- [ ] ✅ **Install guides promised on the landing don't exist.** The facts strip and FAQ name WordPress, Shopify and
+- [x] ✅ **Install guides promised on the landing don't exist.** (done 2026-09-29: dashboard + public /install) The facts strip and FAQ name WordPress, Shopify and
       Tilda; the Install page has only HTML, Next.js, own button and `identify()`. Add short per-platform guides.
 - [ ] ✅ **Retention covers screenshots only** (`lib/retention.ts`). Messages, emails, URLs and console errors stay
       forever. Pick a row retention period (or state "until you delete it" in the privacy policy) and enforce it.
