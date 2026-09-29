@@ -1,4 +1,5 @@
 import { browserImageEnv, encodeWithinLimit } from '../image/prepare';
+import { applyStyles } from '../ui/adopt-styles';
 import { h } from '../ui/h';
 import { fitRect, toImagePoint } from './geometry';
 import { drawStrokes } from './render';
@@ -29,24 +30,6 @@ const TOOLBAR_BOTTOM = 16;
 const VIEWPORT_PADDING = 24;
 const MIN_RECT_SIZE = 4;
 const MIN_PEN_STEP = 2;
-
-/**
- * Constructable stylesheets are not `<style>` elements, so a strict `style-src` CSP on the host
- * does not block them. Returns false (nothing adopted) when unsupported, so callers can fall back.
- */
-function adoptStyles(shadow: ShadowRoot, sources: string[]): boolean {
-  try {
-    if (typeof CSSStyleSheet !== 'function' || !('adoptedStyleSheets' in shadow)) return false;
-    shadow.adoptedStyleSheets = sources.map((css) => {
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(css);
-      return sheet;
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export const browserEditorEnv: EditorEnv = {
   decode: browserImageEnv.decode,
@@ -342,9 +325,7 @@ export function openEditor(
       host.setAttribute('data-bugping-annotate', '');
       host.style.cssText = 'all: initial; position: fixed; inset: 0; z-index: 2147483001';
       const shadow = host.attachShadow({ mode: 'open' });
-      if (!adoptStyles(shadow, [styles])) {
-        shadow.append(h('style', {}, styles));
-      }
+      applyStyles(shadow, [styles]);
       shadow.append(root);
       document.body.append(host);
 

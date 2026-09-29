@@ -2,6 +2,7 @@ import type { WidgetConfig } from '@bugping/shared';
 import { HEX_COLOR_PATTERN, type FeedbackType } from '@bugping/shared/constants';
 import type { IdentifiedUser } from '../context/metadata';
 import { MESSAGES, launcherLabel, resolveLocale } from '../i18n';
+import { applyStyles } from './adopt-styles';
 import { onAccent, tint } from './color';
 import { createDial, type Dial } from './dial';
 import { h } from './h';
@@ -45,24 +46,6 @@ function defaultCompact(): boolean {
   }
 }
 
-/**
- * Constructable stylesheets are not `<style>` elements, so a strict `style-src` CSP on the host
- * does not block them. Returns false (nothing adopted) when unsupported, so callers can fall back.
- */
-function adoptStyles(shadow: ShadowRoot, sources: string[]): boolean {
-  try {
-    if (typeof CSSStyleSheet !== 'function' || !('adoptedStyleSheets' in shadow)) return false;
-    shadow.adoptedStyleSheets = sources.map((css) => {
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(css);
-      return sheet;
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function mountWidget(
   container: HTMLElement,
   config: WidgetConfig,
@@ -75,9 +58,7 @@ export function mountWidget(
     : 'all: initial; position: fixed; z-index: 2147483000;';
   const shadow = host.attachShadow({ mode: 'open' });
   const sources = config.customCss ? [styles, config.customCss] : [styles];
-  if (!adoptStyles(shadow, sources)) {
-    for (const css of sources) shadow.append(h('style', {}, css));
-  }
+  applyStyles(shadow, sources);
 
   const locale = resolveLocale(config.locale, options.languages ?? navigator.languages ?? []);
   const root = h('div', {

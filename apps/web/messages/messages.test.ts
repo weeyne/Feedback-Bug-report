@@ -18,7 +18,7 @@ function flatten(tree: Tree, prefix = ''): Record<string, string> {
 // Dummy values covering every ICU argument name used across en.json/ru.json
 // (feedback.hidden, feedback.usage/billing.usage, settings.cssBytes,
 // integrations.*, billing.renews/endsOn, overview.*, empty.noneOfType,
-// blockedOrigin.title and legal.*). Passing one superset object keeps this test independent
+// blockedOrigin.title, billing.monthly/lifetime/switchLifetime's price and legal.*). Passing one superset object keeps this test independent
 // from which locale/key is being formatted.
 const dummyValues = {
   count: 1,
@@ -42,6 +42,7 @@ const dummyValues = {
   name: 'Jane Doe',
   country: 'Ukraine',
   digest: '1234567890',
+  price: '$9',
 };
 
 describe('messages', () => {

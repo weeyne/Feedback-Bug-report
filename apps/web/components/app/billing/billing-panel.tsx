@@ -11,14 +11,27 @@ import { Button } from '@/components/ui/button';
 import { billingStatusAction, openPortalAction, startCheckoutAction } from '@/app/app/actions';
 import { openPendingTab, pollActivation } from '@/lib/billing/browser';
 import type { BillingOverview } from '@/lib/billing/checkout';
+import { PRICES } from '@/lib/pricing';
 import { usePaddle } from './use-paddle';
 
 const POLL_MS = 2000;
 const POLL_LIMIT_MS = 60_000;
 
 const PLAN_CARDS = [
-  { key: 'pro', features: 5, testId: 'billing-card-monthly', featured: true },
-  { key: 'lifetime', features: 2, testId: 'billing-card-lifetime', featured: false },
+  {
+    key: 'pro',
+    features: 5,
+    price: PRICES.proMonthly,
+    testId: 'billing-card-monthly',
+    featured: true,
+  },
+  {
+    key: 'lifetime',
+    features: 2,
+    price: PRICES.lifetime,
+    testId: 'billing-card-lifetime',
+    featured: false,
+  },
 ] as const;
 
 export function BillingPanel(props: {
@@ -112,7 +125,7 @@ export function BillingPanel(props: {
     return (
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          {PLAN_CARDS.map(({ key, features, testId, featured }, i) => (
+          {PLAN_CARDS.map(({ key, features, price, testId, featured }, i) => (
             <SectionCard
               key={key}
               index={i + 1}
@@ -129,9 +142,7 @@ export function BillingPanel(props: {
                 </span>
               )}
               <p className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-extrabold tracking-tight">
-                  {t(`landing.pricing.${key}Price`)}
-                </span>
+                <span className="text-3xl font-extrabold tracking-tight">{price}</span>
                 <span className="text-muted-foreground">{t(`landing.pricing.${key}Period`)}</span>
               </p>
               <ul className="flex flex-1 flex-col gap-1.5 text-sm">
@@ -207,7 +218,7 @@ export function BillingPanel(props: {
             onClick={() => checkout('lifetime')}
             data-testid="billing-switch-lifetime"
           >
-            {t('billing.switchLifetime')}
+            {t('billing.switchLifetime', { price: PRICES.lifetime })}
           </Button>
         )}
       </div>

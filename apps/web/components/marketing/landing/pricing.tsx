@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { buttonVariants } from '@/components/ui/button';
+import { PRICES } from '@/lib/pricing';
 import { Reveal } from '../reveal';
 import { CARD, CONTAINER, SectionHeading } from './section';
 
@@ -14,11 +15,26 @@ const PLANS: {
   features: number;
   href: string;
   cta: 'startFree' | 'pricing.proCta' | 'pricing.lifetimeCta';
+  /** Display price; the free plan's `$0` stays a message. */
+  price?: string;
   featured?: boolean;
 }[] = [
   { key: 'free', features: 5, href: '/login', cta: 'startFree' },
-  { key: 'pro', features: 5, href: '/app/billing', cta: 'pricing.proCta', featured: true },
-  { key: 'lifetime', features: 2, href: '/app/billing', cta: 'pricing.lifetimeCta' },
+  {
+    key: 'pro',
+    features: 5,
+    href: '/app/billing',
+    cta: 'pricing.proCta',
+    price: PRICES.proMonthly,
+    featured: true,
+  },
+  {
+    key: 'lifetime',
+    features: 2,
+    href: '/app/billing',
+    cta: 'pricing.lifetimeCta',
+    price: PRICES.lifetime,
+  },
 ];
 
 export async function Pricing() {
@@ -37,7 +53,7 @@ export async function Pricing() {
       />
       <Reveal stagger className="mt-12">
         <ul className="mx-auto grid max-w-md gap-4 lg:max-w-none lg:grid-cols-3 lg:items-stretch lg:gap-5">
-          {PLANS.map(({ key, features, href, cta, featured }, i) => (
+          {PLANS.map(({ key, features, href, cta, price, featured }, i) => (
             <li key={key} className="reveal-item" style={{ '--i': i } as CSSProperties}>
               <div
                 className={cn(
@@ -58,7 +74,7 @@ export async function Pricing() {
                 </p>
                 <p className="mt-6 flex items-baseline gap-1.5">
                   <span className="text-4xl font-extrabold tracking-tight">
-                    {t(`pricing.${key}Price`)}
+                    {price ?? t('pricing.freePrice')}
                   </span>
                   <span className="text-muted-foreground">{t(`pricing.${key}Period`)}</span>
                 </p>
